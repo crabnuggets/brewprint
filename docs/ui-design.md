@@ -2,7 +2,7 @@
 
 This document records the owner's visual and interaction preferences for Brewprint. It is a working design brief, with confirmed preferences separated from proposals and open questions.
 
-Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX draft](ux.md). The UX draft describes proposed behavior; this brief adds the visual direction. Typography option A has been selected; exact screen layouts and implementation remain undecided.
+Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX draft](ux.md). The UX draft describes proposed behavior; this brief adds the visual direction. Typography option A has been selected. The owner accepted the [v1 mockups](design/mockups/README.md) as a rough visual reference. Use them as the appearance baseline while adapting layouts for implementation and accessibility.
 
 ## Confirmed direction
 
