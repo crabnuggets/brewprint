@@ -4,6 +4,8 @@ This is a proposed first version for a personal Android app. Its main job is to 
 
 Use the terms in [the glossary](../GLOSSARY.md). On forms, use familiar labels such as "Coffee dose, g", "Grind setting, ticks", and "Variety / cultivar". Keep "ticks" as the user's unit; "clicks" is another common label for a stepped grinder's adjustments.
 
+See [the UI design direction](ui-design.md) for the owner's visual preferences and grinder dial interaction concept.
+
 ## Scope and defaults
 
 The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. Cloud sync, sharing, inventory quantities, analytics, equipment integrations, and guided timers are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
