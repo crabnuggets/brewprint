@@ -5,8 +5,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.Journal
 
@@ -17,7 +15,7 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
     var roaster by rememberSaveable { mutableStateOf(false) }
     Text("How was this cup?", style = MaterialTheme.typography.titleLarge)
     Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth().semantics { contentDescription = "Cup observations" }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
+    OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), label = { Text("Your notes") }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
     DisclosureRow(if (explore) "Hide taste exploration" else "Explore the taste", explore) { explore = !explore }
     if (explore) {
         JournalText("Aroma", "What do you smell? Try floral, toasted nuts, or fruit.", journal.aroma) { onChange(journal.copy(aroma = it)) }
@@ -39,7 +37,7 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
         Choice(listOf("Short", "Medium", "Long"), journal.finishLength) { onChange(journal.copy(finishLength = it)) }
     }
     Text("Next time", style = MaterialTheme.typography.titleMedium)
-    OutlinedTextField(journal.nextTime, { onChange(journal.copy(nextTime = it)) }, Modifier.fillMaxWidth().semantics { contentDescription = "Next time" }, placeholder = { Text("A reminder for your next brew.") }, minLines = 2, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
+    OutlinedTextField(journal.nextTime, { onChange(journal.copy(nextTime = it)) }, Modifier.fillMaxWidth(), label = { Text("Reminder") }, placeholder = { Text("Try one tick finer") }, minLines = 2, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
     DisclosureRow("As it cools", cooling) { cooling = !cooling }
     if (cooling) JournalText("As it cools", "Did anything change as you kept drinking?", journal.asItCools) { onChange(journal.copy(asItCools = it)) }
     DisclosureRow("View roaster's notes", roaster) { roaster = !roaster }

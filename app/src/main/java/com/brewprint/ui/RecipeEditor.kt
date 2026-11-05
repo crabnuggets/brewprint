@@ -26,7 +26,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -170,17 +169,14 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                         Box(Modifier.size(48.dp).onGloballyPositioned { gripCoordinates = it }
                                             .semantics {
                                                 contentDescription = "Drag pulse ${index + 1} to reorder"
-                                                if (pulses.size == 1) disabled()
                                             }
                                             .pointerInput(pulse.id) {
                                                 detectDragGestures(
                                                     onDragStart = { position ->
-                                                        if (pulses.size > 1) {
-                                                            dragPointerY = gripCoordinates!!.localToWindow(position).y
-                                                            dragGrabOffset = dragPointerY - pulseBounds.getValue(pulse.id).top
-                                                            reorderPending = false
-                                                            draggedPulseId = pulse.id
-                                                        }
+                                                        dragPointerY = gripCoordinates!!.localToWindow(position).y
+                                                        dragGrabOffset = dragPointerY - pulseBounds.getValue(pulse.id).top
+                                                        reorderPending = false
+                                                        draggedPulseId = pulse.id
                                                     },
                                                     onDrag = { change, _ ->
                                                         if (draggedPulseId == pulse.id) {

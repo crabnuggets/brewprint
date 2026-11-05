@@ -114,7 +114,7 @@ class UiScreenshotTest {
         compose.onNodeWithText("Finish brew").assertIsDisplayed().performClick()
         capture("review-narrow-large-font")
         compose.onNodeWithText("Save brew").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Cup observations").performScrollTo().assertIsDisplayed()
+        compose.onNode(hasText("Your notes") and hasSetTextAction()).performScrollTo().assertIsDisplayed()
         capture("review-narrow-large-font-input")
     }
 

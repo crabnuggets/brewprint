@@ -172,7 +172,7 @@ private fun GrinderWheel(value: Int?, finish: DialFinish, onTick: (Int) -> Boole
 
 private fun DrawScope.drawGrinderWheel(value: Int, finish: DialFinish, pointer: Color) {
     val center = Offset(size.width - 2.dp.toPx(), size.height / 2)
-    val radius = min(size.width * .9f, size.height * .455f)
+    val radius = min(size.width * .9f, size.height / 2 - 18.dp.toPx())
     val matte = finish == DialFinish.MATTE
     val glass = finish == DialFinish.GLASS
     for (layer in 8 downTo 1) {

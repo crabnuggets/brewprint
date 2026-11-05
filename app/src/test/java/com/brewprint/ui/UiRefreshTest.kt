@@ -85,12 +85,20 @@ class UiRefreshTest {
     @Test fun `tasting notes keep a named input and visible save action during exploration`() {
         seedSavedBrew()
         tap("Add tasting notes")
-        val observations = compose.onNodeWithContentDescription("Cup observations")
+        val observations = field("Your notes")
         observations.performTextInput("Sweet and silky")
+        observations.assertTextContains("Sweet and silky")
+        observations.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+        field("Reminder").performScrollTo().performTextInput("Repeat at 24 ticks")
+        field("Reminder").assertTextContains("Repeat at 24 ticks")
+        field("Reminder").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
         tap("Explore the taste")
         observations.assertHasClickAction()
         compose.onNodeWithText("Save notes").assertIsDisplayed().performClick()
-        compose.runOnIdle { assertEquals("Sweet and silky", repository.state.value.brews.single().journal.impression) }
+        compose.runOnIdle {
+            assertEquals("Sweet and silky", repository.state.value.brews.single().journal.impression)
+            assertEquals("Repeat at 24 ticks", repository.state.value.brews.single().journal.nextTime)
+        }
     }
 
     @Test fun `new beans stays neutral until blur and valid fields enable saving`() {

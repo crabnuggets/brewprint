@@ -103,7 +103,7 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
                     Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
                         Text(dateTime(recent.startedAt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    TextButton(onClick = { onRecord(recent.id) }) { Text("View brew"); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp)) }
+                    TextButton(onClick = { onRecord(recent.id) }, contentPadding = PaddingValues(vertical = 8.dp)) { Text("View brew"); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp)) }
                 }
                 Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
                 Text(recent.recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,13 +197,13 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
             }
             DraftStage.REVIEW -> {
                 Panel {
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.align(Alignment.CenterVertically), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(draft.beans!!.name, style = MaterialTheme.typography.titleMedium)
+                            Text("${draft.recipe!!.name} · ${draft.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                         }
-                        TextButton(onClick = { change(draft.copy(stage = DraftStage.SETUP)) }) { Text("Correct setup") }
+                        TextButton(onClick = { change(draft.copy(stage = DraftStage.SETUP)) }, modifier = Modifier.align(Alignment.CenterVertically), contentPadding = PaddingValues(vertical = 8.dp)) { Text("Correct setup") }
                     }
-                    Text("${draft.recipe!!.name} · ${draft.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
                 JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
@@ -286,7 +286,7 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
             Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
                 Text("${grinder.name} · $setting ticks", style = MaterialTheme.typography.bodyMedium)
             }
-            if (onCorrect != null) TextButton(onClick = onCorrect) { Text("Correct setup") }
+            if (onCorrect != null) TextButton(onClick = onCorrect, contentPadding = PaddingValues(vertical = 8.dp)) { Text("Correct setup") }
         }
     }
 }
@@ -345,7 +345,7 @@ private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: 
                 Icon(Icons.Outlined.CalendarToday, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(dateTime(parsed), style = MaterialTheme.typography.bodyMedium)
             }
-            TextButton(onClick = { editing = true }) { Text("Change date") }
+            TextButton(onClick = { editing = true }, contentPadding = PaddingValues(vertical = 8.dp)) { Text("Change date") }
         }
     }
 }

@@ -85,7 +85,7 @@ class BrewJourneyTest {
         tap("Use this plan")
         compose.onNodeWithText("Pour to 240 g total").assertExists()
         tap("Finish brew")
-        enter("What did you notice? Everyday words are welcome.", "Cocoa, lighter than expected")
+        enter("Your notes", "Cocoa, lighter than expected")
         tap("Save brew")
         compose.onNodeWithText("Brew record").assertExists()
         compose.runOnIdle {
