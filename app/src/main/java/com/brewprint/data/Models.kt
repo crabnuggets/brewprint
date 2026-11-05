@@ -7,6 +7,12 @@ import kotlinx.serialization.Serializable
 
 fun newId(): String = UUID.randomUUID().toString()
 
+const val MIN_GRIND_SETTING = 0
+const val MAX_GRIND_SETTING = 100
+
+fun parseGrindSetting(text: String): Int? =
+    text.trim().toIntOrNull()?.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING }
+
 @Serializable
 data class Beans(
     val id: String = newId(),

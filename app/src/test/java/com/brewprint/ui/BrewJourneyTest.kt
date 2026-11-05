@@ -122,7 +122,7 @@ class BrewJourneyTest {
         tap("Edit brew")
         compose.onNodeWithText("Brew date and time").performScrollTo().performTextReplacement("")
         tap("Ethiopia")
-        tap("Back")
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Save brew").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Discard changes?").assertExists()

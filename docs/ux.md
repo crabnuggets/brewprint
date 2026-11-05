@@ -57,7 +57,7 @@ Allow edits and archiving. Archived beans disappear from normal selection but re
 
 ### Grinders
 
-Require a name. Offer a last recorded setting in whole ticks and optional reference notes, such as "Count from my usual zero mark". Do not assume a shared zero, tick range, or direction of adjustment across grinders. Do not instruct the user to force the burrs closed to establish a reference.
+Require a name. Offer a last recorded setting in whole ticks from 0 through 100, inclusive, and optional reference notes, such as "Count from my usual zero mark". Keep the range visible as neutral helper text. Do not assume a shared physical zero or direction of adjustment across grinders. Do not instruct the user to force the burrs closed to establish a reference. The half-wheel dial and direct numeric entry use the same range. The dial has no visible increase or decrease buttons; retain accessible wheel adjustment semantics.
 
 With one grinder, select it automatically. With several, let the user choose a default in the grinder list. Selecting another grinder loads its own recorded setting, never the previous grinder's tick count. Require a setting in brew setup if the selected grinder has none.
 
@@ -80,7 +80,7 @@ Show both the amount to add and the cumulative scale reading. For example, "Add 
 
 "Add pulse" copies the previous pulse's water amount and pour duration into a separate editable pulse. Copy its wait when one exists; otherwise prefill zero. Labels are not copied. When the previous last pulse gains a following pulse, show its wait field with zero prefilled. The new last pulse has no wait field. Explain this behavior beside the add action so a needed wait is not overlooked.
 
-Allow removing pulses and moving them up or down. Recalculate cumulative water and timing after every change. Waits belong to the pulse they follow. If a pulse becomes last, remove its wait and announce that change; if it later gains a successor, its wait starts at zero. A recipe must retain at least one pulse.
+Allow removing pulses and dragging them by a clearly labeled handle to rearrange them. Keep labeled move up and move down actions available for accessibility. Recalculate cumulative water and timing after every change. Waits belong to the pulse they follow. If a pulse becomes last, remove its wait and announce that change; if it later gains a successor, its wait starts at zero. A recipe must retain at least one pulse.
 
 Below the list, show "Planned pours: 240 g / Target: 240 g". If the rounded pulse sum differs from the target, show the difference, such as "Add 20 g across your pulses to reach 240 g". Keep the edits on screen but block saving until they match. Changing dose or ratio recalculates the target without silently scaling the pulses; explain the resulting mismatch beside the total.
 
@@ -143,7 +143,7 @@ For example, the user saves a brew before tasting, returns from the Brew screen,
 
 ## Android interaction details
 
-Use numeric keyboards for quantities and durations, readable unit labels, and inline errors next to the relevant fields. Keep primary actions reachable above the keyboard. Support large text and screen readers; read cumulative water with its meaning rather than as an unlabeled number. Use text as well as color for errors and selected defaults. Pulse reordering must work through labeled buttons, without requiring dragging.
+Use numeric keyboards for quantities and durations, readable unit labels, and inline errors next to the relevant fields. Show neutral required indicators before interaction. Show field errors after meaningful editing or after the user leaves the field, and keep untouched blank fields neutral. Required validation still gates saving. Use softly filled rounded fields with subtle borders consistently in library forms, dates, and the tasting journal. Keep primary actions reachable above the keyboard. Support large text and screen readers; read cumulative water with its meaning rather than as an unlabeled number. Use text as well as color for errors and selected defaults. Pulse reordering supports dragging and labeled move actions, so dragging is never required.
 
 ## Review scenarios
 
