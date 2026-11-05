@@ -240,7 +240,7 @@ internal fun LibraryPage(title: String, onBack: (() -> Unit)?, content: @Composa
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false) {
+internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null) {
     var interacted by rememberSaveable { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
     val visibleError = error.takeIf { interacted }
@@ -262,6 +262,7 @@ internal fun LibraryField(value: String, onChange: (String) -> Unit, label: Stri
         }.semantics { if (visibleError != null) this.error(visibleError) },
         shape = MaterialTheme.shapes.medium,
         colors = softFieldColors(),
+        prefix = prefix,
         singleLine = !multiline,
         minLines = if (multiline) 3 else 1,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),

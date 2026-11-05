@@ -132,12 +132,12 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
     LibraryPage(if (initial == null) "New recipe" else "Edit recipe", back) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a recipe name." else null, required = true)
         LibraryField(dose, { dose = it }, "Coffee dose, g", KeyboardType.Decimal, error = if (doseValue == null) "Enter a positive amount with up to one decimal place." else null, required = true)
-        LibraryField(ratio, { ratio = it }, "Brew ratio, 1 :", KeyboardType.Decimal, error = if (ratioValue == null) "Enter a positive ratio denominator." else null, required = true)
+        LibraryField(ratio, { ratio = it }, "Brew ratio", KeyboardType.Decimal, error = if (ratioValue == null) "Enter a positive ratio denominator." else null, required = true, prefix = { Text("1 : ") })
         if (ratioValue != null) Text("1 g coffee to ${formatAmount(ratioValue)} g water", style = MaterialTheme.typography.bodySmall)
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Total brew water", style = MaterialTheme.typography.labelLarge)
-                Text(target?.let { "${formatAmount(it)} g" } ?: "Enter dose and ratio", style = MaterialTheme.typography.headlineSmall)
+                Text(target?.let { "${formatAmount(it)} g" } ?: "Enter dose and ratio", style = if (target == null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.headlineSmall, color = if (target == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
             }
         }
         Text("Pulses", style = MaterialTheme.typography.titleLarge)
@@ -160,39 +160,41 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Text("Pulse ${index + 1} · ${formatDuration(start)}", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                                    IconButton(enabled = index > 0, modifier = Modifier.size(48.dp), onClick = {
-                                        reorderOrRemove(pulses.toMutableList().also { it.add(index - 1, it.removeAt(index)) })
-                                    }) { Icon(Icons.Outlined.ArrowUpward, "Move pulse ${index + 1} up", Modifier.size(20.dp)) }
-                                    IconButton(enabled = index < pulses.lastIndex, modifier = Modifier.size(48.dp), onClick = {
-                                        reorderOrRemove(pulses.toMutableList().also { it.add(index + 1, it.removeAt(index)) })
-                                    }) { Icon(Icons.Outlined.ArrowDownward, "Move pulse ${index + 1} down", Modifier.size(20.dp)) }
-                                    Box(Modifier.size(48.dp).onGloballyPositioned { gripCoordinates = it }
-                                        .semantics {
-                                            contentDescription = "Drag pulse ${index + 1} to reorder"
-                                            if (pulses.size == 1) disabled()
+                                    if (pulses.size > 1) {
+                                        IconButton(enabled = index > 0, modifier = Modifier.size(48.dp), onClick = {
+                                            reorderOrRemove(pulses.toMutableList().also { it.add(index - 1, it.removeAt(index)) })
+                                        }) { Icon(Icons.Outlined.ArrowUpward, "Move pulse ${index + 1} up", Modifier.size(20.dp)) }
+                                        IconButton(enabled = index < pulses.lastIndex, modifier = Modifier.size(48.dp), onClick = {
+                                            reorderOrRemove(pulses.toMutableList().also { it.add(index + 1, it.removeAt(index)) })
+                                        }) { Icon(Icons.Outlined.ArrowDownward, "Move pulse ${index + 1} down", Modifier.size(20.dp)) }
+                                        Box(Modifier.size(48.dp).onGloballyPositioned { gripCoordinates = it }
+                                            .semantics {
+                                                contentDescription = "Drag pulse ${index + 1} to reorder"
+                                                if (pulses.size == 1) disabled()
+                                            }
+                                            .pointerInput(pulse.id) {
+                                                detectDragGestures(
+                                                    onDragStart = { position ->
+                                                        if (pulses.size > 1) {
+                                                            dragPointerY = gripCoordinates!!.localToWindow(position).y
+                                                            dragGrabOffset = dragPointerY - pulseBounds.getValue(pulse.id).top
+                                                            reorderPending = false
+                                                            draggedPulseId = pulse.id
+                                                        }
+                                                    },
+                                                    onDrag = { change, _ ->
+                                                        if (draggedPulseId == pulse.id) {
+                                                            change.consume()
+                                                            dragPointerY = gripCoordinates!!.localToWindow(change.position).y
+                                                            moveDraggedPulse()
+                                                        }
+                                                    },
+                                                    onDragEnd = { moveDraggedPulse(); draggedPulseId = null },
+                                                    onDragCancel = { draggedPulseId = null },
+                                                )
+                                            }, contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Outlined.DragIndicator, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
-                                        .pointerInput(pulse.id) {
-                                            detectDragGestures(
-                                                onDragStart = { position ->
-                                                    if (pulses.size > 1) {
-                                                        dragPointerY = gripCoordinates!!.localToWindow(position).y
-                                                        dragGrabOffset = dragPointerY - pulseBounds.getValue(pulse.id).top
-                                                        reorderPending = false
-                                                        draggedPulseId = pulse.id
-                                                    }
-                                                },
-                                                onDrag = { change, _ ->
-                                                    if (draggedPulseId == pulse.id) {
-                                                        change.consume()
-                                                        dragPointerY = gripCoordinates!!.localToWindow(change.position).y
-                                                        moveDraggedPulse()
-                                                    }
-                                                },
-                                                onDragEnd = { moveDraggedPulse(); draggedPulseId = null },
-                                                onDragCancel = { draggedPulseId = null },
-                                            )
-                                        }, contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.DragIndicator, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                                 LibraryField(pulse.label, { value -> replace(pulse.id) { it.copy(label = value) } }, "Label, optional")
@@ -200,7 +202,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                 if (cumulativeValid) Text("Add ${formatAmount(currentWater!!)} g · Pour to ${formatAmount(roundedAmount(cumulative))} g total")
                                 LibraryField(pulse.pour, { value -> replace(pulse.id) { it.copy(pour = value) } }, "Pour duration, seconds", KeyboardType.Number, error = if (pulse.pour.toIntOrNull()?.let { it > 0 } != true) "Enter a positive whole number of seconds." else null, required = true)
                                 if (index < pulses.lastIndex) LibraryField(pulse.wait, { value -> replace(pulse.id) { it.copy(wait = value) } }, "Wait after pouring, seconds", KeyboardType.Number, error = if (pulse.wait.toIntOrNull()?.let { it >= 0 } != true) "Enter zero or a positive whole number." else null)
-                                TextButton(enabled = pulses.size > 1, onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
+                                if (pulses.size > 1) TextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
                             }
                         }
                     }

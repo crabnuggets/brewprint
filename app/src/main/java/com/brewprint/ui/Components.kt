@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -140,7 +141,7 @@ internal fun softFieldColors(): TextFieldColors {
         errorContainerColor = colors.surfaceVariant.copy(alpha = .4f),
         focusedBorderColor = colors.onSurface.copy(alpha = .35f),
         unfocusedBorderColor = colors.outlineVariant,
-        errorBorderColor = colors.outlineVariant,
+        errorBorderColor = colors.error.copy(alpha = .6f),
         focusedLabelColor = colors.onSurfaceVariant,
         errorLabelColor = colors.onSurfaceVariant,
     )
@@ -154,8 +155,18 @@ fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> 
 }
 
 @Composable
-fun PrimaryAction(text: String, enabled: Boolean = true, onClick: () -> Unit) {
-    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = MaterialTheme.shapes.small) { Text(text, modifier = Modifier.padding(vertical = 4.dp)) }
+fun PrimaryAction(text: String, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
+    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = MaterialTheme.shapes.small) {
+        if (icon != null) { Icon(icon, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)) }
+        Text(text, modifier = Modifier.padding(vertical = 4.dp))
+    }
+}
+
+@Composable
+internal fun SecondaryAction(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = MaterialTheme.shapes.small) {
+        Text(text, Modifier.padding(vertical = 4.dp))
+    }
 }
 
 @Composable

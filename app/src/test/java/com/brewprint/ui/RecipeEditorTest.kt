@@ -53,14 +53,14 @@ class RecipeEditorTest {
         assertEquals(240.0, result.plannedWater, 0.0)
     }
 
-    @Test fun `removing pulses retains at least one and disables its reorder controls`() {
+    @Test fun `removing pulses retains at least one and hides its unused reorder controls`() {
         show(recipe)
         compose.onNodeWithText("Remove pulse 3").performScrollTo().performClick()
         compose.onNodeWithText("Remove pulse 2").performScrollTo().performClick()
-        compose.onNodeWithText("Remove pulse 1").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Move pulse 1 up").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Move pulse 1 down").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Drag pulse 1 to reorder").assertIsNotEnabled()
+        compose.onNodeWithText("Remove pulse 1").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Move pulse 1 up").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Move pulse 1 down").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Drag pulse 1 to reorder").assertDoesNotExist()
         compose.onNodeWithText("Wait after pouring, seconds").assertDoesNotExist()
         compose.onNode(hasText("Water to add, g") and hasSetTextAction()).performScrollTo().performTextReplacement("240")
         val result = save()

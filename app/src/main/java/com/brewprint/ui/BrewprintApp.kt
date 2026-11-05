@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.brewprint.ui
 
 import androidx.activity.compose.BackHandler
@@ -73,7 +75,7 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
         if (state.draft != null) {
             PrimaryAction("Resume brew", onClick = onResume)
             Text("One brew is in progress.", style = MaterialTheme.typography.bodyMedium)
-        } else PrimaryAction("+ New brew", onClick = onNew)
+        } else PrimaryAction("New brew", icon = Icons.Outlined.Add, onClick = onNew)
         val grinder = state.grinders.find { it.id == state.defaultGrinderId && !it.archived }
         if (grinder != null) Panel {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -85,7 +87,6 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
                     }
                     Text(grinder.name, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
-                Icon(Icons.Outlined.Tune, null, Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape).padding(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         val recent = state.brews.maxByOrNull { it.startedAt }
@@ -98,15 +99,17 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
         } else {
             Text("Most recent brew", style = MaterialTheme.typography.titleMedium)
             Panel {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(dateTime(recent.startedAt), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                        Text(dateTime(recent.startedAt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     TextButton(onClick = { onRecord(recent.id) }) { Text("View brew"); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp)) }
                 }
-                Text(recent.beans.name, Modifier.clickable { onRecord(recent.id) }.padding(vertical = 6.dp), style = MaterialTheme.typography.titleLarge)
+                Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
                 Text(recent.recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${formatAmount(recent.recipe.dose)} g · 1:${formatAmount(recent.recipe.ratio)} · ${recent.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onRepeat(recent.id) }, enabled = state.draft == null, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Outlined.Replay, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Repeat") }
+                SecondaryAction("Repeat", enabled = state.draft == null) { onRepeat(recent.id) }
                 TextButton(onClick = { onNotes(recent.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Outlined.EditNote, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(if (state.noteEdits.any { it.brewId == recent.id }) "Resume tasting notes" else if (recent.journal.isEmpty) "Add tasting notes" else "Edit tasting notes") }
             }
         }
@@ -193,9 +196,17 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 PlanSchedule(draft.recipe)
             }
             DraftStage.REVIEW -> {
-                PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
+                Panel {
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                            Text(draft.beans!!.name, style = MaterialTheme.typography.titleMedium)
+                        }
+                        TextButton(onClick = { change(draft.copy(stage = DraftStage.SETUP)) }) { Text("Correct setup") }
+                    }
+                    Text("${draft.recipe!!.name} · ${draft.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
-                JournalEditor(draft.journal, draft.beans.expectedNotes) { change(draft.copy(journal = it)) }
+                JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
             }
         }
     }
@@ -271,9 +282,11 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
         Text(recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleMedium)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${grinder.name} · $setting ticks", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            if (onCorrect != null) TextButton(onClick = onCorrect) { Text("Correct setup", style = MaterialTheme.typography.bodySmall) }
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                Text("${grinder.name} · $setting ticks", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (onCorrect != null) TextButton(onClick = onCorrect) { Text("Correct setup") }
         }
     }
 }
@@ -309,13 +322,32 @@ private fun PlanSchedule(recipe: Recipe) {
 
 private val entryFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT)
 private fun dateInput(value: Long) = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).format(entryFormat)
-private fun dateTime(value: Long) = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM uuuu, HH:mm"))
+private fun dateTime(value: Long): String {
+    val date = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault())
+    val day = when (date.toLocalDate()) {
+        LocalDate.now() -> "Today"
+        LocalDate.now().minusDays(1) -> "Yesterday"
+        else -> date.format(DateTimeFormatter.ofPattern("d MMM uuuu"))
+    }
+    return "$day, ${date.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+}
 
 @Composable
 private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: (Boolean) -> Unit, onChange: (Long) -> Unit) {
     val parsed = runCatching { LocalDateTime.parse(text, entryFormat).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrNull()
+    var editing by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(parsed) { onValidity(parsed != null) }
-    LibraryField(text, { input -> onTextChange(input); runCatching { LocalDateTime.parse(input, entryFormat).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrNull()?.let(onChange) }, "Brew date and time", error = if (parsed == null) "Use yyyy-MM-dd HH:mm, for example 2026-11-01 08:30." else null, helper = "yyyy-MM-dd HH:mm", required = true)
+    if (editing || parsed == null) {
+        LibraryField(text, { input -> onTextChange(input); runCatching { LocalDateTime.parse(input, entryFormat).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() }.getOrNull()?.let(onChange) }, "Brew date and time", error = if (parsed == null) "Use yyyy-MM-dd HH:mm, for example 2026-11-01 08:30." else null, helper = "yyyy-MM-dd HH:mm")
+    } else Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.small, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        FlowRow(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Outlined.CalendarToday, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(dateTime(parsed), style = MaterialTheme.typography.bodyMedium)
+            }
+            TextButton(onClick = { editing = true }) { Text("Change date") }
+        }
+    }
 }
 
 @Composable
@@ -327,7 +359,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         Text(dateTime(brew.startedAt), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (!brew.journal.isEmpty) Panel { JournalSummary(brew.journal) }
         PrimaryAction(if (hasNoteEdit) "Resume tasting notes" else if (brew.journal.isEmpty) "Add tasting notes" else "Edit tasting notes", onClick = onNotes)
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = onRepeat, modifier = Modifier.fillMaxWidth()) { Text("Repeat") }
+        SecondaryAction("Repeat", onClick = onRepeat)
         Text("Preparation", style = MaterialTheme.typography.titleLarge)
         PlanSummary(brew.beans, brew.grinder, brew.setting, brew.recipe)
         PlanSchedule(brew.recipe)
@@ -336,7 +368,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
             Text(brew.beans.roaster)
             listOf("Origin" to brew.beans.origin, "Variety / cultivar" to brew.beans.variety, "Processing method" to brew.beans.processing, "Expected tasting notes" to brew.beans.expectedNotes, "Bean notes" to brew.beans.notes, "Grinder reference" to brew.grinder.referenceNotes).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
         }
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("Edit brew") }
+        SecondaryAction("Edit brew", onClick = onEdit)
         TextButton(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) { Text("Delete brew") }
     }
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Delete brew?") }, text = { Text("This removes only this brew record.") }, confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Keep brew") } })
@@ -349,16 +381,17 @@ private fun NotesScreen(brew: BrewRecord, pending: Journal?, repository: BrewRep
     var discard by remember { mutableStateOf(false) }
     fun back() { if (journal != brew.journal) discard = true else onClose() }
     BackHandler { back() }
-    Page("Tasting notes", ::back) {
+    Page("Tasting notes", ::back, footer = {
+        PrimaryAction("Save notes") {
+            repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
+        }
+    }) {
         Text(brew.beans.name, style = MaterialTheme.typography.titleMedium)
         JournalEditor(journal, brew.beans.expectedNotes) { updated ->
             encoded = Json.encodeToString(updated)
             repository.saveNoteEdit(brew.id, updated).onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") }
         }
-        PrimaryAction("Save notes") {
-            repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
-        }
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { repository.saveNoteEdit(brew.id, journal).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") } }, modifier = Modifier.fillMaxWidth()) { Text("Continue later") }
+        SecondaryAction("Continue later") { repository.saveNoteEdit(brew.id, journal).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") } }
     }
     if (discard) DiscardDialog({ discard = false }, { repository.discardNoteEdit(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard notes.") }; discard = false })
 }

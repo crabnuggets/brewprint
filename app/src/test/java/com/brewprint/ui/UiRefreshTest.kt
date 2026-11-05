@@ -82,6 +82,17 @@ class UiRefreshTest {
         }
     }
 
+    @Test fun `tasting notes keep a named input and visible save action during exploration`() {
+        seedSavedBrew()
+        tap("Add tasting notes")
+        val observations = compose.onNodeWithContentDescription("Cup observations")
+        observations.performTextInput("Sweet and silky")
+        tap("Explore the taste")
+        observations.assertHasClickAction()
+        compose.onNodeWithText("Save notes").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("Sweet and silky", repository.state.value.brews.single().journal.impression) }
+    }
+
     @Test fun `new beans stays neutral until blur and valid fields enable saving`() {
         openForm("beans")
         assertUntouched("Save beans")
@@ -145,7 +156,7 @@ class UiRefreshTest {
         field("Coffee dose, g").performScrollTo().performTextInput("0")
         field("Coffee dose, g").assert(error)
         field("Coffee dose, g").performTextReplacement("15")
-        field("Brew ratio, 1 :").performScrollTo().performTextInput("16")
+        field("Brew ratio").performScrollTo().performTextInput("16")
         field("Water to add, g").performScrollTo().performTextInput("240")
         field("Pour duration, seconds").performScrollTo().performTextInput("30")
         compose.onAllNodes(error).assertCountEquals(0)
@@ -170,7 +181,7 @@ class UiRefreshTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onAllNodesWithText("Library").assertCountEquals(2)
         tap("Brew")
-        tap("+ New brew")
+        tap("New brew")
         tap("Add beans")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("New brew").assertExists()
@@ -199,7 +210,7 @@ class UiRefreshTest {
 
     @Test fun `dial input gates draft and retains changes until brew save updates grinder`() {
         seedSavedBrew()
-        tap("+ New brew")
+        tap("New brew")
         tap("Adjust")
         field("Enter value, ticks").performScrollTo().performTextReplacement("101")
         tap("Close")

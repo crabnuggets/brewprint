@@ -56,7 +56,7 @@ class BrewJourneyTest {
     }
 
     @Test fun `first brew creates library items returns to setup and saves a repeatable record`() {
-        tap("+ New brew")
+        tap("New brew")
         tap("Add beans")
         tap("Add beans")
         enter("Name", "Ethiopia natural")
@@ -78,7 +78,7 @@ class BrewJourneyTest {
         tap("Add recipe")
         enter("Name", "One pour")
         enter("Coffee dose, g", "15")
-        enter("Brew ratio, 1 :", "16")
+        enter("Brew ratio", "16")
         enter("Water to add, g", "240")
         enter("Pour duration, seconds", "30")
         tap("Save recipe")
@@ -120,6 +120,7 @@ class BrewJourneyTest {
         seedBrew()
         tap("View brew")
         tap("Edit brew")
+        tap("Change date")
         compose.onNodeWithText("Brew date and time").performScrollTo().performTextReplacement("")
         tap("Ethiopia")
         compose.onNodeWithContentDescription("Back").performClick()

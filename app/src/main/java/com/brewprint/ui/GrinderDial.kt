@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.brewprint.data.DialFinish
@@ -67,43 +68,44 @@ fun GrinderDial(value: Int?, lastSetting: Int?, finish: DialFinish, onValue: (In
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 16.dp,
         ) {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Grind setting, ticks", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
                     TextButton(onClick = onDismiss) { Text("Close") }
                 }
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                BoxWithConstraints(Modifier.fillMaxWidth().padding(start = 20.dp)) {
                     val stacked = maxWidth < 300.dp || LocalDensity.current.fontScale > 1.3f
                     val readout: @Composable () -> Unit = {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(pendingValue?.toString() ?: "\u2014", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Light)
-                            Text("ticks", style = MaterialTheme.typography.titleMedium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(pendingValue?.toString() ?: "\u2014", Modifier.alignByBaseline(), style = MaterialTheme.typography.displayMedium.copy(fontSize = 52.sp), fontWeight = FontWeight.Medium)
+                                Text("ticks", Modifier.alignByBaseline(), style = MaterialTheme.typography.bodyLarge)
+                            }
                             Text("0\u2013100", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                     if (stacked) {
                         Column(Modifier.fillMaxWidth()) {
                             readout()
-                            GrinderWheel(pendingValue, finish, tick, setValue, Modifier.fillMaxWidth(.75f).align(Alignment.End).height(280.dp))
+                            GrinderWheel(pendingValue, finish, tick, setValue, Modifier.fillMaxWidth(.75f).align(Alignment.End).height(260.dp))
                         }
                     } else {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(.8f)) { readout() }
-                            GrinderWheel(pendingValue, finish, tick, setValue, Modifier.weight(1.2f).height(300.dp))
+                            Box(Modifier.weight(1f)) { readout() }
+                            GrinderWheel(pendingValue, finish, tick, setValue, Modifier.weight(1.2f).height(260.dp))
                         }
                     }
                 }
-                LibraryField(
+                Box(Modifier.padding(horizontal = 20.dp)) { LibraryField(
                     input,
                     { text -> input = text; pendingValue = parseGrindSetting(text); onValue(pendingValue) },
                     "Enter value, ticks",
                     KeyboardType.Number,
                     error = if (parseGrindSetting(input) == null) "Enter whole ticks from 0 to 100." else null,
-                    required = true,
-                )
-                Text("Last recorded setting: ${lastSetting?.let { "$it ticks" } ?: "Not recorded"}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                Text("Wheel finish", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ) }
+                Text("Last recorded setting: ${lastSetting?.let { "$it ticks" } ?: "Not recorded"}", Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text("Wheel finish", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.labelLarge)
+                FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DialFinish.entries.forEach { material ->
                         FilterChip(selected = finish == material, onClick = { onFinish(material) }, label = {
                             Text(when (material) {
