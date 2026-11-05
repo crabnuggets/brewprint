@@ -15,6 +15,9 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - Support both light and dark appearances with a mostly monochrome palette.
 - Follow the device appearance by default, with an in-app override for light or dark appearance.
 - Use softly rounded rectangles for controls and containers.
+- Use softly filled form fields with subtle rounded borders. Show required indicators in a neutral tone, and show errors after the user edits or leaves a field. Untouched empty fields stay neutral; invalid required values still block saving.
+- Use a custom monochrome floating bottom navigation with a softly rounded selected state and no inner rectangular fill or shadow.
+- Place an icon Back action beside the title on create, edit, detail, and picker screens.
 - Use the understated typography of option A from the generated comparison.
 - Reduce unnecessary subtext. Every line should help the user understand information or take an action.
 
@@ -60,10 +63,11 @@ The exact gesture, rotation direction, dismissal interaction, and location of th
 - Keep the same precise tick behavior across all selectable wheel materials. A material choice changes its appearance.
 - Keep the adjustment local to the current form or brew draft. Existing save and discard rules determine when it updates the grinder's last recorded setting.
 - Preserve the distinction between a historical brew's setting and the grinder's last recorded setting when repeating a brew.
-- Provide direct numeric entry and labeled increase and decrease controls as alternatives to the wheel gesture.
+- Use whole ticks from 0 through 100, inclusive, for every grind setting entry and wheel adjustment.
+- Provide direct numeric entry and accessible wheel adjustment semantics. Do not show separate increase or decrease buttons.
 - Respect device haptic preferences. The setting must remain usable without vibration and with reduced motion.
 - Keep the wheel clear of system edge gestures, and keep its controls reachable at larger text sizes.
-- Do not infer a universal tick range, zero point, or finer/coarser direction. Each grinder has its own reference.
+- Each grinder has its own reference point. Do not infer a finer/coarser direction from the tick value.
 
 These details extend the whole-tick entry described in the UX draft. They do not connect to or change the physical grinder.
 

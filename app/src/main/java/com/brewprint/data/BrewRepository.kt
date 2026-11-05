@@ -56,6 +56,7 @@ class BrewRepository(context: Context) {
 
     fun upsertGrinder(grinder: Grinder): Result<Unit> = change { current ->
         require(grinder.name.isNotBlank()) { "Enter a name." }
+        require(grinder.lastSetting == null || grinder.lastSetting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
         val grinders = current.grinders.filterNot { it.id == grinder.id } + grinder
         val default = current.defaultGrinderId ?: grinders.firstOrNull { !it.archived }?.id
         current.copy(grinders = grinders, defaultGrinderId = default) to Unit
@@ -98,6 +99,7 @@ class BrewRepository(context: Context) {
 
     fun updateGrinderSetting(id: String, setting: Int): Result<Unit> = change { current ->
         require(current.grinders.any { it.id == id && !it.archived }) { "Choose an active grinder." }
+        require(setting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
         current.copy(grinders = current.grinders.map { if (it.id == id) it.copy(lastSetting = setting) else it }) to Unit
     }
 
@@ -112,7 +114,7 @@ class BrewRepository(context: Context) {
             beans = current.beans.firstOrNull { it.id == current.lastBeansId && !it.archived },
             recipe = current.recipes.firstOrNull { it.id == current.lastRecipeId && !it.archived },
             grinder = grinder,
-            setting = grinder?.lastSetting,
+            setting = grinder?.lastSetting?.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING },
         )
         current.copy(draft = draft) to draft
     }
@@ -125,7 +127,7 @@ class BrewRepository(context: Context) {
         val draft = BrewDraft(
             beans = original.beans,
             grinder = grinder,
-            setting = if (grinder == null) null else original.setting,
+            setting = if (grinder == null) null else original.setting.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING },
             recipe = original.recipe,
         )
         current.copy(draft = draft) to draft
@@ -133,6 +135,7 @@ class BrewRepository(context: Context) {
 
     fun updateDraft(draft: BrewDraft): Result<Unit> = change { current ->
         require(current.draft?.id == draft.id) { "This brew draft is no longer active." }
+        require(draft.setting == null || draft.setting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
         current.copy(draft = draft) to Unit
     }
 
@@ -145,6 +148,7 @@ class BrewRepository(context: Context) {
         val beans = requireNotNull(draft.beans) { "Choose beans." }
         val grinder = requireNotNull(draft.grinder) { "Choose a grinder." }
         val setting = requireNotNull(draft.setting) { "Enter a grind setting." }
+        require(setting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
         val recipe = requireNotNull(draft.recipe) { "Choose a recipe." }
         require(recipe.validationErrors().isEmpty()) { "Check the recipe plan." }
         require(current.grinders.any { it.id == grinder.id && !it.archived }) { "Choose an active grinder." }
@@ -170,6 +174,7 @@ class BrewRepository(context: Context) {
 
     fun updateBrew(brew: BrewRecord): Result<Unit> = change { current ->
         require(current.brews.any { it.id == brew.id }) { "Brew not found." }
+        require(brew.setting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
         require(brew.beans.name.isNotBlank() && brew.beans.roaster.isNotBlank()) { "Enter beans and roaster." }
         require(brew.grinder.name.isNotBlank()) { "Enter a grinder name." }
         require(brew.recipe.validationErrors().isEmpty()) { "Check the recipe plan." }

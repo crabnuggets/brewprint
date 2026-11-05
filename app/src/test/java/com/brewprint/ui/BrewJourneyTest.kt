@@ -56,7 +56,7 @@ class BrewJourneyTest {
     }
 
     @Test fun `first brew creates library items returns to setup and saves a repeatable record`() {
-        tap("+ New brew")
+        tap("New brew")
         tap("Add beans")
         tap("Add beans")
         enter("Name", "Ethiopia natural")
@@ -78,14 +78,14 @@ class BrewJourneyTest {
         tap("Add recipe")
         enter("Name", "One pour")
         enter("Coffee dose, g", "15")
-        enter("Brew ratio, 1 :", "16")
+        enter("Brew ratio", "16")
         enter("Water to add, g", "240")
         enter("Pour duration, seconds", "30")
         tap("Save recipe")
         tap("Use this plan")
         compose.onNodeWithText("Pour to 240 g total").assertExists()
         tap("Finish brew")
-        enter("What did you notice? Everyday words are welcome.", "Cocoa, lighter than expected")
+        enter("Your notes", "Cocoa, lighter than expected")
         tap("Save brew")
         compose.onNodeWithText("Brew record").assertExists()
         compose.runOnIdle {
@@ -120,9 +120,10 @@ class BrewJourneyTest {
         seedBrew()
         tap("View brew")
         tap("Edit brew")
+        tap("Change date")
         compose.onNodeWithText("Brew date and time").performScrollTo().performTextReplacement("")
         tap("Ethiopia")
-        tap("Back")
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Save brew").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Discard changes?").assertExists()

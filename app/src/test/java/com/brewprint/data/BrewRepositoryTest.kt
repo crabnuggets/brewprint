@@ -48,12 +48,12 @@ class BrewRepositoryTest {
 
     @Test fun `first grinder becomes default and default selection uses its own setting`() {
         assertEquals(grinder.id, repository.state.value.defaultGrinderId)
-        val second = Grinder(name = "Other grinder", lastSetting = -3)
+        val second = Grinder(name = "Other grinder", lastSetting = 0)
         repository.upsertGrinder(second).getOrThrow()
         repository.setDefaultGrinder(second.id).getOrThrow()
         val draft = repository.startDraft().getOrThrow()
         assertEquals(second.id, draft.grinder?.id)
-        assertEquals(-3, draft.setting)
+        assertEquals(0, draft.setting)
     }
 
     @Test fun `draft and notes survive restart and repeated save produces one record`() {
@@ -173,5 +173,53 @@ class BrewRepositoryTest {
         assertNotNull(reopened.loadError)
         assertTrue(reopened.upsertBeans(beans).isFailure)
         assertEquals("broken saved data", storage.readText())
+    }
+
+    @Test fun `both tick endpoints survive grinder draft save record correction and restart`() {
+        for (setting in listOf(0, 100)) {
+            repository.upsertGrinder(grinder.copy(lastSetting = setting)).getOrThrow()
+            assertEquals(setting, repository.startDraft().getOrThrow().setting)
+            val draft = preparedDraft().copy(setting = setting)
+            repository.updateDraft(draft).getOrThrow()
+            val record = repository.saveBrew(draft.id).getOrThrow()
+            assertEquals(setting, record.setting)
+            assertEquals(setting, repository.state.value.grinders.single().lastSetting)
+            repository.updateBrew(record.copy(setting = 100 - setting)).getOrThrow()
+            assertEquals(100 - setting, repository.state.value.brews.first { it.id == record.id }.setting)
+            assertEquals(setting, repository.state.value.grinders.single().lastSetting)
+            repository.updateGrinderSetting(grinder.id, 100 - setting).getOrThrow()
+            repository = BrewRepository(context)
+            assertEquals(100 - setting, repository.state.value.grinders.single().lastSetting)
+            assertEquals(100 - setting, repository.state.value.brews.first { it.id == record.id }.setting)
+        }
+    }
+
+    @Test fun `invalid tick mutations fail without changing persisted state`() {
+        val record = savedBrew()
+        val draft = preparedDraft()
+        for (setting in listOf(-1, 101, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val before = repository.state.value
+            assertTrue(repository.upsertGrinder(grinder.copy(lastSetting = setting)).isFailure)
+            assertTrue(repository.updateGrinderSetting(grinder.id, setting).isFailure)
+            assertTrue(repository.updateDraft(draft.copy(setting = setting)).isFailure)
+            assertTrue(repository.updateBrew(record.copy(setting = setting)).isFailure)
+            assertEquals(before, repository.state.value)
+            assertEquals(before, BrewRepository(context).state.value)
+        }
+    }
+
+    @Test fun `legacy invalid draft setting cannot be saved as a brew`() {
+        val draft = preparedDraft()
+        val storage = File(context.filesDir, "brewprint.json")
+        for (setting in listOf(-1, 101)) {
+            val original = storage.readText()
+            storage.writeText(original.replace("\"setting\":24", "\"setting\":$setting"))
+            val reopened = BrewRepository(context)
+            assertEquals(setting, reopened.state.value.draft?.setting)
+            val before = reopened.state.value
+            assertTrue(reopened.saveBrew(draft.id).isFailure)
+            assertEquals(before, reopened.state.value)
+            storage.writeText(original)
+        }
     }
 }

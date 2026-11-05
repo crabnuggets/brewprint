@@ -14,8 +14,9 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
     var cooling by rememberSaveable { mutableStateOf(journal.asItCools.isNotBlank()) }
     var roaster by rememberSaveable { mutableStateOf(false) }
     Text("How was this cup?", style = MaterialTheme.typography.titleLarge)
-    OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4)
-    OutlinedButton(onClick = { explore = !explore }, modifier = Modifier.fillMaxWidth()) { Text(if (explore) "Hide taste exploration" else "Explore the taste") }
+    Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), label = { Text("Your notes") }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
+    DisclosureRow(if (explore) "Hide taste exploration" else "Explore the taste", explore) { explore = !explore }
     if (explore) {
         JournalText("Aroma", "What do you smell? Try floral, toasted nuts, or fruit.", journal.aroma) { onChange(journal.copy(aroma = it)) }
         Text("Flavor", style = MaterialTheme.typography.titleMedium)
@@ -35,21 +36,21 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
         JournalText("Finish / aftertaste", "What lingers after swallowing?", journal.finish) { onChange(journal.copy(finish = it)) }
         Choice(listOf("Short", "Medium", "Long"), journal.finishLength) { onChange(journal.copy(finishLength = it)) }
     }
-    JournalText("Next time", "A reminder for your next brew.", journal.nextTime) { onChange(journal.copy(nextTime = it)) }
-    OutlinedButton(onClick = { cooling = !cooling }, modifier = Modifier.fillMaxWidth()) { Text("As it cools") }
+    Text("Next time", style = MaterialTheme.typography.titleMedium)
+    OutlinedTextField(journal.nextTime, { onChange(journal.copy(nextTime = it)) }, Modifier.fillMaxWidth(), label = { Text("Reminder") }, placeholder = { Text("Try one tick finer") }, minLines = 2, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
+    DisclosureRow("As it cools", cooling) { cooling = !cooling }
     if (cooling) JournalText("As it cools", "Did anything change as you kept drinking?", journal.asItCools) { onChange(journal.copy(asItCools = it)) }
-    OutlinedButton(onClick = { roaster = !roaster }, modifier = Modifier.fillMaxWidth()) { Text("View roaster's notes") }
+    DisclosureRow("View roaster's notes", roaster) { roaster = !roaster }
     if (roaster) Panel {
         Text("Roaster's expected tasting notes", style = MaterialTheme.typography.titleMedium)
         Text(expectedNotes.ifBlank { "No expected tasting notes recorded." })
         Text("Your notes don't need to match the bag.", style = MaterialTheme.typography.bodyMedium)
     }
-    Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
 private fun JournalText(label: String, help: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), label = { Text(label) }, supportingText = { Text(help) }, minLines = 2)
+    LibraryField(value, onChange, "$label, optional", multiline = true, helper = help)
 }
 
 @Composable
@@ -57,7 +58,7 @@ private fun Intensity(label: String, help: String, value: String?, notes: String
     Text(label, style = MaterialTheme.typography.titleMedium)
     Text(help, style = MaterialTheme.typography.bodyMedium)
     Choice(listOf("Low", "Medium", "High"), value, onValue)
-    OutlinedTextField(notes, onNotes, Modifier.fillMaxWidth(), label = { Text("$label in your words") })
+    LibraryField(notes, onNotes, "$label in your words, optional")
 }
 
 @OptIn(ExperimentalLayoutApi::class)

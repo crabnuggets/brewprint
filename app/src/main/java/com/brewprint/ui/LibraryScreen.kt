@@ -2,14 +2,18 @@ package com.brewprint.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
@@ -76,8 +80,8 @@ fun LibraryScreen(
                 DetailLine("Reference notes", grinder.referenceNotes)
                 DetailLine("Dial finish", finishLabel(grinder.finish))
                 if (state.defaultGrinderId == grinder.id) Text("Default grinder", style = MaterialTheme.typography.labelLarge)
-                else OutlinedButton(onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
-                OutlinedButton(onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
+                else OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
+                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
             }
             if (recipe != null && kind == "recipes") {
                 Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleLarge)
@@ -93,12 +97,12 @@ fun LibraryScreen(
                 val last = recipe.schedule().lastOrNull()
                 last?.let { Text("Scheduled pours end at ${formatDuration(it.startSeconds + it.pulse.pourSeconds)}. Allow for drawdown.") }
                 DetailLine("Preparation notes", recipe.notes)
-                OutlinedButton(onClick = {
+                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = {
                     val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
                     if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate recipe") }
             }
-            Button(onClick = { editing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Edit ${kindLabel(kind)}") }
+            Button(shape = MaterialTheme.shapes.small, onClick = { editing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Edit ${kindLabel(kind)}") }
             TextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
@@ -120,13 +124,16 @@ fun LibraryScreen(
                 }
                 if (items.isEmpty()) Text("No $currentKind yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 items.forEach { (id, content) ->
-                    OutlinedCard(onClick = {
+                    Surface(onClick = {
                         kind = currentKind
                         if (onPicked != null) onPicked(currentKind, id) else detailId = id
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(content.first, style = MaterialTheme.typography.titleMedium)
-                            Text(content.second, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(content.first, style = MaterialTheme.typography.titleMedium)
+                                Text(content.second, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) TextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
@@ -144,7 +151,7 @@ fun LibraryScreen(
                 if (needsReplacement) {
                     Text("Choose a new default grinder.")
                     replacements.forEach { option ->
-                        OutlinedButton(onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
                             Text(option.name + if (replacementId == option.id) " · Selected" else "")
                         }
                     }
@@ -162,9 +169,9 @@ fun LibraryScreen(
         }, dismissButton = { TextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
     }
     if (settingDialog && grinder != null) AlertDialog(onDismissRequest = { settingDialog = false }, title = { Text("Update last recorded setting") }, text = {
-        LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (settingText.toIntOrNull() == null) "Enter a whole tick setting." else null)
-    }, confirmButton = { TextButton(enabled = settingText.toIntOrNull() != null, onClick = {
-        if (save(repository.updateGrinderSetting(grinder.id, settingText.toInt()))) settingDialog = false
+        LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
+    }, confirmButton = { TextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
+        if (save(repository.updateGrinderSetting(grinder.id, parseGrindSetting(settingText)!!))) settingDialog = false
     }) { Text("Update setting") } }, dismissButton = { TextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
 }
 
@@ -184,14 +191,14 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(onBack = back)
     LibraryPage(if (initial == null) "Add beans" else "Edit beans", back) {
-        LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null)
-        LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null)
+        LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
+        LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
         LibraryField(origin, { origin = it }, "Origin, optional", helper = "Country, region, or farm if known")
         LibraryField(variety, { variety = it }, "Variety / cultivar, optional")
         LibraryField(processing, { processing = it }, "Processing method, optional")
         LibraryField(expectedNotes, { expectedNotes = it }, "Expected tasting notes, optional", multiline = true)
         LibraryField(notes, { notes = it }, "General notes, optional", multiline = true)
-        Button(enabled = name.isNotBlank() && roaster.isNotBlank(), onClick = {
+        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && roaster.isNotBlank(), onClick = {
             if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes))) onBack()
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save beans") }
     }
@@ -212,15 +219,15 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(onBack = back)
     LibraryPage(if (initial == null) "Add grinder" else "Edit grinder", back) {
-        LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a grinder name." else null)
-        LibraryField(setting, { setting = it }, "Last recorded setting, ticks, optional", KeyboardType.Number, error = if (setting.isNotBlank() && setting.toIntOrNull() == null) "Enter a whole tick setting." else null)
+        LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a grinder name." else null, required = true)
+        LibraryField(setting, { setting = it }, "Last recorded setting, ticks, optional", KeyboardType.Number, error = if (setting.isNotBlank() && parseGrindSetting(setting) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks")
         LibraryField(reference, { reference = it }, "Reference notes, optional", multiline = true, helper = "Describe your own reference point for counting ticks.")
         Text("Dial finish", style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DialFinish.entries.forEach { finish -> FilterChip(selected = finishName == finish.name, onClick = { finishName = finish.name }, label = { Text(finishLabel(finish)) }) }
         }
-        Button(enabled = name.isNotBlank() && (setting.isBlank() || setting.toIntOrNull() != null), onClick = {
-            if (onSave(original.copy(id = id, name = name.trim(), lastSetting = setting.toIntOrNull(), referenceNotes = reference, finish = DialFinish.valueOf(finishName)))) onBack()
+        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && (setting.isBlank() || parseGrindSetting(setting) != null), onClick = {
+            if (onSave(original.copy(id = id, name = name.trim(), lastSetting = parseGrindSetting(setting), referenceNotes = reference, finish = DialFinish.valueOf(finishName)))) onBack()
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save grinder") }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
@@ -228,17 +235,40 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
 
 @Composable
 internal fun LibraryPage(title: String, onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (onBack != null) TextButton(onClick = onBack) { Text("Back") }
-        Text(title, style = MaterialTheme.typography.headlineLarge)
-        content()
-        Spacer(Modifier.height(24.dp))
-    }
+    Page(title, back = onBack, content = content)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null) {
-    OutlinedTextField(value = value, onValueChange = onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = !multiline, minLines = if (multiline) 3 else 1, keyboardOptions = KeyboardOptions(keyboardType = keyboard), isError = error != null, supportingText = if (error != null || helper != null) ({ Text(error ?: helper.orEmpty()) }) else null)
+internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null) {
+    var interacted by rememberSaveable { mutableStateOf(false) }
+    var wasFocused by remember { mutableStateOf(false) }
+    val visibleError = error.takeIf { interacted }
+    OutlinedTextField(
+        value = value,
+        onValueChange = { input ->
+            if (input != value && (input.isNotBlank() || value.isNotBlank())) interacted = true
+            onChange(input)
+        },
+        label = {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(label)
+                if (required) Text("Required", style = MaterialTheme.typography.labelSmall)
+            }
+        },
+        modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+            if (focus.isFocused) wasFocused = true
+            else if (wasFocused) interacted = true
+        }.semantics { if (visibleError != null) this.error(visibleError) },
+        shape = MaterialTheme.shapes.medium,
+        colors = softFieldColors(),
+        prefix = prefix,
+        singleLine = !multiline,
+        minLines = if (multiline) 3 else 1,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+        isError = visibleError != null,
+        supportingText = if (visibleError != null || helper != null) ({ Text(visibleError ?: helper.orEmpty()) }) else null,
+    )
 }
 
 @Composable
