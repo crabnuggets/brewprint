@@ -11,6 +11,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 class BrewRepository(context: Context) {
+    companion object {
+        @Volatile private var shared: BrewRepository? = null
+
+        /** The one repository for the app process, shared by the activity and the timer service. */
+        fun get(context: Context): BrewRepository = shared ?: synchronized(this) {
+            shared ?: BrewRepository(context.applicationContext).also { shared = it }
+        }
+    }
+
     private val file = AtomicFile(File(context.filesDir, "brewprint.json"))
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val mutableState: MutableStateFlow<AppState>
@@ -107,6 +116,19 @@ class BrewRepository(context: Context) {
         current.copy(appearance = appearance) to Unit
     }
 
+    fun setTimerSettings(settings: TimerSettings): Result<Unit> = change { current ->
+        current.copy(timerSettings = settings) to Unit
+    }
+
+    /** Applies a timer action to the active draft's timer, from the sheet or the live notification. */
+    fun updateTimer(transform: (BrewDraft, BrewTimer, Recipe) -> BrewDraft): Result<Unit> = change { current ->
+        val draft = current.draft
+        val timer = draft?.timer
+        val recipe = draft?.recipe
+        if (draft == null || timer == null || recipe == null) current to Unit
+        else current.copy(draft = transform(draft, timer, recipe)) to Unit
+    }
+
     fun startDraft(): Result<BrewDraft> = change { current ->
         val grinder = current.grinders.firstOrNull { it.id == current.defaultGrinderId && !it.archived }
             ?: current.grinders.singleOrNull { !it.archived }
@@ -162,6 +184,7 @@ class BrewRepository(context: Context) {
             setting = setting,
             recipe = recipe,
             journal = draft.journal,
+            timing = draft.timer?.timing(recipe),
         )
         current.copy(
             brews = (current.brews + record).sortedByDescending { it.startedAt },

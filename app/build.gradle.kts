@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.brewprint"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.brewprint"

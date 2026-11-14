@@ -84,7 +84,7 @@ class UiScreenshotTest {
         pair("setup")
         tap("Use this plan")
         pair("sheet")
-        tap("Finish brew")
+        tap("Finish without timing")
         pair("review")
         compose.onNodeWithText("View roaster's notes").performScrollTo()
         pair("review-more")
@@ -111,7 +111,7 @@ class UiScreenshotTest {
         capture("setup-narrow-large-font")
         compose.onNodeWithText("Use this plan").assertIsDisplayed().performClick()
         capture("sheet-narrow-large-font")
-        compose.onNodeWithText("Finish brew").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Finish without timing").assertIsDisplayed().performClick()
         capture("review-narrow-large-font")
         compose.onNodeWithText("Save brew").assertIsDisplayed()
         compose.onNode(hasText("Your notes") and hasSetTextAction()).performScrollTo().assertIsDisplayed()
@@ -177,5 +177,109 @@ class UiScreenshotTest {
         capture("dial-narrow-large-font", dialog = true)
         compose.onNode(hasText("Enter value, ticks") and hasSetTextAction()).performScrollTo().assertIsDisplayed()
         capture("dial-narrow-large-font-input", dialog = true)
+    }
+
+    private var now = 1_000_000L
+    private fun pass(seconds: Int) {
+        now += seconds * 1000L
+        compose.mainClock.advanceTimeBy(250)
+    }
+
+    private fun timerRepository(): BrewRepository {
+        val data = temporary.newFolder("timer")
+        val repository = BrewRepository(object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun getFilesDir(): File = data
+        })
+        val beans = Beans(name = "Ethiopia natural", roaster = "Sample Roaster")
+        val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+            Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),
+            Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 45.0, pourSeconds = 15)))
+        repository.upsertBeans(beans).getOrThrow()
+        repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 26)).getOrThrow()
+        repository.upsertRecipe(recipe).getOrThrow()
+        repository.updateDraft(repository.startDraft().getOrThrow().copy(beans = beans, recipe = recipe, stage = DraftStage.SHEET)).getOrThrow()
+        return repository
+    }
+
+    @Test fun `capture brew timer states`() {
+        var appearance by mutableStateOf(Appearance.LIGHT)
+        val repository = timerRepository()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            androidx.compose.runtime.CompositionLocalProvider(LocalClock provides { now }) {
+                BrewprintTheme(appearance) { BrewprintApp(state, repository) }
+            }
+        }
+        tap("Resume brew")
+        capture("timer-01-start")
+        tap("Start timer")
+        pass(88)
+        capture("timer-02-pour")
+        compose.runOnIdle { appearance = Appearance.DARK }
+        capture("timer-02-pour-dark")
+        compose.runOnIdle { appearance = Appearance.LIGHT }
+        pass(15)
+        capture("timer-03-wait")
+        tap("Start pulse 4")
+        pass(2)
+        capture("timer-04-skipped")
+        pass(32)
+        tap("Pause")
+        pass(15)
+        capture("timer-05-paused")
+        tap("Resume")
+        pass(8)
+        tap("4 done, show plan")
+        capture("timer-06-plan")
+        tap("Back to current step")
+        pass(40)
+        capture("timer-07-drawdown")
+        tap("Finish brew")
+        capture("timer-08-review")
+        tap("Save brew")
+        capture("timer-09-record")
+        compose.onNodeWithText("Start times come from the timer. Pours are not measured.").performScrollTo()
+        capture("timer-10-record-timing")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithContentDescription("Settings").performClick()
+        capture("timer-11-settings")
+    }
+
+    @Test fun `capture forgotten brew on the brew screen`() {
+        val repository = timerRepository()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            androidx.compose.runtime.CompositionLocalProvider(LocalClock provides { now }) {
+                BrewprintTheme(Appearance.LIGHT) { BrewprintApp(state, repository) }
+            }
+        }
+        tap("Resume brew")
+        tap("Start timer")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
+        pass(100)
+        capture("timer-12-home-running")
+        pass(1000)
+        capture("timer-13-home-stopped")
+        tap("Resume brew")
+        capture("timer-14-review-stopped")
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h700dp-xxhdpi")
+    fun `capture narrow brew timer with large text`() {
+        RuntimeEnvironment.setFontScale(1.5f)
+        val repository = timerRepository()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            androidx.compose.runtime.CompositionLocalProvider(LocalClock provides { now }) {
+                BrewprintTheme(Appearance.LIGHT) { BrewprintApp(state, repository) }
+            }
+        }
+        tap("Resume brew")
+        tap("Start timer")
+        pass(103)
+        capture("timer-narrow-large-font-wait")
+        compose.onNodeWithText("Start pulse 4").assertIsDisplayed()
     }
 }
