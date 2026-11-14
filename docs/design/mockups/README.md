@@ -30,6 +30,19 @@ Implement responsive UI using the images as references. Sample beans, times, set
 
 ![Optional tasting notes and History in light appearance](v1/03-tasting-and-history.png)
 
+## Brew timer
+
+The [brew timer boards](brew-timer/index.html) were accepted by the owner on 2026-11-14 after three rounds of review. They are hand-written HTML rendered to PNG, in light appearance. Behavior is defined in [UX journeys](../../ux.md#brew-timer).
+
+| Reference | Screens |
+| --- | --- |
+| [Running the timer](brew-timer/01-running.png) | Before the first pour, pour, wait, just after a skip |
+| [Pause, plan, drawdown, finish](brew-timer/02-pause-plan-drawdown-finish.png) | Paused, full plan, drawdown, Finish brew review |
+| [Recipes, forgotten brew, record](brew-timer/03-recipes-forgotten-record.png) | Two pulses, ten pulses, a forgotten brew, the saved record |
+| [Live notification](brew-timer/04-live-notification.png) | Lock screen, collapsed and Undo, paused and drawdown, Settings |
+
+The notification screens show the standard Android 16 progress template. How ColorOS presents it is unverified.
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.

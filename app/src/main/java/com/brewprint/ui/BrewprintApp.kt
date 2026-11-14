@@ -30,7 +30,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Composable
-fun BrewprintApp(state: AppState, repository: BrewRepository) {
+fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: Int = 0) {
     var tab by rememberSaveable { mutableStateOf("Brew") }
     var route by rememberSaveable { mutableStateOf<String?>(null) }
     var recordId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -39,6 +39,25 @@ fun BrewprintApp(state: AppState, repository: BrewRepository) {
     var error by remember { mutableStateOf(repository.loadError) }
     var libraryEditing by remember { mutableStateOf(false) }
     val onError: (String) -> Unit = { error = it }
+    val clock = LocalClock.current
+    // The live notification asks for the sheet or the review; show the draft it belongs to.
+    LaunchedEffect(openDraftRequest) {
+        val draft = state.draft
+        if (openDraftRequest > 0 && draft != null) {
+            // Going Back to the Brew screen leaves a timed draft on setup; the notification should open its sheet.
+            if (draft.timer != null && draft.stage == DraftStage.SETUP) repository.updateDraft(draft.copy(stage = DraftStage.SHEET))
+            if (route != "draft") { draftReturn = null; route = "draft" }
+        }
+    }
+    state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && state.timerSettings.vibrate) StepVibration(draft.recipe, draft.timer) }
+    fun resumeDraft() {
+        // A brew that was left alone goes straight to the review, where the total can be entered.
+        val draft = state.draft
+        if (draft?.timer != null && draft.recipe != null && draft.stage != DraftStage.REVIEW && draft.timer.stopped(draft.recipe, clock())) {
+            repository.updateDraft(draft.copy(stage = DraftStage.REVIEW)).onFailure { error = it.message ?: "Couldn't open brew." }
+        }
+        draftReturn = null; route = "draft"
+    }
     fun openRecord(id: String) { recordId = id; route = "record" }
     fun repeat(id: String) {
         repository.repeatBrew(id).onSuccess { draftReturn = route; route = "draft" }.onFailure { error = it.message ?: "Couldn't repeat brew." }
@@ -57,11 +76,11 @@ fun BrewprintApp(state: AppState, repository: BrewRepository) {
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { repository.deleteBrew(brew.id).onSuccess { route = null }.onFailure { onError(it.message ?: "Couldn't delete brew.") } }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
-                "settings" -> AppearanceScreen(state.appearance, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }) { route = null }
+                "settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }) { route = null }
                 else -> when (tab) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
                     "History" -> HistoryScreen(state.brews) { openRecord(it) }
-                    else -> BrewHome(state, { repository.startDraft().onSuccess { draftReturn = null; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { draftReturn = null; route = "draft" }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
+                    else -> BrewHome(state, { repository.startDraft().onSuccess { draftReturn = null; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
                 }
             }
         }
@@ -71,8 +90,26 @@ fun BrewprintApp(state: AppState, repository: BrewRepository) {
 
 @Composable
 private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onSettings: () -> Unit) {
-    Page("Brew", actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Appearance settings") } }) {
-        if (state.draft != null) {
+    Page("Brew", actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings") } }) {
+        val draft = state.draft
+        if (draft?.timer != null && draft.recipe != null) {
+            val view = TimerNow(draft.recipe, draft.timer, rememberNow())
+            Panel {
+                Text("Brew in progress", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text(draft.beans?.name ?: draft.recipe.name, style = MaterialTheme.typography.titleLarge)
+                Text("${draft.recipe.name} · ${draft.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                val brewTime = "Brew time ${formatDuration(view.brewSeconds)}"
+                Text(when {
+                    view.phase == TimerPhase.STOPPED -> stoppedText(view)
+                    view.phase == TimerPhase.FINISHED -> "Finished. $brewTime"
+                    view.paused -> "Paused. $brewTime"
+                    view.phase == TimerPhase.DRAWDOWN -> "Drawdown. $brewTime"
+                    else -> brewTime
+                })
+                PrimaryAction("Resume brew", onClick = onResume)
+            }
+        } else if (draft != null) {
             PrimaryAction("Resume brew", onClick = onResume)
             Text("One brew is in progress.", style = MaterialTheme.typography.bodyMedium)
         } else PrimaryAction("New brew", icon = Icons.Outlined.Add, onClick = onNew)
@@ -157,13 +194,27 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     var validDate by rememberSaveable { mutableStateOf(true) }
     var dateText by rememberSaveable(initial.id) { mutableStateOf(dateInput(initial.startedAt)) }
     var discard by remember { mutableStateOf(false) }
+    var showPlan by rememberSaveable { mutableStateOf(false) }
+    val clock = LocalClock.current
+    // The live notification changes the timer and stage behind this screen; follow it.
+    LaunchedEffect(initial.timer, initial.stage) {
+        if (draft.timer != initial.timer || draft.stage != initial.stage) encoded = Json.encodeToString(draft.copy(timer = initial.timer, stage = initial.stage))
+    }
+    val view = if (draft.stage == DraftStage.SHEET && draft.timer != null && draft.recipe != null) TimerNow(draft.recipe, draft.timer, rememberNow()) else null
+    KeepScreenOn(view?.active == true && state.timerSettings.keepScreenOn)
+    var validTotal by rememberSaveable { mutableStateOf(true) }
     fun change(updated: BrewDraft) {
         encoded = Json.encodeToString(updated)
         repository.updateDraft(updated).onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
     }
+    fun timer(action: BrewTimer.(Recipe, Long) -> BrewTimer) {
+        val recipe = draft.recipe ?: return
+        change(draft.copy(timer = draft.timer?.action(recipe, clock())))
+    }
+    fun finish() = change(draft.copy(stage = DraftStage.REVIEW, timer = draft.timer?.finish(draft.recipe!!, clock())))
     fun back() {
         when (draft.stage) {
-            DraftStage.REVIEW -> change(draft.copy(stage = DraftStage.SHEET))
+            DraftStage.REVIEW -> { validTotal = true; change(draft.copy(stage = DraftStage.SHEET, timer = draft.timer?.unfinished())) }
             DraftStage.SHEET -> change(draft.copy(stage = DraftStage.SETUP))
             DraftStage.SETUP -> repository.updateDraft(draft).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
         }
@@ -177,8 +228,12 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     } else Page(when (draft.stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, footer = {
         when (draft.stage) {
             DraftStage.SETUP -> PrimaryAction("Use this plan", enabled = ready(draft, state)) { change(draft.copy(stage = DraftStage.SHEET)) }
-            DraftStage.SHEET -> PrimaryAction("Finish brew") { change(draft.copy(stage = DraftStage.REVIEW)) }
-            DraftStage.REVIEW -> PrimaryAction("Save brew", enabled = validDate) {
+            DraftStage.SHEET -> if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Tap as you begin the first pour.", Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                PrimaryAction("Start timer") { showPlan = false; change(draft.copy(timer = BrewTimer(startedAt = clock()))) }
+                TextButton(onClick = ::finish, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Finish without timing") }
+            } else TimerFooter(view, { timer { recipe, now -> pause(recipe, now) } }, { timer { recipe, now -> resume(recipe, now) } }, { timer { recipe, now -> skip(recipe, now) } }, { timer { _, now -> undone(now) } }, ::finish)
+            DraftStage.REVIEW -> PrimaryAction("Save brew", enabled = validDate && validTotal) {
                 repository.updateDraft(draft).fold(
                     onSuccess = { repository.saveBrew(draft.id).onSuccess { onSaved(it.id) }.onFailure { onError("Couldn't save brew. Try again.") } },
                     onFailure = { onError("Couldn't save brew. Try again.") },
@@ -191,10 +246,10 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 SetupFields(draft, state, { picker = it }, { dial = true }, ::change)
                 TextButton(onClick = { discard = true }, modifier = Modifier.fillMaxWidth()) { Text("Discard brew") }
             }
-            DraftStage.SHEET -> {
+            DraftStage.SHEET -> if (view == null) {
                 PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
                 PlanSchedule(draft.recipe)
-            }
+            } else TimerSheet(view, showPlan) { showPlan = it }
             DraftStage.REVIEW -> {
                 Panel {
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -206,6 +261,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                     }
                 }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
+                draft.timer?.let { timer -> TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) } }
                 JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
             }
         }
@@ -221,7 +277,8 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
 private fun selectItem(draft: BrewDraft, state: AppState, kind: String, id: String): BrewDraft = when (kind) {
     "beans" -> draft.copy(beans = state.beans.first { it.id == id }, allowArchivedBeans = false)
     "grinders" -> state.grinders.first { it.id == id }.let { draft.copy(grinder = it, setting = it.lastSetting) }
-    else -> draft.copy(recipe = state.recipes.first { it.id == id })
+    // The timer follows one recipe; choosing another clears it.
+    else -> state.recipes.first { it.id == id }.let { recipe -> draft.copy(recipe = recipe, timer = draft.timer.takeIf { recipe == draft.recipe }) }
 }
 
 internal fun ready(draft: BrewDraft, state: AppState): Boolean = draft.beans != null && draft.recipe != null && draft.grinder != null && draft.setting?.let { parseGrindSetting(it.toString()) } != null && draft.recipe.validationErrors().isEmpty() && state.grinders.any { it.id == draft.grinder.id && !it.archived } && (state.beans.none { it.id == draft.beans.id && it.archived } || draft.allowArchivedBeans)
@@ -362,6 +419,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         SecondaryAction("Repeat", onClick = onRepeat)
         Text("Preparation", style = MaterialTheme.typography.titleLarge)
         PlanSummary(brew.beans, brew.grinder, brew.setting, brew.recipe)
+        brew.timing?.let { TimingPanel(brew.recipe, it) }
         PlanSchedule(brew.recipe)
         Panel {
             Text("Beans", style = MaterialTheme.typography.titleMedium)
@@ -427,15 +485,3 @@ private fun EditRecord(brew: BrewRecord, state: AppState, repository: BrewReposi
     if (discard) DiscardDialog({ discard = false }, onClose)
 }
 
-@Composable
-private fun AppearanceScreen(appearance: Appearance, onChange: (Appearance) -> Unit, onClose: () -> Unit) {
-    BackHandler { onClose() }
-    Page("Appearance", onClose) {
-        Appearance.entries.forEach { option -> Surface(onClick = { onChange(option) }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = option == appearance, onClick = { onChange(option) })
-                Text(option.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.padding(start = 12.dp))
-            }
-        } }
-    }
-}

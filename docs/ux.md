@@ -8,7 +8,7 @@ See [the UI design direction](ui-design.md) for the owner's visual preferences a
 
 ## Scope and defaults
 
-The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. Cloud sync, sharing, inventory quantities, analytics, equipment integrations, and guided timers are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
+The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. Cloud sync, sharing, inventory quantities, analytics, and equipment integrations are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
 
 The app remembers the default grinder, each grinder's last recorded tick setting, and the most recently used beans and recipe. It shows these choices before each brew so the user can correct them. The app cannot know the physical grinder's current setting; the UI calls it "Last recorded setting".
 
@@ -32,7 +32,7 @@ Create and edit screens open above these destinations. Android Back returns to t
 4. Add beans with a name and roaster. The user may fill in origin, variety, and expected tasting notes now or later.
 5. Create a recipe with a name, dose, ratio, and pulses. A running total helps the user make the pulses match the target water amount.
 6. Return to setup with the new items selected. Review the tick setting and recipe summary, then tap "Use this plan".
-7. Read the brew sheet while preparing the coffee. It shows the chosen beans, grinder setting, dose, ratio, and ordered pulse instructions.
+7. Read the brew sheet while preparing the coffee. It shows the chosen beans, grinder setting, dose, ratio, and ordered pulse instructions. Tap "Start timer" at the first pour to be guided through the pulses, or "Finish without timing".
 8. Tap "Finish brew", optionally add observations, then tap "Save brew". The app opens the saved record and makes it available in History.
 
 Creating a library item during setup returns directly to that setup without losing other choices. Save is available once required fields are valid; optional metadata never blocks a brew.
@@ -92,13 +92,41 @@ The brew sheet presents a static schedule with elapsed start times, per-pulse am
 
 An illustrative 15 g, 1:16 recipe has three pulses. Pour 60 g over 10 seconds, then wait 30 seconds. At 0:40, pour another 90 g over 20 seconds, then wait 20 seconds. At 1:20, pour the final 90 g over 20 seconds. The cumulative amounts are 60 g, 150 g, and 240 g. Scheduled pouring ends at 1:40.
 
-These numbers demonstrate the UI and calculations; they are not a recommended recipe. Final drawdown can continue after the scheduled pours. The app does not treat the end of the last pour as the completion of the brew. The user decides when to tap "Finish brew". A live timer, alarms, automatic advancement, and measured total brew time are deferred.
+These numbers demonstrate the UI and calculations; they are not a recommended recipe. Final drawdown can continue after the scheduled pours. The app does not treat the end of the last pour as the completion of the brew. The user decides when to tap "Finish brew".
+
+### Brew timer
+
+The brew sheet offers "Start timer" and "Finish without timing". The timer is optional; an untimed brew works as before. See the [brew timer mockups](design/mockups/brew-timer/index.html) for appearance.
+
+- **Steps.** A step is a pour or a wait. The timer moves through the recipe's steps on schedule. A zero wait starts the next pour immediately. After the last pour the sheet shows "Drawdown" and brew time keeps counting until "Finish brew".
+- **Focus card.** It leads with the state word, "Pour", "Wait", "Paused" or "Drawdown", then the cumulative scale reading to pour to and the seconds left. A plan strip shows the whole recipe, and "Next" lists up to two upcoming rows. "N done, show plan" opens the full plan, which stays open until "Back to current step".
+- **Skip.** The skip button is labelled by its effect, in two or three words so it fits a phone: "Pour done" during a pour, "Start pulse N" during a wait. Skipping moves every later step earlier and keeps their durations. The button ignores taps for 1 second after a step changes. "Undo" is offered for 5 seconds and restores the schedule as it was, even if a step has changed on its own in that time.
+- **Pause.** "Pause" holds the schedule while brew time keeps counting. "Resume" continues the held step; "Start pulse N" ends the pause and starts the next pour. Pause is not offered during drawdown.
+- **Finish.** "Finish brew" stops the clock and opens the review with "Total brew time", which can be corrected. Back from the review restores the timer as it was, including a pause.
+- **A forgotten brew.** The timer stops itself 15 minutes after the last pour ends, or 15 minutes after a pause began. The Brew screen then shows when it stopped, and "Resume brew" opens the review. The total is "Not recorded" until the user enters one.
+- **Closing the app.** The timer is kept as timestamps in the draft, so reopening the app shows the correct step and brew time.
+
+### Timer settings and live notification
+
+Settings holds the appearance choice and three brew timer switches: "Live notification" (off by default), "Vibrate at each step", and "Keep screen on while brewing" (both on by default).
+
+Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
+
+With the switch on, a running timer shows one ongoing notification, requested as an Android 16 Live Update with the standard progress template. Each part has one job:
+
+- **Icon.** It shows the state: a drop for a pour, an hourglass for a wait, a pause mark, or a stopwatch during drawdown.
+- **Status-bar chip.** Beside the icon it shows only the numbers to act on: the scale target and seconds left during a pour ("145g 7s"), seconds left during a wait, "Paused", or brew time during drawdown. It is kept short because ColorOS sizes the capsule to it.
+- **Title and text.** The title is the instruction in a few words, such as "Pour to 145 g" or "Wait, then 195 g". The text line gives the pulse.
+- **Header clock and bar.** The system countdown shows the time left in the step, or brew time during drawdown. The bar has one segment per pulse and moves once a second. While the screen is off, the notification is redrawn only when the step or state changes.
+- **Actions.** Tapping the notification opens the sheet, so there are only two short actions: "Pause" or "Resume", and the skip action, which becomes "Undo" for 5 seconds after a skip. During drawdown the action is "Finish".
+
+The target device is ColorOS 16, which shows the Live Update as a capsule in the status bar.
 
 ## Saving and reviewing a brew
 
 "Finish brew" opens a short review with optional brew observations. Show the chosen plan and equipment, with a way back to correct setup before saving. Prefill the brew date and time when the draft starts and allow editing it to log an earlier brew.
 
-A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned; the first version does not measure or collect actual water amounts or pulse timings.
+A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. A pulse that started on time reads "On schedule"; otherwise it shows the time and the difference, such as "12 s early". An untimed brew has no Timing section. The app does not measure water amounts or pour durations.
 
 History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" requires confirmation and removes only that record. Library items use archive rather than deletion in this version.
 
@@ -163,7 +191,12 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - Viewing expected tasting notes does not populate or overwrite the user's journal.
 - Repeating a brew leaves its new journal empty and preserves the original journal.
 - Interrupted note edits can be resumed without losing the existing saved brew.
+- A timed brew left untouched records every pulse on schedule.
+- Skipping a wait 12 seconds early records that pulse 12 seconds early and moves later pulses earlier; Undo puts the schedule back.
+- A 15-second pause delays later pulses by 15 seconds and adds 15 seconds to the total.
+- A brew left alone stops after 15 minutes and saves with no total unless one is entered.
+- With "Live notification" off, no notification or permission prompt appears.
 
 ## Assumptions to revisit
 
-This draft assumes whole ticks, optional bean metadata beyond name and roaster, a static brew sheet, and recipes with absolute water amounts per pulse. The most useful next design decision is whether you want a guided timer during brewing or primarily a record to consult and save. Either choice can preserve the recipe and brew-record distinction.
+This draft assumes whole ticks, optional bean metadata beyond name and roaster, and recipes with absolute water amounts per pulse.

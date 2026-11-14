@@ -235,7 +235,7 @@ class UiRefreshTest {
             assertEquals(24, repository.state.value.grinders.single().lastSetting)
         }
         tap("Use this plan")
-        tap("Finish brew")
+        tap("Finish without timing")
         tap("Save brew")
         compose.runOnIdle {
             assertEquals(100, repository.state.value.grinders.single().lastSetting)

@@ -35,6 +35,16 @@ The planned time from starting a pulse to finishing its pour.
 **Wait duration**:
 The planned interval from the end of a pulse's pour to the start of the next pulse.
 
+**Step**:
+A pour or a wait in a timed brew. A recipe with N pulses has N pours and up to N-1 waits.
+
+**Brew time**:
+The running time of a timed brew, counted from the start of the first pour.
+
+**Total brew time**:
+The time from the start of the first pour to "Finish brew", saved with a timed brew record.
+_Avoid_: Pour time, extraction time
+
 **Bloom**:
 An initial wetting of the coffee before subsequent pours. A recipe may label its first pulse as the bloom.
 

@@ -152,6 +152,7 @@ data class BrewRecord(
     val setting: Int,
     val recipe: Recipe,
     val journal: Journal = Journal(),
+    val timing: BrewTiming? = null,
 )
 
 @Serializable
@@ -165,6 +166,7 @@ data class BrewDraft(
     val stage: DraftStage = DraftStage.SETUP,
     val journal: Journal = Journal(),
     val allowArchivedBeans: Boolean = false,
+    val timer: BrewTimer? = null,
 )
 
 @Serializable
@@ -182,4 +184,5 @@ data class AppState(
     val lastBeansId: String? = null,
     val lastRecipeId: String? = null,
     val appearance: Appearance = Appearance.SYSTEM,
+    val timerSettings: TimerSettings = TimerSettings(),
 )

@@ -84,7 +84,7 @@ class BrewJourneyTest {
         tap("Save recipe")
         tap("Use this plan")
         compose.onNodeWithText("Pour to 240 g total").assertExists()
-        tap("Finish brew")
+        tap("Finish without timing")
         enter("Your notes", "Cocoa, lighter than expected")
         tap("Save brew")
         compose.onNodeWithText("Brew record").assertExists()
