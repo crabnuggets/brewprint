@@ -105,7 +105,7 @@ internal fun FloatingNavigation(selectedTab: String, onSelect: (String) -> Unit)
     Surface(
         modifier = Modifier.navigationBarsPadding().padding(horizontal = 14.dp, vertical = 8.dp).testTag("bottom-navigation"),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shadowElevation = 8.dp,
     ) {
