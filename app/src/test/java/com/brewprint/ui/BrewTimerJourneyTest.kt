@@ -58,7 +58,7 @@ class BrewTimerJourneyTest {
     private fun shows(text: String) = compose.onNodeWithText(text).assertExists()
 
     @Test fun `timer advances on schedule and the record shows every pulse on schedule`() {
-        shows("Tap as you begin the first pour.")
+        shows("Tap at the first pour.")
         tap("Start timer")
         shows("Pour"); shows("Pulse 1 of 3"); shows("Pour done")
         pass(12)
@@ -127,7 +127,7 @@ class BrewTimerJourneyTest {
         total.performTextInput("3:75")
         compose.onNodeWithText("Save brew").assertIsNotEnabled()
         // Leaving the review drops the invalid edit, so it cannot keep Save disabled.
-        tap("Correct setup")
+        tap("Change setup")
         tap("Use this plan")
         tap("Finish brew")
         compose.onNodeWithText("Save brew").assertIsEnabled()

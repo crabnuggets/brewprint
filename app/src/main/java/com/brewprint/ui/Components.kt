@@ -14,6 +14,9 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Coffee
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
@@ -96,6 +99,9 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             actions()
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
+        // A hairline marks where content continues under the footer, so a cut-off line reads as scrollable.
+        val bottomPadding = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.roundToPx() }
+        if (footer != null && scroll.maxValue - scroll.value > bottomPadding) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         if (footer != null) Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.background.copy(alpha = .8f), MaterialTheme.colorScheme.background))).padding(horizontal = 24.dp, vertical = 12.dp)) { footer() }
     }
 }
@@ -121,11 +127,12 @@ internal fun FloatingNavigation(selectedTab: String, onSelect: (String) -> Unit)
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Icon(when (destination) {
-                        "Brew" -> Icons.Outlined.Coffee
-                        "History" -> Icons.AutoMirrored.Outlined.FormatListBulleted
-                        else -> Icons.AutoMirrored.Outlined.MenuBook
+                        // A filled icon and a heavier label mark the selected tab without relying on the soft fill.
+                        "Brew" -> if (selected) Icons.Filled.Coffee else Icons.Outlined.Coffee
+                        "History" -> if (selected) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.AutoMirrored.Outlined.FormatListBulleted
+                        else -> if (selected) Icons.AutoMirrored.Filled.MenuBook else Icons.AutoMirrored.Outlined.MenuBook
                     }, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(destination, style = MaterialTheme.typography.labelMedium, color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(destination, style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal), color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -139,8 +146,9 @@ internal fun softFieldColors(): TextFieldColors {
         focusedContainerColor = colors.surface,
         unfocusedContainerColor = colors.surfaceVariant.copy(alpha = .4f),
         errorContainerColor = colors.surfaceVariant.copy(alpha = .4f),
-        focusedBorderColor = colors.onSurface.copy(alpha = .35f),
-        unfocusedBorderColor = colors.outlineVariant,
+        focusedBorderColor = colors.onSurface,
+        // At least 3:1 against the fill, so the field reads as a control.
+        unfocusedBorderColor = colors.outline,
         errorBorderColor = colors.error.copy(alpha = .6f),
         focusedLabelColor = colors.onSurfaceVariant,
         errorLabelColor = colors.onSurfaceVariant,

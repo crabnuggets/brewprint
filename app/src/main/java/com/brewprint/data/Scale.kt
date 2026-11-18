@@ -35,6 +35,10 @@ data class ScaleLive(
     val zeroed: Boolean = false,
     /** The scale did not zero after a tare command, so its own tare button is needed. */
     val tareFailed: Boolean = false,
+    /** Before the first pour, no usable reading has arrived since the scale went silent or overloaded. */
+    val silent: Boolean = false,
+    /** A tare was sent and the scale has not yet read about 0 g. */
+    val taring: Boolean = false,
     /** Why a scale brew is following the clock, or null while the scale guides it. */
     val following: String? = null,
     val curve: List<Double?> = emptyList(),
@@ -120,3 +124,10 @@ object ScaleProtocol {
         return crc
     }
 }
+
+/**
+ * The draft after the scale is lost. Before a dose is chosen, its tare is no longer known, so the coffee step goes
+ * back to taring the brewer. Scale data on the brewer step marks this reset, so the sheet can say why.
+ */
+fun BrewDraft.afterScaleLost(): BrewDraft =
+    if (timer == null && scale != null && scaleStep == ScaleStep.COFFEE) copy(scaleStep = ScaleStep.BREWER) else this

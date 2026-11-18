@@ -80,38 +80,130 @@ class ScaleJourneyTest {
         assertEquals(15.2, draft.scale!!.weighedDose!!, 0.0)
         assertEquals(ScaleStep.ARMED, draft.scaleStep)
         assertEquals(15.0, repository.state.value.recipes.single().dose, 0.0)
+        // Until the scale reads 0 g after its tare, a pour cannot start the timer and no start is offered.
+        live = ScaleLive(connected = true, grams = 15.23, steady = true, taring = true)
+        shows("Waiting for the scale to read 0 g")
+        compose.onNodeWithText("Start timer now").assertDoesNotExist()
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        compose.onNode(hasContentDescription("On scale, tared · Weighed 15.2 g, 0.0 grams")).assertExists()
         shows("Waiting for the first pour")
         shows("Start timer now")
     }
 
-    @Test fun `starting by hand after a tare the scale ignored follows the clock`() {
+    @Test fun `a reading at zero is not coffee and a dropped scale tares the brewer again`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 1.0, steady = true)
+        compose.onNodeWithText("Use dose").assertIsNotEnabled()
+        live = ScaleLive(connected = false)
+        compose.runOnIdle { assertEquals(ScaleStep.BREWER, repository.state.value.draft!!.scaleStep) }
+        live = ScaleLive(connected = true, grams = 312.4, steady = true)
+        shows("Put the brewer on the scale")
+        shows("Tare the brewer again. Take the coffee out first if you've added it.")
+        tap("Tare")
+        compose.onNodeWithText("Tare the brewer again. Take the coffee out first if you've added it.").assertDoesNotExist()
+    }
+
+    @Test fun `with no readings the armed sheet says so instead of waiting`() {
         open(paired = true)
         tap("Tare")
         live = ScaleLive(connected = true, grams = 15.0, steady = true)
-        tap("Skip")
+        tap("Keep 15 g")
+        live = ScaleLive(connected = true, grams = null, silent = true)
+        shows("No scale reading")
+        compose.onNodeWithText("Waiting for the scale to settle").assertDoesNotExist()
+        compose.onNodeWithText("Tare the scale to 0 g").assertDoesNotExist()
+        shows("Brew without the scale")
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        compose.onNodeWithText("No scale reading").assertDoesNotExist()
+        shows("Waiting for the first pour")
+    }
+
+    @Test fun `a dropped link after weighing keeps the scale card instead of a clock start`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.23, steady = true)
+        tap("Use 15.2 g")
+        live = ScaleLive(connected = false)
+        shows("No scale reading")
+        compose.onNodeWithText("Start timer").assertDoesNotExist()
+        shows("Finish without timing")
+        shows("Brew without the scale")
+    }
+
+    @Test fun `choosing other beans after weighing restores the recipe's dose and starts the scale steps again`() {
+        open(paired = true)
+        repository.upsertBeans(Beans(name = "Kenya washed", roaster = "Sample")).getOrThrow()
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.23, steady = true)
+        tap("Use 15.2 g")
+        tap("Change setup")
+        tap("Ethiopia")
+        tap("Kenya washed")
+        val draft = repository.state.value.draft!!
+        assertEquals("Kenya washed", draft.beans!!.name)
+        assertEquals(15.0, draft.recipe!!.dose, 0.0)
+        assertNull(draft.scale)
+        assertEquals(ScaleStep.BREWER, draft.scaleStep)
+    }
+
+    @Test fun `choosing another recipe after weighing starts the scale steps again`() {
+        open(paired = true)
+        repository.upsertRecipe(Recipe(name = "One pour", dose = 12.0, ratio = 15.0, pulses = listOf(Pulse(water = 180.0, pourSeconds = 30)))).getOrThrow()
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.23, steady = true)
+        tap("Use 15.2 g")
+        tap("Change setup")
+        tap("Five-pulse filter")
+        tap("One pour")
+        val draft = repository.state.value.draft!!
+        assertEquals(12.0, draft.recipe!!.dose, 0.0)
+        assertNull(draft.scale)
+        assertEquals(ScaleStep.BREWER, draft.scaleStep)
+    }
+
+    @Test fun `a dose cannot be used while the brewer's tare is pending`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 312.4, steady = true, taring = true)
+        shows("Taring the brewer")
+        compose.onNodeWithText("Add your coffee").assertDoesNotExist()
+        compose.onNodeWithText("Use dose").assertDoesNotExist()
+        live = ScaleLive(connected = true, grams = 312.4, steady = true, tareFailed = true)
+        shows("The scale didn't tare")
+        tap("Tare")
+        assertEquals(2, tares)
+    }
+
+    @Test fun `off zero the armed sheet asks for a tare and starts clock-only only through brew without the scale`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        tap("Keep 15 g")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        shows("Tare the scale to 0 g")
+        compose.onNodeWithText("Start timer now").assertDoesNotExist()
+        // Near 0 g but not yet steady, the scale is settling after a tare, so it is not asked for again.
+        live = ScaleLive(connected = true, grams = 0.3, steady = false)
+        shows("Waiting for the scale to settle")
+        compose.onNodeWithText("Tare the scale to 0 g").assertDoesNotExist()
         live = ScaleLive(connected = true, grams = 15.0, steady = true, tareFailed = true)
-        shows("The scale didn't tare. Press its tare button.")
-        tap("Start timer now")
+        shows("The scale didn't tare")
+        // The card leads the retry; the footer adds no waiting status beside it.
+        compose.onNodeWithText("Waiting for the scale to settle").assertDoesNotExist()
+        compose.onNodeWithText("Tare the scale to 0 g").assertDoesNotExist()
+        tap("Brew without the scale")
+        tap("Start timer")
         val draft = repository.state.value.draft!!
         assertFalse(draft.timer!!.byWeight)
         assertNull(draft.scale)
-    }
-
-    @Test fun `starting by hand before the scale shows its zero follows the clock`() {
-        open(paired = true)
-        tap("Tare")
-        live = ScaleLive(connected = true, grams = 15.0, steady = true)
-        tap("Skip")
-        live = ScaleLive(connected = true, grams = 15.0, steady = true)
-        tap("Start timer now")
-        assertFalse(repository.state.value.draft!!.timer!!.byWeight)
     }
 
     @Test fun `starting by hand once the scale shows its zero is guided by the scale`() {
         open(paired = true)
         tap("Tare")
         live = ScaleLive(connected = true, grams = 15.0, steady = true)
-        tap("Skip")
+        tap("Keep 15 g")
         live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
         tap("Start timer now")
         assertTrue(repository.state.value.draft!!.timer!!.byWeight)

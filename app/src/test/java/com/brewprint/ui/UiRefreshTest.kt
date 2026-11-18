@@ -190,11 +190,13 @@ class UiRefreshTest {
         compose.onAllNodesWithText("Library").assertCountEquals(2)
         tap("Brew")
         tap("New brew")
-        tap("Add beans")
+        tap("Choose beans")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("New brew").assertExists()
+        // Nothing was chosen, so leaving the setup discards it rather than leaving a brew to resume.
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithText("Resume brew").assertExists()
+        compose.onNodeWithText("Resume brew").assertDoesNotExist()
+        compose.runOnIdle { assertNull(repository.state.value.draft) }
     }
 
     @Test fun `record correction rejects invalid ticks and accepts endpoints without changing grinder`() {
@@ -222,9 +224,10 @@ class UiRefreshTest {
         tap("Adjust")
         field("Enter value, ticks").performScrollTo().performTextReplacement("101")
         tap("Close")
-        compose.onNodeWithText("Use this plan").assertIsDisplayed().assertIsNotEnabled()
+        // An invalid entry stays in the dial; the brew keeps its last valid setting.
+        compose.onNodeWithText("Use this plan").assertIsDisplayed().assertIsEnabled()
         compose.runOnIdle {
-            assertNull(repository.state.value.draft?.setting)
+            assertEquals(24, repository.state.value.draft?.setting)
             assertEquals(24, repository.state.value.grinders.single().lastSetting)
         }
         tap("Adjust")

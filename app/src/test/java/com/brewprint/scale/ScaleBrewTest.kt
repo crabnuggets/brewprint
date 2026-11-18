@@ -135,15 +135,69 @@ class ScaleBrewTest {
         assertTrue(draft.scale!!.curve.size >= 40)
     }
 
+    @Test fun `losing the scale while the coffee is weighed goes back to taring the brewer, even with the sheet closed`() {
+        repository.updateDraft(draft.copy(scaleStep = ScaleStep.COFFEE)).getOrThrow()
+        brew.connected(false, now)
+        assertEquals(ScaleStep.BREWER, draft.scaleStep)
+        // Once a dose is chosen, losing the scale leaves the armed step alone.
+        repository.updateDraft(draft.copy(scaleStep = ScaleStep.ARMED)).getOrThrow()
+        brew.connected(false, now)
+        assertEquals(ScaleStep.ARMED, draft.scaleStep)
+    }
+
+    @Test fun `a silent scale before the first pour drops its stale weight until a reading returns`() {
+        feed(1200, to = 0.0)
+        assertTrue(brew.live.value.zeroed)
+        brew.lose(now)
+        assertTrue(brew.live.value.silent)
+        assertNull(brew.live.value.grams)
+        assertFalse(brew.live.value.zeroed)
+        feed(100, to = 0.0)
+        assertFalse(brew.live.value.silent)
+        assertEquals(0.0, brew.live.value.grams!!, 0.01)
+    }
+
+    @Test fun `a scale that goes silent before any draft does not leave a stale weight`() {
+        repository.discardDraft().getOrThrow()
+        feed(300, to = 312.4)
+        brew.lose(now)
+        assertTrue(brew.live.value.silent)
+        assertNull(brew.live.value.grams)
+    }
+
+    @Test fun `a tare with no readings at all fails at its deadline`() {
+        brew.tare(now)
+        brew.expireTare(now + 1_000)
+        assertTrue(brew.live.value.taring)
+        brew.expireTare(now + 1_500)
+        assertFalse(brew.live.value.taring)
+        assertTrue(brew.live.value.tareFailed)
+    }
+
+    @Test fun `an overloaded scale does not leave a tare pending`() {
+        brew.tare(now)
+        now += 1_600
+        brew.reading(now, 0.0, 0.0, overload = true)
+        assertTrue(brew.live.value.tareFailed)
+        assertFalse(brew.live.value.taring)
+    }
+
     @Test fun `a tare the scale ignores asks for its own tare button and does not arm`() {
         grams = 12.0
         brew.tare(now)
         assertEquals(2, sent.size)
+        // Until the scale reads about 0 g, the tare is pending, so the brewer's weight cannot pass as a dose.
+        assertTrue(brew.live.value.taring)
         feed(1600)
         assertTrue(brew.live.value.tareFailed)
+        assertFalse(brew.live.value.taring)
         assertEquals(12.0, brew.live.value.grams!!, 0.01)
+        brew.tare(now)
+        assertFalse(brew.live.value.tareFailed)
+        assertTrue(brew.live.value.taring)
         feed(1200, to = 0.0)
         assertFalse(brew.live.value.tareFailed)
+        assertFalse(brew.live.value.taring)
         assertTrue(brew.live.value.zeroed)
     }
 

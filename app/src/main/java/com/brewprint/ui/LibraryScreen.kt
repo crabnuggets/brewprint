@@ -30,7 +30,15 @@ fun LibraryScreen(
 ) {
     var kind by rememberSaveable(requestedKind) { mutableStateOf(requestedKind ?: "") }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
-    var editing by rememberSaveable { mutableStateOf(false) }
+    // Picking from an empty list can only mean adding one, so the form opens directly and Back returns to the caller.
+    val pickingFromEmpty = onPicked != null && when (requestedKind) {
+        "beans" -> state.beans.none { !it.archived }
+        "grinders" -> state.grinders.none { !it.archived }
+        "recipes" -> state.recipes.none { !it.archived }
+        else -> false
+    }
+    var editing by rememberSaveable { mutableStateOf(pickingFromEmpty) }
+    val leaveEditor = { editing = false; if (pickingFromEmpty) onClose?.invoke(); Unit }
     var archive by rememberSaveable { mutableStateOf(false) }
     var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var settingDialog by rememberSaveable { mutableStateOf(false) }
@@ -54,13 +62,13 @@ fun LibraryScreen(
         when (kind) {
             "beans" -> BeansEditor(beans, onSave = { item ->
                 save(repository.upsertBeans(item)).also { if (it) saved(item.id) }
-            }, onBack = { editing = false })
+            }, onBack = leaveEditor)
             "grinders" -> GrinderEditor(grinder, onSave = { item ->
                 save(repository.upsertGrinder(item)).also { if (it) saved(item.id) }
-            }, onBack = { editing = false })
+            }, onBack = leaveEditor)
             "recipes" -> RecipeEditor(recipe, onSave = { item ->
                 save(repository.upsertRecipe(item)).also { if (it) saved(item.id) }
-            }, onBack = { editing = false })
+            }, onBack = leaveEditor)
         }
         return
     }

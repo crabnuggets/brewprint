@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brewprint.data.*
 import com.brewprint.scale.ScaleLink
+import com.brewprint.scale.ZERO_GRAMS
+import kotlin.math.abs
 import java.util.regex.Pattern
 
 /** The live scale and its one command. Tests replace it. */
@@ -56,24 +58,53 @@ val LocalScale = compositionLocalOf { ScaleUi() }
 
 internal fun tenths(value: Double?): String = value?.let { "%.1f".format(it) } ?: "–"
 
+/**
+ * What to tell the user when pairing fails, or null to stay quiet. Declining or cancelling is the user's own choice;
+ * only a search that found nothing suggests turning the scale on. [resultCode] is null when Android gives only text.
+ * With no reason at all (an empty picker result), a failure is not assumed.
+ */
+internal fun pairingFailure(resultCode: Int?, error: CharSequence?): String? {
+    val text = error?.toString().orEmpty().lowercase()
+    return when {
+        resultCode == CompanionDeviceManager.RESULT_USER_REJECTED || resultCode == CompanionDeviceManager.RESULT_CANCELED -> null
+        resultCode == CompanionDeviceManager.RESULT_DISCOVERY_TIMEOUT -> "No compatible scale found. Turn it on and try again."
+        resultCode != null -> "Couldn't pair the scale. Try again."
+        error == null -> null
+        "cancel" in text || "reject" in text -> null
+        "timeout" in text || "not found" in text || "no device" in text -> "No compatible scale found. Turn it on and try again."
+        else -> "Couldn't pair the scale. Try again."
+    }
+}
+
 /** Opens Android's companion device picker, then asks for Nearby devices once a scale is chosen. */
 @Composable
-internal fun rememberScalePairing(onPaired: (PairedScale) -> Unit): () -> Unit {
+internal fun rememberScalePairing(onFailed: (String) -> Unit = {}, onPaired: (PairedScale) -> Unit): () -> Unit {
     val context = LocalContext.current
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ScaleLink.sync(context) }
+    // The picker's result and the association callback can both report one failure; tell the user once per attempt.
+    val reported = remember { booleanArrayOf(false) }
+    val fail = { message: String? -> if (message != null && !reported[0]) { reported[0] = true; onFailed(message) } }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        val scale = result.data?.let(::chosenScale) ?: return@rememberLauncherForActivityResult
+        val scale = result.data?.let(::chosenScale)
+        if (scale == null) {
+            // The picker closes with Android's companion result code: declined or cancelled stays quiet.
+            fail(pairingFailure(result.resultCode.takeUnless { it == android.app.Activity.RESULT_OK }, null))
+            return@rememberLauncherForActivityResult
+        }
         onPaired(scale)
         if (!ScaleLink.allowed(context)) permission.launch(Manifest.permission.BLUETOOTH_CONNECT)
     }
     return {
+        reported[0] = false
         // Only named TIMEMORE scales, so the picker is not a list of every nearby device and MAC address.
         val scales = BluetoothLeDeviceFilter.Builder().setNamePattern(Pattern.compile(ScaleProtocol.NAME_PATTERN)).build()
         val request = AssociationRequest.Builder().addDeviceFilter(scales).setSingleDevice(false).build()
         context.getSystemService(CompanionDeviceManager::class.java)?.associate(request, object : CompanionDeviceManager.Callback() {
             @Deprecated("Also receives onAssociationPending from Android 13")
             override fun onDeviceFound(chooser: IntentSender) = picker.launch(IntentSenderRequest.Builder(chooser).build())
-            override fun onFailure(error: CharSequence?) {}
+            // Newer Android versions give the reason as a code; earlier ones give only text.
+            override fun onFailure(resultCode: Int, error: CharSequence?) { fail(pairingFailure(resultCode, error)) }
+            override fun onFailure(error: CharSequence?) { fail(pairingFailure(null, error)) }
         }, null)
     }
 }
@@ -106,7 +137,7 @@ internal fun forgetScale(context: Context, scale: PairedScale) {
 internal fun ScaleOffer(onPair: () -> Unit, onDismiss: () -> Unit) {
     Panel {
         Text("Brew with a scale?", style = MaterialTheme.typography.titleMedium)
-        Text("Starts the timer at your first pour and ends each pour at its target.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text("Starts the timer at your first pour and moves on when each pour reaches its target. You can pair one later in Settings.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Not now") }
             OutlinedButton(onClick = onPair, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Pair a scale") }
@@ -115,21 +146,27 @@ internal fun ScaleOffer(onPair: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-internal fun ScaleChip(name: String, connected: Boolean) {
+internal fun ScaleChip(name: String, connected: Boolean, reading: Boolean = true) {
     val colors = MaterialTheme.colorScheme
+    // "Off" only for a dropped link; a link that is up but sends nothing says "No reading", like the card.
+    val status = if (!connected) "Off" else if (!reading) "No reading" else null
+    val live = status == null
     Surface(shape = MaterialTheme.shapes.small, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant),
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$name, ${if (connected) "connected" else "not connected"}" }) {
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$name, ${if (!connected) "not connected" else if (!reading) "no reading" else "connected"}" }) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(8.dp).then(if (connected) Modifier.background(colors.onSurface, CircleShape) else Modifier.background(colors.outlineVariant, CircleShape)))
-            Text(name, color = if (connected) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+            Box(Modifier.size(8.dp).then(if (live) Modifier.background(colors.onSurface, CircleShape) else Modifier.background(colors.outlineVariant, CircleShape)))
+            Text(if (status == null) name else "$name · $status", color = if (live) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
 @Composable
-private fun Reading(label: String, value: Double?, note: String? = null) {
+private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false) {
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.semantics(mergeDescendants = true) { }) {
+    val note = plan?.let { "plan ${formatAmount(it)} g" }
+    val spoken = "$label, " + (value?.let { "${tenths(it)} grams" } ?: "no reading") + (plan?.let { ", plan ${formatAmount(it)} grams" } ?: "")
+    // [announce] makes a steady reading a polite live region, so TalkBack says when it becomes ready; a moving one stays quiet.
+    Column(Modifier.clearAndSetSemantics { contentDescription = spoken; if (announce) liveRegion = LiveRegionMode.Polite }) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tenths(value), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.SemiBold))
@@ -139,59 +176,100 @@ private fun Reading(label: String, value: Double?, note: String? = null) {
     }
 }
 
+/**
+ * Off zero with no tare pending: nothing changes until the user tares. A reading already near 0 g is settling
+ * toward a steady zero, so it is not asked for again.
+ */
+internal fun ScaleLive.needsTare(): Boolean = !zeroed && !taring && (grams?.let { abs(it) > ZERO_GRAMS } ?: true)
+
 /** The scale card before the first pour: tare the brewer, weigh the coffee, then wait at 0 g for the pour. */
 @Composable
-internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, onTare: () -> Unit, onUse: (Double) -> Unit, onSkip: () -> Unit, onWithout: () -> Unit) {
+internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ratio: Double, weighedDose: Double?, reconnected: Boolean, onTare: () -> Unit, onUse: (Double) -> Unit, onSkip: () -> Unit, onWithout: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Panel {
-        when (step) {
+        // With no readings, any weight would be stale and waiting would not help, so the card says so and offers the clock.
+        if (live.silent) {
+            Text("No scale reading", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
+            Text("Check that the scale is on, nearby, and not overloaded. Its reading comes back here.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        // Only the scale's own zero makes its display match the targets, so a tare it ignored leads the card and Tare is offered again.
+        } else if (live.tareFailed && step != ScaleStep.BREWER) {
+            Text("The scale didn't tare", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
+            Reading("On scale", live.grams)
+            Text("Tap Tare again, or press the scale's tare button.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+        } else when (step) {
             ScaleStep.BREWER -> {
                 Text("Put the brewer on the scale", style = MaterialTheme.typography.titleMedium)
+                // Back here after the scale dropped mid-weighing: its tare is unknown, and grounds may already be in the brewer.
+                if (reconnected) Text("Tare the brewer again. Take the coffee out first if you've added it.", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = colors.onSurface, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) { Reading("On scale", live.grams) }
-                    OutlinedButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                    Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
                 }
             }
-            ScaleStep.COFFEE -> {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Until the scale reads about 0 g, coffee must wait: grounds added now would be tared away or taken as the dose.
+            ScaleStep.COFFEE -> if (live.taring) Row(Modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.onSurface, trackColor = colors.outlineVariant)
+                Text("Taring the brewer", style = MaterialTheme.typography.titleMedium)
+            } else {
+                Row(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Outlined.Check, null, Modifier.size(18.dp))
                     Text("Brewer tared", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
                 HorizontalDivider(color = colors.outlineVariant)
-                val coffee = live.grams?.takeIf { live.steady && it >= 1.0 && !live.tareFailed }?.let(::roundedAmount)
-                Reading(if (coffee != null) "Coffee, steady" else "Add your coffee", live.grams, "plan ${formatAmount(plannedDose)} g")
+                // A reading that still counts as zero is not coffee.
+                val coffee = live.grams?.takeIf { live.steady && it > ZERO_GRAMS }?.let(::roundedAmount)
+                Reading(if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null)
+                // The weighed dose rescales this brew's pours; say so before the choice, not after.
+                if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatAmount(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Skip") }
+                    TextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
                     Button(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
                         Text(if (coffee != null) "Use ${formatAmount(coffee)} g" else "Use dose")
                     }
                 }
             }
             ScaleStep.ARMED -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { Reading(if (live.zeroed) "On scale, tared" else "Tare when the scale is still", live.grams) }
-                OutlinedButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                // The weighed dose belongs with a tared scale; off zero, the reading is what matters.
+                val label = if (live.zeroed) "On scale, tared" + weighedDose?.let { " · Weighed ${formatAmount(it)} g" }.orEmpty() else "On scale"
+                Box(Modifier.weight(1f)) { Reading(label, live.grams) }
+                // Off zero with no tare pending, nothing changes until the user tares, so Tare becomes the step's action.
+                if (live.needsTare()) Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                else OutlinedButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
             }
         }
-        // Only the scale's own zero makes its display match the targets, so a tare it ignored is not covered up.
-        if (live.tareFailed) Text("The scale didn't tare. Press its tare button.", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
         TextButton(onClick = onWithout, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Brew without the scale") }
     }
 }
 
+/**
+ * The sheet's footer once the scale is armed. The status says what the sheet is waiting for. Only a scale at 0 g
+ * offers "Start timer now"; until then, "Brew without the scale" on the card is the way to a clock-only start.
+ */
 @Composable
-internal fun ArmedFooter(onStartNow: () -> Unit, onFinishWithout: () -> Unit) {
+internal fun ArmedFooter(live: ScaleLive, onStartNow: () -> Unit, onFinishWithout: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Surface(Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.small, color = colors.surface, border = BorderStroke(1.dp, colors.outline)) {
-            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // After a failed tare the card leads with the retry, so the footer adds no status of its own.
+        if (!live.tareFailed && !live.silent) Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            val waiting = !live.needsTare()
+            if (waiting) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.onSurface, trackColor = colors.outlineVariant)
                 Spacer(Modifier.width(10.dp))
-                Text("Waiting for the first pour", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
             }
+            // The instruction is styled as text, not like the button beneath it; the action is Tare on the card.
+            Text(when {
+                live.zeroed -> "Waiting for the first pour"
+                live.taring -> "Waiting for the scale to read 0 g"
+                waiting -> "Waiting for the scale to settle"
+                else -> "Tare the scale to 0 g"
+            }, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                color = if (waiting) colors.onSurface else colors.onSurfaceVariant,
+                style = if (waiting) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onStartNow, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Start timer now") }
-            TextButton(onClick = onFinishWithout, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Finish without timing") }
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            if (live.zeroed) TextButton(onClick = onStartNow, modifier = Modifier.heightIn(min = 48.dp)) { Text("Start timer now") }
+            TextButton(onClick = onFinishWithout, modifier = Modifier.heightIn(min = 48.dp)) { Text("Finish without timing") }
         }
     }
 }

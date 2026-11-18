@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -98,22 +99,24 @@ fun GrinderDial(value: Int?, lastSetting: Int?, finish: DialFinish, onValue: (In
                 }
                 Box(Modifier.padding(horizontal = 20.dp)) { LibraryField(
                     input,
-                    { text -> input = text; pendingValue = parseGrindSetting(text); onValue(pendingValue) },
+                    // Invalid text stays in the field with its error; the brew keeps its last valid setting.
+                    { text -> input = text; parseGrindSetting(text)?.let { pendingValue = it; onValue(it) } },
                     "Enter value, ticks",
                     KeyboardType.Number,
-                    error = if (parseGrindSetting(input) == null) "Enter whole ticks from 0 to 100." else null,
+                    error = if (parseGrindSetting(input) == null) "Enter whole ticks from 0 to 100." + (pendingValue?.let { " This brew uses $it ticks." } ?: "") else null,
                 ) }
                 Text("Last recorded setting: ${lastSetting?.let { "$it ticks" } ?: "Not recorded"}", Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Text("Wheel finish", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.labelLarge)
                 FlowRow(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DialFinish.entries.forEach { material ->
+                        // The selected fill is subtle in both themes, so a check marks the choice too.
                         FilterChip(selected = finish == material, onClick = { onFinish(material) }, label = {
                             Text(when (material) {
                                 DialFinish.METAL -> "Brushed metal"
                                 DialFinish.MATTE -> "Matte black"
                                 DialFinish.GLASS -> "Frosted glass"
                             })
-                        })
+                        }, leadingIcon = if (finish == material) ({ Icon(androidx.compose.material.icons.Icons.Outlined.Check, null, Modifier.size(18.dp)) }) else null)
                     }
                 }
             }
