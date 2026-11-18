@@ -120,6 +120,19 @@ class BrewRepository(context: Context) {
         current.copy(timerSettings = settings) to Unit
     }
 
+    fun setScale(scale: PairedScale?): Result<Unit> = change { current ->
+        current.copy(scale = scale) to Unit
+    }
+
+    fun dismissScaleOffer(): Result<Unit> = change { current ->
+        current.copy(scaleOfferDismissed = true) to Unit
+    }
+
+    /** Applies a scale event to the active draft. Nothing changes without a draft. */
+    fun changeDraft(transform: (BrewDraft) -> BrewDraft): Result<Unit> = change { current ->
+        current.copy(draft = current.draft?.let(transform)) to Unit
+    }
+
     /** Applies a timer action to the active draft's timer, from the sheet or the live notification. */
     fun updateTimer(transform: (BrewDraft, BrewTimer, Recipe) -> BrewDraft): Result<Unit> = change { current ->
         val draft = current.draft
@@ -185,6 +198,7 @@ class BrewRepository(context: Context) {
             recipe = recipe,
             journal = draft.journal,
             timing = draft.timer?.timing(recipe),
+            scale = draft.scale?.takeIf { draft.timer != null },
         )
         current.copy(
             brews = (current.brews + record).sortedByDescending { it.startedAt },

@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scale brewing proposals</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></symbol>
+  <symbol id="skip" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5.6v12.8a.7.7 0 0 0 1.1.6l9.4-6.4a.7.7 0 0 0 0-1.2L6.1 5a.7.7 0 0 0-1.1.6z"/><rect x="17" y="5" width="2.6" height="14" rx="1.1"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
+  <symbol id="rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M3 9v-2a4 4 0 0 1 4-4M21 15v2a4 4 0 0 1-4 4"/></symbol>
+  <symbol id="warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 7l-5 5v-9l5 4-10 10"/></symbol>
+  <symbol id="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+</defs></svg>
+<template id="st"><div class="status"><span>9:41</span><i class="cam"></i><span class="ic"><i class="w"></i><i class="s"></i><i class="b"></i></span></div></template>
+
+<!-- ============================ A1 ============================ -->
+<section class="board" id="a1">
+  <div class="bh"><span class="tagp">A</span><div><h1>Scale on the brew sheet</h1><p>The scale plugs into the brew sheet that already exists. Same journey, same focus card; grams replace guesswork. Pair once in Settings, connect only while a brew sheet is open.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Settings</h2></div>
+      <div class="lbl" style="margin-top:6px">Coffee scale</div>
+      <div class="card" style="padding:12px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:16px;font-weight:600">Dotty</div><div class="small" style="color:var(--dim);font-size:13px">TIMEMORE Dot · Battery 87%</div></div><span class="btn out sm">Forget</span></div>
+        <div class="set"><div><h5>Use when brewing</h5><p>Connects while a brew sheet is open</p></div><i class="sw on"></i></div>
+        <div class="set"><div><h5>Start timer at first pour</h5><p>When 2 g lands after taring</p></div><i class="sw on"></i></div>
+        <div class="set"><div><h5>End pours by weight</h5><p>The wait starts when a pour reaches its target</p></div><i class="sw on"></i></div>
+      </div>
+      <div class="lbl">Brew timer</div>
+      <div class="card" style="padding:4px 16px">
+        <div class="set"><div><h5>Live notification</h5></div><i class="sw"></i></div>
+        <div class="set"><div><h5>Vibrate at each step</h5></div><i class="sw on"></i></div>
+        <div class="set"><div><h5>Keep screen on while brewing</h5></div><i class="sw on"></i></div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Pair once in Settings</h3><p>"Add a scale" opens Android's device picker. After that the scale connects only while a brew sheet is open, so nothing scans in the background.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span></div><div class="g"><span>15 g, 1:16, 240 g</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="card" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px 10px 18px">
+        <div><div class="small" style="color:var(--dim);font-size:13px">On scale</div><div style="font-size:30px;font-weight:600;letter-spacing:-1px">0.0<small style="font-size:16px;font-weight:500;margin-left:3px">g</small></div></div>
+        <span class="btn out sm" style="height:48px;padding:0 20px">Tare</span>
+      </div>
+      <div class="sec">Planned pours</div>
+      <div>
+        <div class="p"><span class="t">0:00</span><i class="dot"></i><div><div class="a">Bloom, add 45 g</div><div class="d">Pour 10 s, wait 35 s</div></div></div>
+        <div class="p"><span class="t">0:45</span><i class="dot"></i><div><div class="a">Pulse 2, add 50 g</div><div class="d">To 95 g total. Pour 15 s, wait 20 s</div></div></div>
+        <div class="p"><span class="t">1:20</span><i class="dot"></i><div><div class="a">Pulse 3, add 50 g</div><div class="d">To 145 g total. Pour 15 s, wait 20 s</div></div></div>
+        <div class="more" style="padding-left:60px">2 more pulses</div>
+      </div>
+      <div class="foot">
+        <div class="btn out" style="border-style:dashed"><span class="in"><i class="ring"></i>Waiting for the first pour</span></div>
+        <div class="pair eq"><div class="btn txt">Start timer now</div><div class="btn txt">Finish without timing</div></div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Armed, not started</h3><p>Start timer becomes a waiting state once the scale is tared. Start timer now covers a missed pour. Without a scale this screen is unchanged.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Pour</span><span class="who">Pulse 3 of 5</span></span><span>Brew time<em>1:28</em></span></div>
+        <div class="b"><div><div class="k">Pour to</div><div class="n soft">145<small>g</small></div></div><div><div class="k">On scale</div><div class="n">132.4<small>g</small></div></div></div>
+        <div class="bar"><i style="width:75%"></i></div>
+        <div class="d"><span>12.6 g to go · <b>3.4 g/s</b></span><span>7 s left</span></div>
+      </div>
+      <div class="plan" data-t="88"></div>
+      <div class="sec">Next<a>2 done, show plan</a></div>
+      <div class="nx w"><span class="t">1:35</span><div><div class="a">Wait 20 s</div></div></div>
+      <div class="nx"><span class="t">1:55</span><div><div class="a">Pulse 4, add 50 g</div><div class="d">To 195 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Pour done</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Pour, filled by weight</h3><p>The bar tracks grams instead of seconds. Seconds left stay as a pacing hint. At 145 g the pour ends by itself; Pour done still works.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Wait</span><span class="who">After pulse 3 of 5</span></span><span>Brew time<em>1:43</em></span></div>
+        <div class="b"><div><div class="k">Then pour to</div><div class="n soft">195<small>g</small></div></div><div><div class="k">Time left</div><div class="n">12<small>s</small></div></div></div>
+        <div class="bar"><i style="width:40%"></i></div>
+        <div class="d"><span>Pulse 3 reached 146.1 g</span><span>1.1 g over</span></div>
+      </div>
+      <div class="plan" data-t="103"></div>
+      <div class="sec">Next<a>3 done, show plan</a></div>
+      <div class="nx"><span class="t">1:55</span><div><div class="a">Pulse 4, add 50 g</div><div class="d">To 195 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="nx"><span class="t">2:30</span><div><div class="a">Pulse 5, add 45 g</div><div class="d">To 240 g total. Pour 15 s</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Start pulse 4 now</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>4</b><div><h3>Wait stays on the clock</h3><p>The scale cannot tell a wait from a slow pour, so waits run on time. If water lands early the next pulse starts, like Start pulse 4 now.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ A2 ============================ -->
+<section class="board" id="a2">
+  <div class="bh"><span class="tagp">A</span><div><h1>Scale on the brew sheet: losing it, finishing, the record</h1><p>A lost scale degrades to the clock-only timer. The record gains measured water per pulse; there is still no title to type.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl off"><i></i>Reconnecting</span></div>
+      <div class="warn" style="margin-bottom:10px"><b>Scale disconnected</b><p>Following the clock until it is back.</p></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Pour</span><span class="who">Pulse 4 of 5</span></span><span>Brew time<em>1:47</em></span></div>
+        <div class="b"><div><div class="k">Pour to</div><div class="n">195<small>g</small></div></div><div><div class="k">Time left</div><div class="n">11<small>s</small></div></div></div>
+        <div class="bar"><i style="width:27%"></i></div>
+        <div class="d"><span>Add 50 g over 15 s</span><span>then wait 20 s</span></div>
+      </div>
+      <div class="plan" data-t="119"></div>
+      <div class="sec">Next<a>3 done, show plan</a></div>
+      <div class="nx w"><span class="t">2:10</span><div><div class="a">Wait 20 s</div></div></div>
+      <div class="nx"><span class="t">2:30</span><div><div class="a">Pulse 5, add 45 g</div><div class="d">To 240 g total. Pour 15 s</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Pour done</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>5</b><div><h3>Scale lost mid-brew</h3><p>The focus card returns to the accepted clock layout. Steps keep their schedule; the scale rejoins without a tap and the card swaps back.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass" style="padding:16px 18px">
+        <div class="state" style="font-size:30px;font-weight:600;letter-spacing:-.8px">Drawdown</div>
+        <div class="k" style="margin-top:6px;font-size:13.5px;color:var(--dim)">Brew time</div>
+        <div style="font-size:52px;font-weight:600;letter-spacing:-2px;line-height:1">3:21</div>
+        <div class="kv" style="margin-top:12px"><span>Water</span><b>241.3 g<small>planned 240 g</small></b></div>
+        <div class="kv"><span>Ratio</span><b>1:16.1</b></div>
+      </div>
+      <div class="plan" data-t="999"></div>
+      <div class="sec">All 5 pulses done<a>Show plan</a></div>
+      <div class="foot"><div class="btn pri">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>6</b><div><h3>Drawdown</h3><p>Measured water and ratio join brew time. The scale cannot see drawdown end, so Finish brew stays a tap.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Finish brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>26 ticks</span></div>
+        <div class="kv" style="margin-top:10px"><span>Today, 09:40</span></div>
+        <div class="kv"><span>Total brew time</span><b>3:24</b></div>
+        <div class="kv"><span>Water poured</span><b>241.3 g</b></div>
+      </div>
+      <div class="q">How was this cup?</div>
+      <div class="ta">What did you notice? Everyday words are welcome.</div>
+      <div class="card" style="margin-top:10px;padding:14px 18px;display:flex;justify-content:space-between"><span style="font-weight:500">Explore the taste</span><span style="color:var(--dim)">⌄</span></div>
+      <div class="foot"><div class="help">You can taste first and add notes later.</div><div class="btn pri">Save brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>7</b><div><h3>Finish brew review</h3><p>One new line, Water poured. No title field: beans, recipe and date already name a brew in History.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>15 g, 1:16.1</span></div><div class="g"><span>Today, 09:40</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="sec">Timing and water</div>
+      <div class="card" style="padding:12px 16px">
+        <svg class="ch" data-w="306" data-h="110" data-t="200" data-actual data-targets="all"></svg>
+        <div class="tb">
+          <span class="h">Pulse</span><span class="h r">Plan</span><span class="h r">Started</span><span class="h r">Reached</span>
+          <span>Bloom</span><span class="r x">0:00</span><span class="r">0:00</span><span class="r">45.8 g</span>
+          <span>Pulse 2</span><span class="r x">0:45</span><span class="r">0:45</span><span class="r">96.0 g</span>
+          <span>Pulse 3</span><span class="r x">1:20</span><span class="r">1:20</span><span class="r">146.1 g</span>
+          <span>Pulse 4</span><span class="r x">1:55</span><span class="r"><b>1:43</b></span><span class="r">195.9 g</span>
+          <span>Pulse 5</span><span class="r x">2:30</span><span class="r"><b>2:33</b></span><span class="r">241.3 g</span>
+        </div>
+      </div>
+      <div class="card rowlink">Add tasting notes<span>›</span></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>8</b><div><h3>Saved record</h3><p>The Timing section becomes Timing and water: a small weight curve against the plan's targets, and the scale reading each pulse reached.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ B1 ============================ -->
+<section class="board" id="b1">
+  <div class="bh"><span class="tagp">B</span><div><h1>Live brew instrument</h1><p>A dedicated live screen that reads like an instrument: weight first, flow and ratio around it, the plan as an overlay. The scale lives on Brew home and connects the moment it powers on.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="h1">Brew<svg><use href="#gear"/></svg></div>
+      <div class="fc glass" style="padding:14px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--dim)"><span class="scl" style="border:0;padding:0;height:auto;background:none;color:var(--on)"><i></i>Dotty</span><span>87%</span></div>
+        <div style="font-size:60px;font-weight:600;letter-spacing:-2.6px;line-height:1.05;margin-top:6px">0.0<small style="font-size:24px;font-weight:500;margin-left:4px">g</small></div>
+        <div class="pair eq" style="margin-top:12px"><div class="btn out sm" style="height:48px">Tare</div><div class="btn pri sm" style="height:48px">Quick brew</div></div>
+      </div>
+      <div class="btn out" style="margin-top:12px">New brew from a recipe</div>
+      <div class="sec" style="margin-top:14px">Most recent brew<span style="font-weight:400;color:var(--dim);font-size:13.5px">Today, 08:30</span></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Quick brew</span><span>15.2 g · 1:15.9 · 3:24</span></div>
+        <svg class="ch" data-w="306" data-h="76" data-t="200" data-actual style="margin-top:8px"></svg></div>
+      <div class="card" style="position:absolute;left:14px;right:14px;bottom:22px;height:68px;border-radius:26px;display:grid;grid-template-columns:repeat(3,1fr);padding:6px;font-size:13px"><span style="display:grid;place-items:center;border-radius:20px;background:var(--high);font-weight:600">Brew</span><span style="display:grid;place-items:center;color:var(--dim)">History</span><span style="display:grid;place-items:center;color:var(--dim)">Library</span></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Scale on Brew home</h3><p>Companion-device presence wakes Brewprint when the scale powers on, and the live reading appears here. Quick brew skips the recipe.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="h1">Brew<svg><use href="#gear"/></svg></div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h3>Quick brew</h3>
+        <div class="card" style="margin-top:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;color:var(--dim)">Beans</div><div style="font-weight:600;font-size:16px">Ethiopia natural</div></div><span style="color:var(--dim);font-size:18px">›</span></div>
+        <div class="card" style="margin-top:10px;padding:12px 16px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:13px;color:var(--dim)">Dose, weighed</div><span class="tag" style="margin:0"><b style="color:var(--on)">Steady</b></span></div>
+          <div style="font-size:44px;font-weight:600;letter-spacing:-1.8px;line-height:1.05">15.2<small style="font-size:20px;font-weight:500;margin-left:3px">g</small></div>
+          <div class="small" style="color:var(--dim);font-size:13px">Locks when the scale holds still for 2 s</div>
+        </div>
+        <div class="pair eq" style="margin-top:10px">
+          <div class="card" style="padding:12px 16px"><div style="font-size:13px;color:var(--dim)">Ratio</div><div style="font-size:24px;font-weight:600">1 : 16</div></div>
+          <div class="card" style="padding:12px 16px"><div style="font-size:13px;color:var(--dim)">Water target</div><div style="font-size:24px;font-weight:600">243.2 g</div></div>
+        </div>
+        <div class="help" style="margin-top:16px">Ready tares the scale. The clock starts with your first pour.</div>
+        <div class="btn pri">Ready</div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Weigh the dose</h3><p>Ground coffee on the scale; the dose locks when steady. The target follows the ratio. Recipes use the same dose step before the brew sheet.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2></h2><span class="scl"><i></i>Dotty</span><span class="ib r"><svg><use href="#rot"/></svg></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:2px">
+        <div><div style="font-size:13.5px;color:var(--dim)">Brew time</div><div style="font-size:34px;font-weight:500;letter-spacing:-1px">2:04</div></div>
+        <div style="text-align:right"><div style="font-size:13.5px;color:var(--dim)">Flow</div><div style="font-size:34px;font-weight:500;letter-spacing:-1px">4.2<small style="font-size:15px;margin-left:3px">g/s</small></div></div>
+      </div>
+      <div style="text-align:center;margin-top:8px"><div style="font-size:13.5px;color:var(--dim)">Water</div><div style="font-size:86px;font-weight:600;letter-spacing:-4px;line-height:1">177.4<small style="font-size:30px;font-weight:500;letter-spacing:-.4px;margin-left:4px">g</small></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:14px;color:var(--dim)"><span>Ratio <b style="color:var(--on);font-size:17px">1:11.7</b></span><span>Target <b style="color:var(--on);font-size:17px">1:16</b></span></div>
+      <div class="bar" style="height:8px;overflow:visible"><i style="width:73%"></i><span style="position:absolute;left:100%;top:-5px;width:2px;height:18px;background:var(--on);margin-left:-2px"></span><span style="position:absolute;left:80.2%;top:-4px;width:2px;height:16px;background:var(--rule)"></span></div>
+      <div style="font-size:12.5px;color:var(--dim);margin-top:6px;text-align:right">Pulse 4 · pour to 195 g</div>
+      <div class="card" style="margin-top:12px;padding:12px 10px 6px">
+        <div class="leg" style="padding-left:8px;margin-bottom:6px"><span><i></i>Water</span><span><i class="f"></i>Flow</span><span><i class="t"></i>Targets</span></div>
+        <svg class="ch" data-w="328" data-h="150" data-t="124" data-from="45" data-span="170" data-flow data-targets="145,195" data-dot></svg>
+      </div>
+      <div class="foot" style="flex-direction:row;justify-content:center;gap:12px"><div class="btn out" style="width:64px;border-radius:32px"><svg><use href="#pause"/></svg></div><div class="btn pri" style="flex:1">Finish</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Live screen</h3><p>Weight leads. Flow, ratio and the curve sit around it. With a recipe, the next target is a line on the chart and a mark on the ratio bar.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2></h2><span class="scl off"><i></i>Reconnecting</span><span class="ib r"><svg><use href="#rot"/></svg></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:2px">
+        <div><div style="font-size:13.5px;color:var(--dim)">Brew time</div><div style="font-size:34px;font-weight:500;letter-spacing:-1px">2:16</div></div>
+        <div style="text-align:right"><div style="font-size:13.5px;color:var(--dim)">Flow</div><div style="font-size:34px;font-weight:400;letter-spacing:-1px;color:var(--faint)">–</div></div>
+      </div>
+      <div style="text-align:center;margin-top:8px"><div style="font-size:13.5px;color:var(--dim)">Last reading</div><div style="font-size:86px;font-weight:300;letter-spacing:-4px;line-height:1;color:var(--faint)">177.4<small style="font-size:30px;margin-left:4px">g</small></div></div>
+      <div class="warn" style="margin-top:16px"><b>Scale disconnected</b><p>Brew time keeps running. Readings resume when Dotty is back; the gap stays in the curve.</p></div>
+      <div class="card" style="margin-top:12px;padding:12px 10px 6px">
+        <svg class="ch" data-w="328" data-h="150" data-t="124" data-from="45" data-span="170" data-flow data-targets="145,195"></svg>
+      </div>
+      <div class="foot" style="flex-direction:row;justify-content:center;gap:12px"><div class="btn out" style="width:64px;border-radius:32px"><svg><use href="#pause"/></svg></div><div class="btn pri" style="flex:1">Finish</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>4</b><div><h3>Scale lost</h3><p>Numbers grey out rather than vanish. A brew from a recipe would fall back to the clock-based steps; a quick brew just keeps time.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ B2 ============================ -->
+<section class="board" id="b2">
+  <div class="bh"><span class="tagp">B</span><div><h1>Live brew instrument: landscape, summary, record</h1><p>Turn the phone for a ratio gauge. Finishing opens a data summary; the record keeps the curve.</p></div></div>
+  <div class="row">
+    <div class="col w"><div class="phone land"><div class="screen"><div class="body" style="padding:18px 28px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="ib" style="margin-left:-8px"><svg><use href="#back"/></svg></span><span class="scl"><i></i>Dotty</span></div>
+      <div style="display:grid;grid-template-columns:1fr 320px 1fr;align-items:center;margin-top:-30px">
+        <div style="text-align:center"><div style="font-size:15px;color:var(--dim)">Brew time</div><div style="font-size:72px;font-weight:500;letter-spacing:-3px;line-height:1">2:06</div></div>
+        <div style="position:relative;height:280px"><svg class="gauge" data-v="13.9" data-target="16" width="320" height="280" viewBox="0 0 320 280"></svg>
+          <div style="position:absolute;left:0;right:0;top:118px;text-align:center"><div style="font-size:13px;color:var(--dim)">Ratio</div><div style="font-size:40px;font-weight:600;letter-spacing:-1.4px">1:13.9</div><div style="font-size:13px;color:var(--dim);margin-top:4px">Pulse 5 · to 240 g</div></div></div>
+        <div style="text-align:center"><div style="font-size:15px;color:var(--dim)">Water</div><div style="font-size:72px;font-weight:600;letter-spacing:-3px;line-height:1">211.4<small style="font-size:26px;font-weight:500;margin-left:3px">g</small></div><div style="font-size:20px;color:var(--dim);margin-top:6px">3.1 g/s</div></div>
+      </div>
+      <div style="position:absolute;bottom:18px;left:50%;margin-left:-32px" class="btn out"><span style="width:64px;display:grid;place-items:center"><svg><use href="#pause"/></svg></span></div>
+    </div></div></div>
+      <div class="cap"><b>5</b><div><h3>Turn the phone</h3><p>Landscape trades the chart for a ratio gauge readable from a step away. The tick marks the target; the arc fills with water.</p></div></div>
+      <div class="card" style="margin-top:26px;padding:18px 22px;background:transparent;border-style:dashed">
+        <div style="font-weight:600;font-size:15px">What changes in B</div>
+        <p style="color:var(--dim);font-size:13.5px;margin-top:6px">Brew home gains a live scale card and Quick brew, a no-recipe path that still records beans, dose and ratio. With a recipe, New brew → setup → dose → this live screen, which replaces the focus card while a scale is connected. The record leads with the curve and stat tiles, as in the Timemore app, but keeps Brewprint's tasting journal.</p>
+      </div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew summary</h2></div>
+      <div class="card" style="padding:12px 10px 6px">
+        <div class="leg" style="padding-left:8px;margin-bottom:6px"><span><i></i>Water</span><span><i class="f"></i>Flow</span></div>
+        <svg class="ch" data-w="328" data-h="130" data-t="204" data-actual data-flow></svg>
+      </div>
+      <div class="tiles" style="margin-top:10px">
+        <div class="tile"><span>Brew time</span><b>3:24</b></div>
+        <div class="tile"><span>Dose</span><b>15.2<small>g</small></b></div>
+        <div class="tile"><span>Water</span><b>241.3<small>g</small></b></div>
+        <div class="tile"><span>Ratio</span><b>1:15.9</b></div>
+        <div class="tile"><span>Peak flow</span><b>4.6<small>g/s</small></b></div>
+        <div class="tile ghost"><span>Beverage</span><b>Lift the dripper to weigh</b></div>
+      </div>
+      <div class="q" style="margin-top:14px">How was this cup?</div>
+      <div class="ta" style="height:74px">What did you notice? Everyday words are welcome.</div>
+      <div class="foot"><div class="btn pri">Save brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>6</b><div><h3>Brew summary</h3><p>Stat tiles and the curve first, then the tasting prompt. Beverage weight fills in if the dripper is lifted with the cup still on the scale.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>26 ticks</span></div><div class="g"><span>Today, 09:40</span><span>Hand grinder</span></div></div>
+      <div class="card" style="margin-top:10px;padding:12px 10px 6px">
+        <svg class="ch" data-w="328" data-h="120" data-t="204" data-actual data-flow data-targets="all"></svg>
+      </div>
+      <div class="tiles" style="margin-top:10px">
+        <div class="tile"><span>Brew time</span><b>3:24</b></div>
+        <div class="tile"><span>Water</span><b>241.3<small>g</small></b></div>
+        <div class="tile"><span>Ratio</span><b>1:15.9</b></div>
+      </div>
+      <div class="card" style="margin-top:10px;padding:13px 16px"><div style="font-size:13px;color:var(--dim)">How was this cup?</div><div style="margin-top:3px">Smells like cocoa; lighter than I expected.</div></div>
+      <div class="card rowlink">Pulse timing<span>›</span></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>7</b><div><h3>Saved record</h3><p>The curve, with the plan's targets dashed, sits under the header. Pulse timing moves behind a row.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ C1 ============================ -->
+<section class="board" id="c1">
+  <div class="bh"><span class="tagp">C</span><div><h1>Hands-free brew</h1><p>The scale drives the brew. Each stage advances on what the scale sees, so the phone can sit on the counter and both hands stay on the kettle.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span></div><div class="g"><span>15 g, 1:16, 240 g</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="sec">Planned pours</div>
+      <div class="p"><span class="t">0:00</span><i class="dot"></i><div><div class="a">Bloom, add 45 g</div><div class="d">Pour 10 s, wait 35 s</div></div></div>
+      <div class="p"><span class="t">0:45</span><i class="dot"></i><div><div class="a">Pulse 2, add 50 g</div><div class="d">To 95 g total</div></div></div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h3>Scale nearby</h3>
+        <div class="card" style="margin-top:14px;padding:14px 16px;display:flex;gap:14px;align-items:center"><span style="width:44px;height:44px;border-radius:50%;border:2px solid var(--on);display:grid;place-items:center;font-weight:700">87</span><div><div style="font-weight:600;font-size:16px">Dotty</div><div style="font-size:13px;color:var(--dim)">TIMEMORE Dot</div></div></div>
+        <p style="color:var(--dim);font-size:14px;margin:14px 2px 0">Brewprint will weigh your dose, start the clock at your first pour and move through each pulse by weight.</p>
+        <div class="foot" style="margin-top:18px"><div class="btn pri">Brew with Dotty</div><div class="btn txt">Not now</div></div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Offered where it matters</h3><p>The first time a brew sheet opens near a powered scale, Brewprint offers it. Android confirms once; from then on it connects by itself.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="stages"><span class="done">✓ Brewer</span><span class="on">Coffee</span><span>Pour</span></div>
+      <div class="dial" data-f="1.013"><div class="c"><div class="k">Coffee</div><div class="v">15.2<small>g</small></div><div class="s">Plan <b>15 g</b></div></div></div>
+      <div class="say">Dose recorded<small>Water target 243 g, keeping 1:16</small></div>
+      <div class="foot"><div class="help">Pour when ready. The clock starts with the first drop.</div><div class="pair eq"><div class="btn out">Keep 240 g</div><div class="btn out">Weigh again</div></div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Brewer, then coffee</h3><p>Brewer on the scale: tared when still. Coffee in: the dose is read when steady for 2 s, and targets rescale. The app tares in software, so the scale's own display is untouched.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2><span class="scl"><i></i>1:28</span></div>
+      <div class="stages"><span class="done">✓</span><span class="done">✓</span><span class="on">Pour 3 of 5</span></div>
+      <div class="dial" data-f="0.75" data-warn="0.9"><div class="c"><div class="k">On scale</div><div class="v">132.4<small>g</small></div><div class="s">Pour to <b>145 g</b></div></div></div>
+      <div class="say">12.6 g to go</div>
+      <div class="strip3" style="margin-top:14px"><div><span>Flow</span><b>3.4<small>g/s</small></b></div><div><span>Ratio</span><b>1:8.7</b></div><div><span>Next</span><b>Wait 20<small>s</small></b></div></div>
+      <div class="foot"><div class="pair eq"><div class="btn txt"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn txt">Finish brew</div></div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Pour to the ring</h3><p>One ring per pulse fills to its target. A short buzz at the white mark (90%), a long one at the target. The pour ends when the weight stops rising.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2><span class="scl"><i></i>1:43</span></div>
+      <div class="stages"><span class="done">✓</span><span class="done">✓</span><span class="on">Wait, then 4</span></div>
+      <div class="dial" data-f="0.6" data-mode="count"><div class="c"><div class="k">Wait</div><div class="v">12<small>s</small></div><div class="s">Then pour to <b>195 g</b></div></div></div>
+      <div class="say">Pulse 3 reached 146.1 g<small>1.1 g over</small></div>
+      <div class="strip3" style="margin-top:14px"><div><span>Flow</span><b>0.0<small>g/s</small></b></div><div><span>Ratio</span><b>1:9.6</b></div><div><span>Next</span><b>Add 50<small>g</small></b></div></div>
+      <div class="foot"><div class="pair eq"><div class="btn txt"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn txt">Finish brew</div></div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>4</b><div><h3>Wait, counting down</h3><p>The ring drains in grey. Water landing early simply starts pulse 4; no skip button is needed while the scale is connected.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ C2 ============================ -->
+<section class="board" id="c2">
+  <div class="bh"><span class="tagp">C</span><div><h1>Hands-free brew: losing the scale, finishing, the record</h1><p>Lifting the dripper ends the brew. The cup is weighed while it is still on the scale. The review writes its own summary.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2><span class="scl off"><i></i>1:47</span></div>
+      <div class="warn"><b>Scale disconnected</b><p>Pulses now follow the recipe's clock.</p></div>
+      <div class="dial" data-f="0.27" data-mode="count" style="margin-top:6px"><div class="c"><div class="k">Pour · pulse 4</div><div class="v soft">11<small>s</small></div><div class="s">Pour to <b>195 g</b> by eye</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Pour done</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>5</b><div><h3>Scale lost</h3><p>The ring switches to time, and the manual skip returns because the scale can no longer move the steps.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="stages"><span class="done">✓</span><span class="done">✓</span><span class="done">✓ Pour</span></div>
+      <div class="dial" data-f="1"><div class="c"><div class="k">Brew time</div><div class="v">3:24</div><div class="s">Water <b>241.3 g</b> · 1:15.9</div></div></div>
+      <div class="say">Brew finished<small>The dripper came off at 3:24</small></div>
+      <div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;padding:12px 16px"><div><div style="font-size:13px;color:var(--dim)">In the cup</div><div style="font-size:24px;font-weight:600">212.4 g</div></div><span class="small" style="color:var(--dim);font-size:13px;max-width:150px;text-align:right">Read once the cup is still</span></div>
+      <div class="snack" style="bottom:96px"><span>Finished at 3:24</span><b>Undo</b></div>
+      <div class="foot"><div class="btn pri">Continue</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>6</b><div><h3>Lift to finish</h3><p>A sudden drop of the brewer's weight after the last pour finishes the brew, with Undo for 5 s. The cup left on the scale gives the beverage weight.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Finish brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>26 ticks</span></div>
+        <div class="tiles" style="margin-top:12px;grid-template-columns:1fr 1fr 1fr">
+          <div class="tile" style="padding:8px 10px"><span>Time</span><b style="font-size:18px">3:24</b></div>
+          <div class="tile" style="padding:8px 10px"><span>Dose</span><b style="font-size:18px">15.2<small>g</small></b></div>
+          <div class="tile" style="padding:8px 10px"><span>Ratio</span><b style="font-size:18px">1:15.9</b></div>
+        </div>
+        <div style="margin-top:12px;font-size:13px;color:var(--dim)">Grams over each pulse's target</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:6px;text-align:center">
+          <div class="tile" style="padding:6px 0"><span>Bloom</span><b style="font-size:15px">+0.8</b></div>
+          <div class="tile" style="padding:6px 0"><span>2</span><b style="font-size:15px">+1.0</b></div>
+          <div class="tile" style="padding:6px 0"><span>3</span><b style="font-size:15px">+1.1</b></div>
+          <div class="tile" style="padding:6px 0"><span>4 early</span><b style="font-size:15px">+0.9</b></div>
+          <div class="tile" style="padding:6px 0"><span>5</span><b style="font-size:15px">+1.3</b></div>
+        </div>
+      </div>
+      <div class="q">How was this cup?</div>
+      <div class="ta">What did you notice? Everyday words are welcome.</div>
+      <div class="foot"><div class="help">You can taste first and add notes later.</div><div class="btn pri">Save brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>7</b><div><h3>Finish brew review</h3><p>Three tiles and each pulse's grams over target replace typing. Everything shown was measured; nothing asks for a title.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>15.2 g, 1:15.9</span></div><div class="g"><span>Today, 09:40</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="card" style="margin-top:10px;padding:13px 16px"><div style="font-size:13px;color:var(--dim)">How was this cup?</div><div style="margin-top:3px">Smells like cocoa; lighter than I expected.</div></div>
+      <div class="sec">Measured</div>
+      <div class="card" style="padding:4px 16px 8px">
+        <div class="kv" style="border-top:0"><span>Total brew time</span><b>3:24</b></div>
+        <div class="kv"><span>Dose</span><b>15.2 g<small>planned 15 g</small></b></div>
+        <div class="kv"><span>Water poured</span><b>241.3 g<small>planned 243 g</small></b></div>
+        <div class="kv"><span>In the cup</span><b>212.4 g</b></div>
+        <div class="kv"><span>Pulses</span><b>2 off schedule</b></div>
+      </div>
+      <div class="card rowlink">Pour curve and timing<span>›</span></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>8</b><div><h3>Saved record</h3><p>Tasting first, then a compact Measured list. The curve and per-pulse timing live one tap deeper.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ S1 ============================ -->
+<section class="board" id="s1">
+  <div class="bh"><span class="tagp">S</span><div><h1>Combined flow: pairing to the first pour</h1><p>A's brew sheet stays the backbone. The scale is offered where it matters, weighs the dose when asked, tares itself, and waits for the first pour.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span></div><div class="g"><span>15 g, 1:16, 240 g</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="card" style="margin-top:10px;padding:14px 16px">
+        <div style="font-weight:600;font-size:16px">Brew with a scale?</div>
+        <div style="color:var(--dim);font-size:13.5px;margin-top:2px">Starts the timer at your first pour and ends each pour at its target.</div>
+        <div class="pair eq" style="margin-top:12px"><div class="btn txt" style="height:44px">Not now</div><div class="btn out sm" style="height:44px">Pair a scale</div></div>
+      </div>
+      <div class="sec">Planned pours</div>
+      <div class="p"><span class="t">0:00</span><i class="dot"></i><div><div class="a">Bloom, add 45 g</div><div class="d">Pour 10 s, wait 35 s</div></div></div>
+      <div class="p"><span class="t">0:45</span><i class="dot"></i><div><div class="a">Pulse 2, add 50 g</div><div class="d">To 95 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="p"><span class="t">1:20</span><i class="dot"></i><div><div class="a">Pulse 3, add 50 g</div><div class="d">To 145 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="foot"><div class="help">Tap as you begin the first pour.</div><div class="btn pri">Start timer</div><div class="btn txt">Finish without timing</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Offered once, where it matters</h3><p>From C. Pair a scale opens Android's device picker (A), then asks for Nearby devices once. Not now hides it for good. Settings keeps Add, Forget and a "Blocked by Android" notice; no behavior switches.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span></div><div class="g"><span>15 g, 1:16, 240 g</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="fc glass" style="margin-top:10px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--dim);padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid var(--hair)"><svg style="width:16px;height:16px;color:var(--on)"><use href="#chk"/></svg>Brewer on and tared</div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13.5px;color:var(--dim)">Coffee on the scale</span><span class="tag" style="margin:0;color:var(--on);font-weight:600">Steady</span></div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:2px"><div class="n" style="font-size:52px;font-weight:600;letter-spacing:-2px;line-height:1.05">15.2<small style="font-size:22px;font-weight:500;margin-left:3px">g</small></div><span style="color:var(--dim)">plan 15 g</span></div>
+        <div class="pair" style="margin-top:12px;grid-template-columns:1fr 1.4fr"><div class="btn txt" style="height:48px">Skip</div><div class="btn pri" style="height:48px;font-size:15px">Use 15.2 g</div></div>
+      </div>
+      <div class="sec">Planned pours</div>
+      <div class="p"><span class="t">0:00</span><i class="dot"></i><div><div class="a">Bloom, add 45 g</div><div class="d">Pour 10 s, wait 35 s</div></div></div>
+      <div class="p"><span class="t">0:45</span><i class="dot"></i><div><div class="a">Pulse 2, add 50 g</div><div class="d">To 95 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="more" style="padding-left:60px">3 more pulses</div>
+      <div class="foot"><div class="btn txt">Brew without the scale</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Weigh the dose, if you like</h3><p>From B, made optional. Brewer on, Tare, then coffee; you confirm the steady reading. Targets never rescale. Skip asks you to add coffee, then Tare, so grounds cannot start the timer.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span></div><div class="g"><span>15 g, 1:16, 240 g</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="card" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px 10px 18px">
+        <div><div style="color:var(--dim);font-size:13px">On scale, tared · Weighed 15.2 g</div><div style="font-size:30px;font-weight:600;letter-spacing:-1px">0.0<small style="font-size:16px;font-weight:500;margin-left:3px">g</small></div></div>
+        <span class="btn out sm" style="height:48px;padding:0 20px">Tare</span>
+      </div>
+      <div class="sec">Planned pours</div>
+      <div class="p"><span class="t">0:00</span><i class="dot"></i><div><div class="a">Bloom, add 45 g</div><div class="d">Pour 10 s, wait 35 s</div></div></div>
+      <div class="p"><span class="t">0:45</span><i class="dot"></i><div><div class="a">Pulse 2, add 50 g</div><div class="d">To 95 g total. Pour 15 s, wait 20 s</div></div></div>
+      <div class="more" style="padding-left:60px">3 more pulses</div>
+      <div class="foot">
+        <div class="btn out" style="border-style:dashed"><span class="in"><i class="ring"></i>Waiting for the first pour</span></div>
+        <div class="pair eq"><div class="btn txt">Start timer now</div><div class="btn txt">Finish without timing</div></div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Tared and armed</h3><p>From A. The scale's own tare, so its display matches the targets. The screen stays on from here. A sustained rise starts the timer, backdated, with Undo for 5 s. Leaving the app disarms.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Pour</span><span class="who">Pulse 3 of 5</span></span><span>Brew time<em>1:28</em></span></div>
+        <div class="b"><div><div class="k">Pour to</div><div class="n soft">145<small>g</small></div></div><div><div class="k">On scale</div><div class="n">132.4<small>g</small></div></div></div>
+        <div class="bar"><i style="width:75%"></i></div>
+        <div class="d"><span>12.6 g to go · <b>3.4 g/s</b></span><span>7 s left</span></div>
+      </div>
+      <div class="plan" data-t="88"></div>
+      <div class="card" style="margin-top:14px;padding:10px 8px 4px">
+        <div style="display:flex;justify-content:space-between;padding:0 8px 4px;font-size:13px;color:var(--dim)"><span>Ratio <b style="color:var(--on)">1:8.7</b> → 1:15.8</span><span class="leg"><span><i></i>Water</span><span><i class="f"></i>Flow</span></span></div>
+        <svg class="ch" data-w="314" data-h="104" data-t="88" data-span="180" data-flow data-targets="145,195" data-dot></svg>
+      </div>
+      <div class="sec" style="margin-top:4px">Next<a>2 done, show plan</a></div>
+      <div class="nx w"><span class="t">1:35</span><div><div class="a">Wait 20 s, then pour to 195 g</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Pour done</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>4</b><div><h3>Pour: A's card, B's instruments</h3><p>The accepted card keeps the state word and plan strip. B's ratio and curve sit under it; the ratio heads for what 240 g gives with the weighed dose. Next shrinks to one row.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ S2 ============================ -->
+<section class="board" id="s2" style="width:2272px">
+  <div class="bh"><span class="tagp">S</span><div><h1>Combined flow: waits, a lost scale, finishing, the record</h1><p>Nothing finishes on its own and nothing is invented. Measured values sit beside planned ones, never in their place.</p></div></div>
+  <div class="row">
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Wait</span><span class="who">After pulse 3 of 5</span></span><span>Brew time<em>1:43</em></span></div>
+        <div class="b"><div><div class="k">Then pour to</div><div class="n soft">195<small>g</small></div></div><div><div class="k">Time left</div><div class="n">12<small>s</small></div></div></div>
+        <div class="bar"><i style="width:40%"></i></div>
+        <div class="d"><span>Pulse 3 reached 146.1 g</span><span>1.1 g over</span></div>
+      </div>
+      <div class="plan" data-t="103"></div>
+      <div class="card" style="margin-top:14px;padding:10px 8px 4px">
+        <div style="display:flex;justify-content:space-between;padding:0 8px 4px;font-size:13px;color:var(--dim)"><span>Ratio <b style="color:var(--on)">1:9.6</b> → 1:15.8</span><span class="leg"><span><i></i>Water</span><span><i class="f"></i>Flow</span></span></div>
+        <svg class="ch" data-w="314" data-h="104" data-t="103" data-span="180" data-flow data-targets="145,195" data-dot></svg>
+      </div>
+      <div class="sec" style="margin-top:4px">Next<a>3 done, show plan</a></div>
+      <div class="nx"><span class="t">1:55</span><div><div class="a">Pulse 4, add 50 g</div><div class="d">To 195 g total. Pour 15 s</div></div></div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Start pulse 4</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>5</b><div><h3>Wait</h3><p>From 1 g short of the target, overshoot included, the card flips to Wait, counting to pulse 4's planned start; an early target lengthens the wait. Once flow has stopped for 1 s, a new rise of 2 g starts pulse 4 early, with Undo.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl off"><i></i>Reconnecting</span></div>
+      <div class="warn" style="margin-bottom:10px"><b>Scale disconnected</b><p>Following the clock until it is back.</p></div>
+      <div class="fc glass">
+        <div class="a"><span><span class="state">Pour</span><span class="who">Pulse 4 of 5</span></span><span>Brew time<em>1:47</em></span></div>
+        <div class="b"><div><div class="k">Pour to</div><div class="n">195<small>g</small></div></div><div><div class="k">Time left</div><div class="n">11<small>s</small></div></div></div>
+        <div class="bar"><i style="width:27%"></i></div>
+        <div class="d"><span>Add 50 g over 15 s</span><span>then wait 20 s</span></div>
+      </div>
+      <div class="plan" data-t="119"></div>
+      <div class="card" style="margin-top:14px;padding:10px 8px 4px">
+        <div style="padding:0 8px 4px;font-size:13px;color:var(--dim)">Last reading 151.3 g at 1:45</div>
+        <svg class="ch" data-w="314" data-h="92" data-t="105" data-actual data-span="180" data-flow data-targets="195"></svg>
+      </div>
+      <div class="foot"><div class="pair"><div class="btn out"><span class="in"><svg><use href="#pause"/></svg>Pause</span></div><div class="btn out"><span class="in"><svg><use href="#skip"/></svg>Pour done</span></div></div><div class="btn txt">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>6</b><div><h3>Scale lost (another brew)</h3><p>From A, with B's gap. Silence, overload or a sudden drop at any point count as lost. On rejoin, weight resumes only if the reading still fits the last one; otherwise the clock runs to Finish.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="scl"><i></i>Dotty</span></div>
+      <div class="fc glass" style="padding:16px 18px">
+        <div style="font-size:30px;font-weight:600;letter-spacing:-.8px">Drawdown</div>
+        <div style="margin-top:6px;font-size:13.5px;color:var(--dim)">Brew time</div>
+        <div style="font-size:52px;font-weight:600;letter-spacing:-2px;line-height:1">3:26</div>
+        <div class="kv" style="margin-top:12px"><span>Water</span><b>241.3 g<small>planned 240 g</small></b></div>
+        <div class="kv"><span>Ratio</span><b>1:15.9<small>planned 1:16</small></b></div>
+      </div>
+      <div class="plan" data-t="999"></div>
+      <div class="sec">All 5 pulses done<a>Show plan</a></div>
+      <div class="foot"><div class="btn pri">Finish brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>7</b><div><h3>Drawdown</h3><p>From A. Water is the steady reading after the last pour, so lifting the dripper cannot change it. Finish brew stays your tap and sets the total.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Finish brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>26 ticks</span></div>
+        <div class="kv" style="margin-top:10px"><span>Today, 09:40</span><b>✎</b></div>
+        <div class="kv"><span>Total brew time</span><b>3:27 ✎</b></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:-2px 0 8px;font-size:13px;color:var(--dim)"><span>Dripper lifted at 3:24</span><span class="tag" style="margin:0;color:var(--on);font-weight:600">Use 3:24</span></div>
+        <div class="kv"><span>Dose</span><b>15.2 g<small>planned 15 g</small></b></div>
+        <div class="kv"><span>Total brew water</span><b>241.3 g<small>planned 240 g</small></b></div>
+      </div>
+      <div class="q">How was this cup?</div>
+      <div class="ta">What did you notice? Everyday words are welcome.</div>
+      <div class="card" style="margin-top:10px;padding:14px 18px;display:flex;justify-content:space-between"><span style="font-weight:500">Explore the taste</span><span style="color:var(--dim)">⌄</span></div>
+      <div class="foot"><div class="help">You can taste first and add notes later.</div><div class="btn pri">Save brew</div></div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>8</b><div><h3>Finish brew review</h3><p>From A, plus measured dose and water beside their plan. The total is the Finish tap; a seen dripper lift is a one-tap correction. No title, no beverage weight.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen"><div class="body">
+      <div class="top"><span class="ib"><svg><use href="#back"/></svg></span><h2>Brew</h2></div>
+      <div class="card sum"><h4>Ethiopia natural</h4><div class="v"><span>Five-pulse filter</span><span>15 g, 1:16</span></div><div class="g"><span>Today, 09:40</span><span>Hand grinder, 26 ticks</span></div></div>
+      <div class="card" style="margin-top:10px;padding:13px 16px"><div style="font-size:13px;color:var(--dim)">How was this cup?</div><div style="margin-top:3px">Smells like cocoa; lighter than I expected.</div></div>
+      <div class="sec">Timing and water</div>
+      <div class="card" style="padding:10px 14px">
+        <div class="kv" style="border-top:0;padding-top:2px"><span>Total brew time</span><b>3:24</b></div>
+        <div class="kv"><span>Dose · Water · Ratio</span><b>15.2 g · 241.3 g · 1:15.9</b></div>
+        <svg class="ch" data-w="312" data-h="78" data-t="200" data-actual="skip" data-targets="all" style="margin-top:4px"></svg>
+        <div class="tb" style="grid-template-columns:1fr 38px 88px 62px;font-size:13px;row-gap:5px">
+          <span class="h">Pulse</span><span class="h r">Plan</span><span class="h r">Started</span><span class="h r">Reached</span>
+          <span>Bloom</span><span class="r x">0:00</span><span class="r x">On schedule</span><span class="r">45.8 g</span>
+          <span>Pulse 2</span><span class="r x">0:45</span><span class="r x">On schedule</span><span class="r">96.0 g</span>
+          <span>Pulse 3</span><span class="r x">1:20</span><span class="r x">On schedule</span><span class="r">146.1 g</span>
+          <span>Pulse 4</span><span class="r x">1:55</span><span class="r"><b>1:43</b> 12 s early</span><span class="r">195.9 g</span>
+          <span>Pulse 5</span><span class="r x">2:30</span><span class="r"><b>2:18</b> 12 s early</span><span class="r">241.3 g</span>
+        </div>
+      </div>
+    </div><i class="home"></i></div></div>
+      <div class="cap"><b>9</b><div><h3>Saved record</h3><p>C's order, A's content: your impression first, then timing and water. The header keeps the plan; measurements get their own row. Starts keep the accepted On schedule wording.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<script src="base.js"></script>
+</body>
+</html>

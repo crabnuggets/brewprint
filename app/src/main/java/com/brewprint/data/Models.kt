@@ -153,6 +153,7 @@ data class BrewRecord(
     val recipe: Recipe,
     val journal: Journal = Journal(),
     val timing: BrewTiming? = null,
+    val scale: ScaleData? = null,
 )
 
 @Serializable
@@ -167,6 +168,11 @@ data class BrewDraft(
     val journal: Journal = Journal(),
     val allowArchivedBeans: Boolean = false,
     val timer: BrewTimer? = null,
+    /** Set once the scale is used for this brew; null for a brew timed by the clock alone. */
+    val scale: ScaleData? = null,
+    val scaleStep: ScaleStep = ScaleStep.BREWER,
+    /** "Brew without the scale" was chosen for this brew. */
+    val withoutScale: Boolean = false,
 )
 
 @Serializable
@@ -185,4 +191,7 @@ data class AppState(
     val lastRecipeId: String? = null,
     val appearance: Appearance = Appearance.SYSTEM,
     val timerSettings: TimerSettings = TimerSettings(),
+    val scale: PairedScale? = null,
+    /** "Not now" on the pairing card hides it for good. */
+    val scaleOfferDismissed: Boolean = false,
 )

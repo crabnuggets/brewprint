@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -17,8 +18,11 @@ import com.brewprint.data.BrewRepository
 import com.brewprint.data.Appearance
 import com.brewprint.timer.BrewTimerService
 import com.brewprint.timer.EXTRA_OPEN_DRAFT
+import com.brewprint.scale.ScaleLink
 import com.brewprint.ui.BrewprintApp
 import com.brewprint.ui.BrewprintTheme
+import com.brewprint.ui.LocalScale
+import com.brewprint.ui.ScaleUi
 
 class MainActivity : ComponentActivity() {
     /** Counts requests from the live notification to show the brew in progress. */
@@ -37,7 +41,12 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             LaunchedEffect(state.draft?.timer, state.timerSettings) { BrewTimerService.sync(this@MainActivity) }
-            BrewprintTheme(state.appearance) { BrewprintApp(state, repository, openDraft) }
+            LaunchedEffect(state.scale) { ScaleLink.sync(this@MainActivity) }
+            val brew = ScaleLink.brew(this@MainActivity)
+            val live by brew.live.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalScale provides ScaleUi(live) { brew.tare(System.currentTimeMillis()) }) {
+                BrewprintTheme(state.appearance) { BrewprintApp(state, repository, openDraft) }
+            }
         }
     }
 
@@ -51,10 +60,12 @@ class MainActivity : ComponentActivity() {
         BrewTimerService.appOpen = true
         BrewTimerService.clearFinished(this)
         BrewTimerService.sync(this)
+        ScaleLink.sync(this)
     }
 
     override fun onStop() {
         BrewTimerService.appOpen = false
+        ScaleLink.sync(this)
         super.onStop()
     }
 }

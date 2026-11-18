@@ -16,6 +16,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -23,6 +25,7 @@ import androidx.annotation.RequiresApi
 import com.brewprint.MainActivity
 import com.brewprint.R
 import com.brewprint.data.*
+import com.brewprint.scale.ScaleLink
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -37,8 +40,12 @@ const val ACTION_UNDO = "com.brewprint.timer.UNDO"
 const val ACTION_FINISH = "com.brewprint.timer.FINISH"
 const val ACTION_UNFINISH = "com.brewprint.timer.UNFINISH"
 
-fun vibrateStep(context: Context) {
-    context.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createOneShot(180, VibrationEffect.DEFAULT_AMPLITUDE))
+private val tones by lazy { runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80) }.getOrNull() }
+
+/** Marks a step change with a vibration and a short tone, as Settings allow. */
+fun stepCue(context: Context, settings: TimerSettings) {
+    if (settings.vibrate) context.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createOneShot(180, VibrationEffect.DEFAULT_AMPLITUDE))
+    if (settings.sound) tones?.startTone(ToneGenerator.TONE_PROP_BEEP2, 200)
 }
 
 /** What a notification action does to the draft. Stale taps, such as Undo after its 5 s, change nothing. */
@@ -88,11 +95,14 @@ class BrewTimerService : Service() {
                 instance?.render()
             }
 
+        /** The timer to show, if the service should run: for the live notification, or to hold the scale during a scale brew. */
         private fun live(context: Context, state: AppState, now: Long): TimerNow? {
             val timer = state.draft?.timer ?: return null
             val recipe = state.draft.recipe ?: return null
-            if (!state.timerSettings.liveNotification) return null
-            if (context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() == false) return null
+            if (!state.scaleBrewRunning(now)) {
+                if (!state.timerSettings.liveNotification) return null
+                if (context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() == false) return null
+            }
             return TimerNow(recipe, timer, now)
         }
 
@@ -138,6 +148,9 @@ class BrewTimerService : Service() {
         wakeLock = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "brewprint:timer").apply { acquire(45 * 60_000L) }
         registerReceiver(screen, IntentFilter().apply { addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF) })
         scope.launch { BrewRepository.get(this@BrewTimerService).state.collect { render() } }
+        // Android may recreate this service without the app after the process died; a scale brew needs its scale back,
+        // or follows the clock if it does not return.
+        ScaleLink.sync(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -148,6 +161,8 @@ class BrewTimerService : Service() {
     override fun onDestroy() {
         running = false
         instance = null
+        // A scale brew that ended with the app closed lets go of the scale.
+        ScaleLink.sync(this)
         handler.removeCallbacks(wake)
         unregisterReceiver(screen)
         scope.cancel()
@@ -167,9 +182,15 @@ class BrewTimerService : Service() {
             if (foreground(finished(view, undo = true))) handler.postDelayed(wake, undoUntil - now)
             return
         }
-        if (lastStep != null && lastStep != view.step && BrewRepository.get(this).state.value.timerSettings.vibrate) vibrateStep(this)
+        val state = BrewRepository.get(this).state.value
+        if (lastStep != null && lastStep != view.step) stepCue(this, state.timerSettings)
         lastStep = view.step
-        if (!foreground(live(view))) return
+        val notification = if (state.timerSettings.liveNotification) live(view) else base()
+            .setOngoing(true)
+            .setContentTitle("Brewing with ${state.scale?.name ?: "the scale"}")
+            .setContentText("Keeps the scale connected until Finish brew")
+            .build()
+        if (!foreground(notification, holdScale = state.scaleBrewRunning(now) && ScaleLink.allowed(this))) return
         // The capsule's seconds are our own text, so redraw each second, in step with the countdown. Skip it while
         // nobody can see the capsule: the screen is off, or the app is open (the capsule then replays missed updates).
         val drawdown = view.phase == TimerPhase.DRAWDOWN
@@ -185,9 +206,14 @@ class BrewTimerService : Service() {
         handler.postDelayed(wake, next - now + 20)
     }
 
-    /** Becomes foreground with [notification]. False if Android refused, in which case the service stops. */
-    private fun foreground(notification: Notification): Boolean = runCatching {
-        if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+    /**
+     * Becomes foreground with [notification]. False if Android refused, in which case the service stops.
+     * [holdScale] adds the connected-device type, which keeps the scale's Bluetooth connection with the screen off;
+     * Android allows it only with Nearby devices granted.
+     */
+    private fun foreground(notification: Notification, holdScale: Boolean = false): Boolean = runCatching {
+        val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or if (holdScale) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
+        if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION_ID, notification, type)
         else startForeground(NOTIFICATION_ID, notification)
     }.onFailure { stopSelf() }.isSuccess
 

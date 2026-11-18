@@ -20,7 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.brewprint.timer.BrewTimerService
-import com.brewprint.timer.vibrateStep
+import com.brewprint.timer.stepCue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,17 +56,24 @@ private fun pulseDetail(view: TimerNow, index: Int): String {
     return "To ${grams(scheduled.cumulativeWater)} total. Pour ${scheduled.pulse.pourSeconds} s" + (wait?.let { ", wait $it s" } ?: "")
 }
 
-/** The brew sheet while a timer exists: the focus card, the plan strip, and what comes next. */
+/**
+ * The brew sheet while a timer exists: the focus card, the plan strip, and what comes next.
+ * [scale] and [data] are given for a scale brew.
+ */
 @Composable
-internal fun TimerSheet(view: TimerNow, showPlan: Boolean, onShowPlan: (Boolean) -> Unit) {
+internal fun TimerSheet(view: TimerNow, showPlan: Boolean, onShowPlan: (Boolean) -> Unit, scale: ScaleLive? = null, data: ScaleData? = null) {
     if (showPlan) {
         PlanHeader(view)
         FullPlan(view)
         SecondaryAction("Back to current step") { onShowPlan(false) }
         return
     }
-    FocusCard(view)
+    val following = scale?.following?.takeIf { view.active }
+    if (following != null) ScaleBanner(following)
+    // While the scale guides the brew, its reading leads the pour.
+    FocusCard(view, scale?.takeIf { following == null && it.connected && view.timer.byWeight }, data)
     PlanStrip(view)
+    if (scale != null && (view.phase == TimerPhase.POUR || view.phase == TimerPhase.WAIT)) LiveCurveCard(view, scale)
     val done = view.pulsesDone
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.Center) {
         val allDone = view.phase != TimerPhase.POUR && view.phase != TimerPhase.WAIT
@@ -78,11 +85,11 @@ internal fun TimerSheet(view: TimerNow, showPlan: Boolean, onShowPlan: (Boolean)
             Text(if (allDone) "Show plan" else "$done done, show plan")
         }
     }
-    if (view.phase == TimerPhase.POUR || view.phase == TimerPhase.WAIT) NextRows(view)
+    if (view.phase == TimerPhase.POUR || view.phase == TimerPhase.WAIT) NextRows(view, compact = scale != null)
 }
 
 @Composable
-private fun FocusCard(view: TimerNow) {
+private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
     val colors = MaterialTheme.colorScheme
     val pulseOf = "${view.pulse + 1} of ${view.pulseCount}"
     val pouring = view.phase == TimerPhase.POUR
@@ -117,21 +124,37 @@ private fun FocusCard(view: TimerNow) {
             }
             if (pouring || view.phase == TimerPhase.WAIT) {
                 val target = view.schedule[if (pouring) view.pulse else view.pulse + 1].cumulativeWater
+                val onScale = scale?.grams?.takeIf { pouring && !view.paused }
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Numeral(if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", soft = !pouring)
-                    Numeral(if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at", view.leftSeconds.toString(), "s", alignEnd = true)
+                    Numeral(if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", soft = !pouring || onScale != null)
+                    if (onScale != null) Numeral("On scale", tenths(onScale), "g", alignEnd = true)
+                    else Numeral(if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at", view.leftSeconds.toString(), "s", alignEnd = true)
                 }
-                Bar(view.stepFraction)
                 val pulse = view.recipe.pulses[view.pulse]
-                val detail = when {
-                    view.paused -> "Paused for ${formatDuration(((view.now - view.timer.pausedAt!!) / 1000).toInt())}. Brew time is still running."
-                    pouring -> "Add ${grams(pulse.water)} over ${pulse.pourSeconds} s" + if (view.pulse < view.pulseCount - 1 && pulse.waitSeconds > 0) ", then wait ${pulse.waitSeconds} s" else ""
-                    else -> "${view.pulseName(view.pulse + 1)} starts at ${formatDuration(view.startSeconds(view.pulse + 1))}"
+                if (onScale != null) {
+                    // The bar and the line under it follow grams; seconds stay as a pacing hint.
+                    val from = view.schedule[view.pulse].cumulativeWater - pulse.water
+                    Bar(((onScale - from) / pulse.water).toFloat().coerceIn(0f, 1f))
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${tenths((target - onScale).coerceAtLeast(0.0))} g to go · ${tenths(scale?.flow)} g/s", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        Text(if (view.overSeconds > 0) "+${view.overSeconds} s" else "${view.leftSeconds} s left", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Bar(view.stepFraction)
+                    val detail = when {
+                        view.paused -> "Paused for ${formatDuration(((view.now - view.timer.pausedAt!!) / 1000).toInt())}. Brew time is still running."
+                        pouring -> "Add ${grams(pulse.water)} over ${pulse.pourSeconds} s" + if (view.pulse < view.pulseCount - 1 && pulse.waitSeconds > 0) ", then wait ${pulse.waitSeconds} s" else ""
+                        else -> "${view.pulseName(view.pulse + 1)} starts at ${formatDuration(view.startSeconds(view.pulse + 1))}"
+                    }
+                    Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             } else if (view.phase == TimerPhase.DRAWDOWN) {
                 Numeral("Brew time", formatDuration(view.brewSeconds), "")
                 Text("Scheduled pours ended at ${formatDuration(view.poursEndSeconds)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                if (data != null) {
+                    HorizontalDivider(color = colors.outlineVariant)
+                    MeasuredRows(view.recipe, data)
+                }
             } else {
                 Text(stoppedText(view) + ".", style = MaterialTheme.typography.bodyLarge)
                 Text("Finish brew to save it. The total is not recorded unless you enter one.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
@@ -181,13 +204,14 @@ private fun PlanStrip(view: TimerNow) {
     }
 }
 
+/** Up to two upcoming rows, or one when [compact] makes room for the scale's curve. */
 @Composable
-private fun NextRows(view: TimerNow) {
+private fun NextRows(view: TimerNow, compact: Boolean) {
     val colors = MaterialTheme.colorScheme
     val pouring = view.phase == TimerPhase.POUR
     val wait = view.recipe.pulses[view.pulse].waitSeconds.takeIf { pouring && view.pulse < view.pulseCount - 1 && it > 0 }
     val upcoming = (view.pulse + 1 until view.pulseCount).toList()
-    val shown = upcoming.take(if (wait != null) 1 else 2)
+    val shown = upcoming.take((if (wait != null) 1 else 2) - if (compact) 1 else 0)
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (wait != null) NextRow(if (view.paused) "Held" else formatDuration(((view.timer.stepAt + view.stepDuration - view.timer.startedAt + 500) / 1000).toInt()), "Wait $wait s", null)
         shown.forEach { index ->
@@ -272,16 +296,16 @@ private fun FullPlan(view: TimerNow) {
     }
 }
 
-/** Footer actions for a running timer. Buttons stack at large text sizes. */
+/** Footer actions for a running timer. Buttons stack at large text sizes. [onUndoStart] is given just after the scale started the timer. */
 @Composable
-internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Unit, onSkip: () -> Unit, onUndo: () -> Unit, onFinish: () -> Unit) {
+internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Unit, onSkip: () -> Unit, onUndo: () -> Unit, onFinish: () -> Unit, onUndoStart: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val summary = view.skipSummary
+        val summary = view.skipSummary ?: "Timer started at the first pour".takeIf { onUndoStart != null }
         if (summary != null) Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small, color = colors.inverseSurface, contentColor = colors.inverseOnSurface) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(summary, Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = onUndo, colors = ButtonDefaults.textButtonColors(contentColor = colors.inverseOnSurface)) { Text("Undo") }
+                TextButton(onClick = if (view.skipSummary == null && onUndoStart != null) onUndoStart else onUndo, colors = ButtonDefaults.textButtonColors(contentColor = colors.inverseOnSurface)) { Text("Undo") }
             }
         }
         val skip = view.skipLabel
@@ -310,11 +334,11 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
     else OutlinedButton(onClick, modifier.heightIn(min = 56.dp), shape = MaterialTheme.shapes.small, contentPadding = padding, content = content)
 }
 
-/** Timing saved with a brew record: the total, and each pulse's planned and actual start. */
+/** Timing saved with a brew record: the total, and each pulse's planned and actual start. A scale brew adds what the scale measured. */
 @Composable
-internal fun TimingPanel(recipe: Recipe, timing: BrewTiming) {
+internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? = null) {
     val colors = MaterialTheme.colorScheme
-    Text("Timing", style = MaterialTheme.typography.titleLarge)
+    Text(if (scale != null) "Timing and water" else "Timing", style = MaterialTheme.typography.titleLarge)
     Panel {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Total brew time", Modifier.align(Alignment.CenterVertically))
@@ -326,11 +350,17 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming) {
             timing.totalEdited -> "Edited.$paused"
             else -> "First pour to Finish brew.$paused"
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        if (scale != null) {
+            HorizontalDivider(color = colors.outlineVariant)
+            MeasuredRows(recipe, scale)
+            WaterCurve(scale.curve, recipe.schedule().map { it.cumulativeWater }, maxOf(timing.totalSeconds ?: 0, scale.curve.size))
+        }
         HorizontalDivider(color = colors.outlineVariant)
         Row(Modifier.fillMaxWidth()) {
             Text("Pulse", Modifier.weight(1.2f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Text("Planned", Modifier.weight(.8f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Text("Started", Modifier.weight(1.3f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            if (scale != null) Text("Reached", Modifier.weight(1f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
         recipe.schedule().forEachIndexed { index, scheduled ->
             val actual = timing.pulseStarts.getOrNull(index)
@@ -348,9 +378,10 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming) {
                         }
                     }
                 }
+                if (scale != null) Text(scale.reached.getOrNull(index)?.let { "${tenths(it)} g" } ?: "Not recorded", Modifier.weight(1f), color = colors.onSurfaceVariant)
             }
         }
-        Text("Start times come from the timer. Pours are not measured.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text(if (scale != null) "Start times come from the timer. Reached is the scale's steady reading after each pulse." else "Start times come from the timer. Pours are not measured.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -364,15 +395,15 @@ internal fun KeepScreenOn(on: Boolean) {
     }
 }
 
-/** Vibrates at each step change on any screen of the app. Draws nothing. */
+/** Vibrates and sounds at each step change on any screen of the app, as Settings allow. Draws nothing. */
 @Composable
-internal fun StepVibration(recipe: Recipe, timer: BrewTimer) {
+internal fun StepCue(recipe: Recipe, timer: BrewTimer, settings: TimerSettings) {
     val context = LocalContext.current
     val step = TimerNow(recipe, timer, rememberNow()).takeIf { it.active }?.step
     var last by remember { mutableStateOf(step) }
     LaunchedEffect(step) {
-        // The live notification's service vibrates when it is running; this covers the timer without it.
-        if (step != null && last != null && step != last && !BrewTimerService.running) vibrateStep(context)
+        // The timer's service cues the step when it is running; this covers the timer without it.
+        if (step != null && last != null && step != last && !BrewTimerService.running) stepCue(context, settings)
         last = step
     }
 }
