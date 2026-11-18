@@ -97,6 +97,26 @@ class ScaleJourneyTest {
         assertNull(draft.scale)
     }
 
+    @Test fun `starting by hand before the scale shows its zero follows the clock`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        tap("Skip")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        tap("Start timer now")
+        assertFalse(repository.state.value.draft!!.timer!!.byWeight)
+    }
+
+    @Test fun `starting by hand once the scale shows its zero is guided by the scale`() {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        tap("Skip")
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        tap("Start timer now")
+        assertTrue(repository.state.value.draft!!.timer!!.byWeight)
+    }
+
     @Test fun `brewing without the scale keeps the clock-only sheet`() {
         open(paired = true)
         tap("Brew without the scale")

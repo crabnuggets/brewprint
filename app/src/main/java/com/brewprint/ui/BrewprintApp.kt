@@ -259,8 +259,8 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         when (draft.stage) {
             DraftStage.SETUP -> PrimaryAction("Use this plan", enabled = ready(draft, state)) { change(draft.copy(stage = DraftStage.SHEET)) }
             DraftStage.SHEET -> if (view == null && armed) ArmedFooter(
-                // A scale that did not tare cannot measure toward the targets, so that start follows the clock.
-                onStartNow = { showPlan = false; change(if (scale.live.tareFailed) draft.copy(timer = BrewTimer(startedAt = clock()), scale = null) else draft.copy(timer = BrewTimer(startedAt = clock(), byWeight = true))) },
+                // Only a scale seen steady at 0 g since its tare can measure toward the targets; any other start follows the clock.
+                onStartNow = { showPlan = false; change(if (scale.live.zeroed) draft.copy(timer = BrewTimer(startedAt = clock(), byWeight = true)) else draft.copy(timer = BrewTimer(startedAt = clock()), scale = null)) },
                 onFinishWithout = ::finish,
             ) else if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Tap as you begin the first pour.", Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)

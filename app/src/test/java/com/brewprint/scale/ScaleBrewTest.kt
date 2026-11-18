@@ -179,6 +179,22 @@ class ScaleBrewTest {
         assertEquals(saved, draft.scale!!.curve)
     }
 
+    @Test fun `forgetting the scale mid-brew hands the brew to the clock`() {
+        startBrew()
+        repository.setScale(null).getOrThrow()
+        brew.connected(false, now)
+        assertFalse(timer.byWeight)
+    }
+
+    @Test fun `disconnecting after Finish saves the curve gathered since the last measurement`() {
+        startBrew()
+        feed(5000, flow = 5.0, to = 30.0)
+        repository.updateTimer { d, t, r -> d.copy(timer = t.finish(r, now), stage = DraftStage.REVIEW) }
+        assertTrue(draft.scale!!.curve.size < 6)
+        brew.connected(false, now)
+        assertTrue(draft.scale!!.curve.size >= 6)
+    }
+
     @Test fun `a dripper already off at the first drawdown reading is still a lift`() {
         startBrew()
         feed(7000, flow = 5.0, to = 40.5)

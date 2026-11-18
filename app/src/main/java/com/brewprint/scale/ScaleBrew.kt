@@ -60,6 +60,7 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     fun connected(on: Boolean, now: Long) {
         if (!on) {
             lose(now)
+            flush()
             quietSince = null
             riseAt = null
             zeroed = false
@@ -69,11 +70,15 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
 
     fun battery(percent: Int) = mutableLive.update { it.copy(battery = percent) }
 
-    /** The scale went silent, disconnected or overloaded: a running scale brew follows the clock. */
+    /**
+     * The scale went silent, disconnected, overloaded or was forgotten: a running scale brew follows the clock.
+     * This does not depend on the pairing, so forgetting the scale mid-brew still hands the brew to the clock.
+     */
     fun lose(now: Long) {
-        val state = repository.state.value
-        val draft = state.draft
-        if (draft == null || !state.scaleBrewRunning(now)) return
+        val draft = repository.state.value.draft ?: return
+        val timer = draft.timer ?: return
+        val recipe = draft.recipe ?: return
+        if (draft.scale == null || !TimerNow(recipe, timer, now).active) return
         if (draft.id != brewId) attach(draft)
         if (lost) return
         lost = true
@@ -129,10 +134,7 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         val data = draft.scale ?: return
         val timer = draft.timer ?: return armed(draft, now, grams, quiet)
         val view = TimerNow(recipe, timer, now)
-        if (!view.active) {
-            if (view.phase == TimerPhase.FINISHED && data.curve.size != curve.size) save { it }
-            return
-        }
+        if (!view.active) return flush()
         record(timer, now, grams, flow)
         // Drawdown keeps the last pour's peak, so a dripper already off at its first reading still shows as a fall.
         // The peak is capped at the final target, so a brief press on the brewer cannot become a lift.
@@ -221,6 +223,15 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
 
     /** Weight guides the brew again, from where the clock has taken it. */
     private fun guide(now: Long) = repository.updateTimer { d, t, r -> d.copy(timer = t.advanced(r, now).copy(byWeight = true)) }
+
+    /**
+     * Saves the curve samples still held in memory. Runs after the timer stops, at the next reading or when the scale
+     * disconnects or is released, so leaving the app or switching the scale off cannot lose them.
+     */
+    private fun flush() {
+        val draft = repository.state.value.draft ?: return
+        if (draft.id == brewId && draft.scale != null && draft.scale.curve != curve) save { it }
+    }
 
     private fun save(transform: (ScaleData) -> ScaleData) = repository.changeDraft { d ->
         d.copy(scale = d.scale?.let(transform)?.copy(curve = curve.toList()))

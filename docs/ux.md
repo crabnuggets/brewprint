@@ -137,7 +137,7 @@ With a paired scale connected, the brew sheet shows a scale card above the plan:
 
 1. **Brewer.** "Put the brewer on the scale" with the live reading and "Tare".
 2. **Coffee.** After the tare, the card shows the coffee reading. Once it holds steady above 1 g, it offers "Use 15.2 g" and "Skip". "Use" records the weighed dose and rescales this brew's pulses to keep the recipe's ratio: 15.2 g at 1:16 becomes 243.2 g, each pulse scaled and rounded to 0.1 g, the last pulse taking the rounding. The Library recipe does not change. "Skip" keeps the recipe's dose. Either way the app then tares the scale, so the scale's own display matches the cumulative targets. If the scale does not reach about 0 g within 1.5 seconds of a tare, the card says "The scale didn't tare. Press its tare button." and the sheet does not arm until the scale reads about 0 g.
-3. **Armed.** The footer shows "Waiting for the first pour", with "Start timer now" and "Finish without timing". The screen stays on from here. Leaving the app disarms; on return, the card shows the reading and asks for "Tare" if it is no longer about 0 g.
+3. **Armed.** The footer shows "Waiting for the first pour", with "Start timer now" and "Finish without timing". "Start timer now" is guided by the scale only once the scale has held steady at about 0 g since its last tare; before that, it starts a clock-only brew. The screen stays on from here. Leaving the app disarms; on return, the card shows the reading and asks for "Tare" if it is no longer about 0 g.
 
 "Brew without the scale" on the card makes this brew clock-only and keeps the pairing. Before arming, "Start timer" also starts a clock-only brew.
 
