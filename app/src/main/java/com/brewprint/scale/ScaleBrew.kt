@@ -48,6 +48,8 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     private var high = 0.0
     private var brewId: String? = null
     private val curve = mutableListOf<Double?>()
+    /** The start of the timer [curve] belongs to, so a timer started again after Undo begins its own curve. */
+    private var curveStart: Long? = null
     /** Flow for each second of [curve], shown live and not saved. */
     private val flows = mutableListOf<Double?>()
 
@@ -73,10 +75,11 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     /**
      * The scale went silent, disconnected, overloaded or was forgotten: a running scale brew follows the clock.
      * This does not depend on the pairing, so forgetting the scale mid-brew still hands the brew to the clock.
+     * Before the first pour it drops the zero, so "Start timer now" cannot start a brew guided by a silent scale.
      */
     fun lose(now: Long) {
         val draft = repository.state.value.draft ?: return
-        val timer = draft.timer ?: return
+        val timer = draft.timer ?: return disarm()
         val recipe = draft.recipe ?: return
         if (draft.scale == null || !TimerNow(recipe, timer, now).active) return
         if (draft.id != brewId) attach(draft)
@@ -84,6 +87,14 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         lost = true
         repository.updateTimer { d, timer, recipe -> d.copy(timer = timer.followClock(recipe, now), scale = d.scale?.copy(curve = curve.toList())) }
         mutableLive.update { it.copy(following = following()) }
+    }
+
+    /** The scale's zero is no longer known: the start waits for a fresh steady zero. */
+    private fun disarm() {
+        zeroed = false
+        quietSince = null
+        riseAt = null
+        mutableLive.update { it.copy(steady = false, zeroed = false) }
     }
 
     fun reading(now: Long, grams: Double, flow: Double, overload: Boolean) {
@@ -118,6 +129,7 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         lastStep = -1
         curve.clear()
         curve.addAll(draft?.scale?.curve.orEmpty())
+        curveStart = draft?.timer?.startedAt
         flows.clear()
         flows.addAll(List(curve.size) { null })
     }
@@ -203,14 +215,13 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         val rise = riseAt
         if (zeroed && rise != null && now - rise >= RISE_MILLIS && grams >= RISE_GRAMS) {
             zeroed = false
-            curve.clear()
-            flows.clear()
             repository.changeDraft { it.copy(timer = BrewTimer(startedAt = rise, byWeight = true)) }
         }
     }
 
     /** One reading a second from the first pour, with a gap for each second the scale was lost. */
     private fun record(timer: BrewTimer, now: Long, grams: Double, flow: Double) {
+        if (timer.startedAt != curveStart) { curveStart = timer.startedAt; curve.clear(); flows.clear() }
         val second = ((now - timer.startedAt) / 1000).toInt()
         if (second < 0) return
         while (curve.size < second) { curve.add(null); flows.add(null) }

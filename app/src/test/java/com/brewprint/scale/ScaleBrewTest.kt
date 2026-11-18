@@ -179,6 +179,23 @@ class ScaleBrewTest {
         assertEquals(saved, draft.scale!!.curve)
     }
 
+    @Test fun `a scale that goes silent while armed loses its zero`() {
+        feed(1200)
+        assertTrue(brew.live.value.zeroed)
+        brew.lose(now)
+        assertFalse(brew.live.value.zeroed)
+    }
+
+    @Test fun `a timer started again after Undo records its own curve`() {
+        startBrew()
+        feed(4000, flow = 5.0, to = 20.0)
+        repository.changeDraft { it.copy(timer = null) }
+        repository.changeDraft { it.copy(timer = BrewTimer(startedAt = now, byWeight = true)) }
+        feed(2500)
+        brew.connected(false, now)
+        assertEquals(listOf(20.0, 20.0, 20.0), draft.scale!!.curve)
+    }
+
     @Test fun `forgetting the scale mid-brew hands the brew to the clock`() {
         startBrew()
         repository.setScale(null).getOrThrow()
