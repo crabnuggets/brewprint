@@ -32,7 +32,7 @@ internal fun notificationsAllowed(context: Context): Boolean =
     context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
 
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
@@ -74,9 +74,12 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
                 SwitchRow("Vibrate at each step", null, timer.vibrate) { onTimer(timer.copy(vibrate = it)) }
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
+                SwitchRow("Sound at each step", "A short tone, for a phone propped on the counter", timer.sound) { onTimer(timer.copy(sound = it)) }
+                HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
                 SwitchRow("Keep screen on while brewing", null, timer.keepScreenOn) { onTimer(timer.copy(keepScreenOn = it)) }
             }
         }
+        scale()
     }
 }
 

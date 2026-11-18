@@ -10,6 +10,7 @@ const val SKIP_GUARD_MILLIS = 1_000L
 data class TimerSettings(
     val liveNotification: Boolean = false,
     val vibrate: Boolean = true,
+    val sound: Boolean = true,
     val keepScreenOn: Boolean = true,
 )
 
@@ -47,6 +48,10 @@ data class BrewTimer(
     /** The timer as it was just before the last skip, offered back until [undoUntil]. */
     val undo: BrewTimer? = null,
     val undoUntil: Long = 0,
+    /** The scale ends pours: a pour is held until it reaches its target, or "Pour done". */
+    val byWeight: Boolean = false,
+    /** Added to the current step's planned duration: a pour that reached its target early lengthens the wait after it. */
+    val stepExtra: Long = 0,
 ) {
     val paused: Boolean get() = pausedAt != null
     val finished: Boolean get() = finishedAt != null
@@ -57,18 +62,20 @@ data class BrewTimer(
         val time = pausedAt ?: finishedAt ?: now
         var current = step
         var at = stepAt
+        var extra = stepExtra
         val starts = pulseStarts.toMutableList()
-        while (current < steps.size && time - at >= steps[current]) {
-            at += steps[current]
+        while (current < steps.size && !(byWeight && current % 2 == 0) && time - at >= steps[current] + extra) {
+            at += steps[current] + extra
+            extra = 0
             current++
             if (current < steps.size && current % 2 == 0) starts += at - startedAt
         }
-        return if (current == step) this else copy(step = current, stepAt = at, pulseStarts = starts)
+        return if (current == step) this else copy(step = current, stepAt = at, stepExtra = extra, pulseStarts = starts)
     }
 
-    /** When the timer stops itself: 15 minutes after the last pour ends, or after a pause began. */
+    /** When the timer stops itself: 15 minutes after the planned end of the pours, or after a pause began. */
     fun stopsAt(recipe: Recipe): Long =
-        (pausedAt ?: (stepAt + recipe.timerSteps().drop(step).sum())) + FORGOTTEN_BREW_MILLIS
+        (pausedAt ?: (stepAt + stepExtra + recipe.timerSteps().drop(step).sum())) + FORGOTTEN_BREW_MILLIS
 
     /** True once a brew left alone has stopped itself. */
     fun stopped(recipe: Recipe, now: Long): Boolean = !finished && now >= stopsAt(recipe)
@@ -108,14 +115,38 @@ data class BrewTimer(
         return running.copy(
             step = next,
             stepAt = now,
+            stepExtra = 0,
             pulseStarts = if (startsPulse) running.pulseStarts + (now - startedAt) else running.pulseStarts,
             undo = before.copy(undo = null),
             undoUntil = now + UNDO_MILLIS,
         ).advanced(recipe, now)
     }
 
+    /**
+     * The scale reached the current pour's target. Before the planned pour time, the wait after it runs
+     * longer so the next pulse keeps its scheduled start; after it, later steps move later by the overrun.
+     */
+    fun reachTarget(recipe: Recipe, now: Long): BrewTimer {
+        val current = advanced(recipe, now)
+        val steps = recipe.timerSteps()
+        if (current.paused || current.finished || current.step >= steps.size || current.step % 2 != 0) return current
+        val next = current.step + 1
+        val early = (current.stepAt + steps[current.step] - now).coerceAtLeast(0)
+        return current.copy(step = next, stepAt = now, stepExtra = if (next < steps.size) early else 0)
+    }
+
+    /** The scale stopped guiding: pours follow the clock again, and a pour already past its planned time ends now. */
+    fun followClock(recipe: Recipe, now: Long): BrewTimer {
+        if (!byWeight) return this
+        val current = advanced(recipe, now)
+        val steps = recipe.timerSteps()
+        val overrun = !current.paused && !current.finished && current.step < steps.size && current.step % 2 == 0 && now - current.stepAt >= steps[current.step]
+        return if (overrun) current.copy(byWeight = false, step = current.step + 1, stepAt = now, stepExtra = 0).advanced(recipe, now)
+        else current.copy(byWeight = false)
+    }
+
     /** Puts back the timer as it was before the last skip. The schedule is then recomputed from the clock. */
-    fun undone(now: Long): BrewTimer = if (canUndo(now)) undo!! else this
+    fun undone(now: Long): BrewTimer = if (canUndo(now)) undo!!.copy(byWeight = byWeight) else this
 
     fun finish(recipe: Recipe, now: Long): BrewTimer =
         if (finished || stopped(recipe, now)) this else advanced(recipe, now).copy(finishedAt = now, undo = null)
@@ -181,11 +212,13 @@ class TimerNow(val recipe: Recipe, initial: BrewTimer, val now: Long) {
     /** The pulse being poured, or the one just poured during a wait or drawdown. */
     val pulse: Int = minOf(step / 2, recipe.pulses.lastIndex)
     val pulsesDone: Int = if (step < steps.size && step % 2 == 0) pulse else pulse + 1
-    val stepDuration: Long = steps.getOrElse(step) { 0 }
+    val stepDuration: Long = steps.getOrElse(step) { 0 } + timer.stepExtra
     val leftSeconds: Int = ((stepDuration - timer.stepMillis(now) + 999) / 1000).toInt().coerceAtLeast(0)
+    /** Seconds a pour held for the scale has run past its planned time. */
+    val overSeconds: Int = if (phase == TimerPhase.POUR && timer.byWeight) ((timer.stepMillis(now) - stepDuration) / 1000).toInt().coerceAtLeast(0) else 0
     val stepFraction: Float = if (stepDuration > 0) (timer.stepMillis(now).toFloat() / stepDuration).coerceIn(0f, 1f) else 1f
     val brewSeconds: Int = (timer.brewMillis(recipe, now) / 1000).toInt()
-    val poursEndSeconds: Int = ((timer.stepAt + steps.drop(step).sum() - timer.startedAt + 500) / 1000).toInt()
+    val poursEndSeconds: Int = ((timer.stepAt + timer.stepExtra + steps.drop(step).sum() - timer.startedAt + 500) / 1000).toInt()
     /** Schedule position in planned time, for progress bars. */
     val plannedMillis: Long = steps.take(step).sum() + timer.stepMillis(now).coerceIn(0, stepDuration)
     val plannedTotalMillis: Long = steps.sum()
@@ -195,7 +228,7 @@ class TimerNow(val recipe: Recipe, initial: BrewTimer, val now: Long) {
 
     /** Actual start of a pulse that has begun, otherwise where the schedule now puts it. */
     fun startSeconds(index: Int): Int {
-        val millis = timer.pulseStarts.getOrNull(index) ?: (timer.stepAt + steps.subList(step, index * 2).sum() - timer.startedAt)
+        val millis = timer.pulseStarts.getOrNull(index) ?: (timer.stepAt + timer.stepExtra + steps.subList(step, index * 2).sum() - timer.startedAt)
         return ((millis + 500) / 1000).toInt()
     }
 

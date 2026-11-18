@@ -8,7 +8,7 @@ See [the UI design direction](ui-design.md) for the owner's visual preferences a
 
 ## Scope and defaults
 
-The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. Cloud sync, sharing, inventory quantities, analytics, and equipment integrations are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
+The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. An optional Bluetooth coffee scale can guide a brew (see [Brewing with a scale](#brewing-with-a-scale)); other equipment integrations, cloud sync, sharing, inventory quantities, and analytics are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
 
 The app remembers the default grinder, each grinder's last recorded tick setting, and the most recently used beans and recipe. It shows these choices before each brew so the user can correct them. The app cannot know the physical grinder's current setting; the UI calls it "Last recorded setting".
 
@@ -99,7 +99,7 @@ These numbers demonstrate the UI and calculations; they are not a recommended re
 The brew sheet offers "Start timer" and "Finish without timing". The timer is optional; an untimed brew works as before. See the [brew timer mockups](design/mockups/brew-timer/index.html) for appearance.
 
 - **Steps.** A step is a pour or a wait. The timer moves through the recipe's steps on schedule. A zero wait starts the next pour immediately. After the last pour the sheet shows "Drawdown" and brew time keeps counting until "Finish brew".
-- **Focus card.** It leads with the state word, "Pour", "Wait", "Paused" or "Drawdown", then the cumulative scale reading to pour to and the seconds left. A plan strip shows the whole recipe, and "Next" lists up to two upcoming rows. "N done, show plan" opens the full plan, which stays open until "Back to current step".
+- **Focus card.** It leads with the state word, "Pour", "Wait", "Paused" or "Drawdown", then the cumulative scale reading to pour to and the seconds left. A plan strip shows the whole recipe, and "Next" lists up to two upcoming rows (one while a scale guides the brew, to make room for its curve). "N done, show plan" opens the full plan, which stays open until "Back to current step".
 - **Skip.** The skip button is labelled by its effect, in two or three words so it fits a phone: "Pour done" during a pour, "Start pulse N" during a wait. Skipping moves every later step earlier and keeps their durations. The button ignores taps for 1 second after a step changes. "Undo" is offered for 5 seconds and restores the schedule as it was, even if a step has changed on its own in that time.
 - **Pause.** "Pause" holds the schedule while brew time keeps counting. "Resume" continues the held step; "Start pulse N" ends the pause and starts the next pour. Pause is not offered during drawdown.
 - **Finish.** "Finish brew" stops the clock and opens the review with "Total brew time", which can be corrected. Back from the review restores the timer as it was, including a pause.
@@ -108,7 +108,7 @@ The brew sheet offers "Start timer" and "Finish without timing". The timer is op
 
 ### Timer settings and live notification
 
-Settings holds the appearance choice and three brew timer switches: "Live notification" (off by default), "Vibrate at each step", and "Keep screen on while brewing" (both on by default).
+Settings holds the appearance choice and four brew timer switches: "Live notification" (off by default), "Vibrate at each step", "Sound at each step", and "Keep screen on while brewing" (all three on by default). The sound is a short tone at each step change, for a phone propped on the counter where a vibration goes unfelt.
 
 Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
 
@@ -122,11 +122,48 @@ With the switch on, a running timer shows one ongoing notification, requested as
 
 The target device is ColorOS 16, which shows the Live Update as a capsule in the status bar.
 
+## Brewing with a scale
+
+A TIMEMORE Dot (the "Black Mirror" open protocol) can guide a timed brew. The scale is optional: without one, or with "Brew without the scale", every screen works as described above. See the [scale mockups](design/mockups/bt-scale/index.html#s1) for appearance.
+
+### Pairing and connection
+
+- **Pairing.** The first time a brew sheet opens with no scale paired, a card offers "Brew with a scale?" with "Pair a scale" and "Not now". "Not now" hides the card for good. "Pair a scale" opens Android's companion device picker, listing only nearby devices named like a TIMEMORE scale that speaks the open protocol (the Dot and the Basic3 Link), then asks for Nearby devices once. Settings → "Coffee scale" shows the paired scale with "Forget", or "Add a scale". If Nearby devices is refused, a "Blocked by Android" notice appears there with "Open Android settings", and brewing works without the scale.
+- **Connection.** Brewprint connects to the paired scale whenever the app is open, so a scale switched on beforehand is ready. It releases the scale when the app leaves the screen and no scale brew is running, so the TIMEMORE app can still use it. A scale brew keeps the connection with the screen off or the app in the background: the brew timer's service holds it, showing the live notification when that switch is on, or a plain ongoing "Brewing with <scale>" notification when it is off.
+
+### Before the first pour
+
+With a paired scale connected, the brew sheet shows a scale card above the plan:
+
+1. **Brewer.** "Put the brewer on the scale" with the live reading and "Tare".
+2. **Coffee.** After the tare, the card shows the coffee reading. Once it holds steady above 1 g, it offers "Use 15.2 g" and "Skip". "Use" records the weighed dose and rescales this brew's pulses to keep the recipe's ratio: 15.2 g at 1:16 becomes 243.2 g, each pulse scaled and rounded to 0.1 g, the last pulse taking the rounding. The Library recipe does not change. "Skip" keeps the recipe's dose. Either way the app then tares the scale, so the scale's own display matches the cumulative targets. If the scale does not reach about 0 g within 1.5 seconds of a tare, the card says "The scale didn't tare. Press its tare button." and the sheet does not arm until the scale reads about 0 g.
+3. **Armed.** The footer shows "Waiting for the first pour", with "Start timer now" and "Finish without timing". "Start timer now" is guided by the scale only once the scale has held steady at about 0 g since its last tare; before that, it starts a clock-only brew. The screen stays on from here. Leaving the app disarms; on return, the card shows the reading and asks for "Tare" if it is no longer about 0 g.
+
+"Brew without the scale" on the card makes this brew clock-only and keeps the pairing. Before arming, "Start timer" also starts a clock-only brew.
+
+### During the brew
+
+- **Start.** A rise of at least 2 g above the tared zero, with flow sustained for about 300 ms, starts the timer, backdated to the first rising sample. "Timer started · Undo" shows for 5 seconds. Lifting and replacing the brewer does not start it.
+- **Focus card.** During a pour, "Pour to" sits beside "On scale", the live reading. The bar fills by grams, and the detail line reads "12.6 g to go · 3.4 g/s" with the seconds left, or "+3 s" once the planned pour time has passed. Under the plan strip, a card shows the ratio so far and where the plan ends ("Ratio 1:8.7 → 1:16"), with a live water and flow curve and the current and next targets dashed.
+- **Pour end.** A pour reaches its target at the first reading of at least the target minus 1 g, overshoot included, and stays reached. The card then shows "Wait", counting to the next pulse's scheduled start. Reaching the target before the planned pour time ends lengthens the wait and leaves the schedule alone. Short of the target, the card stays on "Pour"; once the scale reaches the target after the planned pour time, later steps move later by the overrun. "Pour done" keeps its meaning: the pour ends now and later steps move earlier. A pour held short of its target does not delay the forgotten-brew stop.
+- **Early pulse.** During a wait, once flow has been about 0 for 1 second, a new rise of at least 2 g above that steady reading starts the next pulse through the same path as "Start pulse N", recorded as early, with Undo. Pause, Undo, and the scale returning disarm this until flow has again been about 0 for 1 second.
+- **Lifting the dripper.** A drop of more than 5 g below the last steady reading pauses weight guidance, for example while swirling, and steps follow the clock. When the reading returns to within 3 g of the steady reading, guidance resumes.
+- **Scale lost.** No reading for 1 second, the overload flag, or a disconnect shows "Scale disconnected · Following the clock until it is back." The card returns to the clock layout in the same positions, and a pour past its planned time ends then, moving later steps later by the overrun so far. The curve keeps a gap. On reconnecting, guidance resumes only if the reading has not dropped below the last steady reading; otherwise the brew follows the clock until "Finish brew". A scale that connects after a clock-only start never takes over that brew. Reconnecting never tares.
+- **Drawdown.** The card adds "Water", the steady reading once flow stops after the last pour, and the ratio, each beside its plan. Lifting the dripper cannot change it. If the dripper came off before a steady reading, water is "Not recorded" and the lift time is still offered in the review.
+
+### Finishing
+
+"Finish brew" stays a tap and sets the total brew time. If the dripper was lifted after the last pour, the review offers "Dripper lifted at 3:24 · Use 3:24" beside the total. The review adds "Dose" (marked "weighed" when measured) and "Total brew water" with the measured water beside the planned amount. There is no title and no beverage weight.
+
+The live notification is unchanged during a scale brew: its chip still shows the target and seconds left.
+
 ## Saving and reviewing a brew
 
 "Finish brew" opens a short review with optional brew observations. Show the chosen plan and equipment, with a way back to correct setup before saving. Prefill the brew date and time when the draft starts and allow editing it to log an earlier brew.
 
-A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. A pulse that started on time reads "On schedule"; otherwise it shows the time and the difference, such as "12 s early". An untimed brew has no Timing section. The app does not measure water amounts or pour durations.
+A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. A pulse that started on time reads "On schedule"; otherwise it shows the time and the difference, such as "12 s early". An untimed brew has no Timing section. Without a scale, the app does not measure water amounts or pour durations.
+
+A scale brew's record also shows, in "Timing and water", a measured row (dose, water, ratio), the water curve against the planned targets, and a "Reached" column with the steady reading after each pulse, or "Not recorded" when the scale gave no steady reading before the next pulse. Water stays on the scale, so a steady reading seen after a gap, within the same wait, still counts. The tasting journal stays first on the record.
 
 History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" requires confirmation and removes only that record. Library items use archive rather than deletion in this version.
 
@@ -195,7 +232,12 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - Skipping a wait 12 seconds early records that pulse 12 seconds early and moves later pulses earlier; Undo puts the schedule back.
 - A 15-second pause delays later pulses by 15 seconds and adds 15 seconds to the total.
 - A brew left alone stops after 15 minutes and saves with no total unless one is entered.
-- With "Live notification" off, no notification or permission prompt appears.
+- With "Live notification" off and no scale brew, no notification or permission prompt appears.
+- Weighing 15.2 g of coffee for a 15 g, 1:16 recipe rescales this brew to 243.2 g and leaves the Library recipe at 15 g.
+- Pouring from the armed sheet starts the timer at the first pour; lifting and replacing the brewer does not.
+- A pour that reaches its target early lengthens the wait; one that overruns moves later pulses later.
+- Swirling the dripper during a wait neither starts the next pulse nor loses the scale.
+- Switching the scale off mid-brew follows the clock and keeps a gap in the saved curve.
 
 ## Assumptions to revisit
 

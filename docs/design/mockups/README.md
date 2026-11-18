@@ -43,6 +43,15 @@ The [brew timer boards](brew-timer/index.html) were accepted by the owner on 202
 
 The notification screens show the standard Android 16 progress template. How ColorOS presents it is unverified.
 
+## Bluetooth scale
+
+The [scale boards](bt-scale/index.html) were accepted by the owner on 2026-11-18 after a council review of three proposals. The combined flow is boards S1 and S2; boards A, B and C are the rejected proposals, kept for reference. Behavior is defined in [UX journeys](../../ux.md#brewing-with-a-scale), which supersedes the boards where they differ: a weighed dose rescales the brew's pulses, so the plan line shows the weighed dose and the ratio heads for the recipe's own ratio. [synthesis.md](bt-scale/synthesis.md) records the council's scores and reasoning.
+
+| Reference | Screens |
+| --- | --- |
+| [Pairing to the first pour](bt-scale/s1.png) | Pairing offer, dose, armed, pour with live curve |
+| [Waits, a lost scale, finishing, the record](bt-scale/s2.png) | Wait, scale lost, drawdown, Finish brew review, saved record |
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.

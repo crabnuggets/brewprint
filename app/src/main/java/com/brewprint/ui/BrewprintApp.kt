@@ -49,7 +49,11 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             if (route != "draft") { draftReturn = null; route = "draft" }
         }
     }
-    state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && state.timerSettings.vibrate) StepVibration(draft.recipe, draft.timer) }
+    state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && (state.timerSettings.vibrate || state.timerSettings.sound)) StepCue(draft.recipe, draft.timer, state.timerSettings) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val pairScale = rememberScalePairing { scale ->
+        repository.setScale(scale).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { error = it.message ?: "Couldn't save the scale." }
+    }
     fun resumeDraft() {
         // A brew that was left alone goes straight to the review, where the total can be entered.
         val draft = state.draft
@@ -71,12 +75,17 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             when (route) {
-                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }) }
+                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale) }
                     ?: LaunchedEffect(Unit) { route = null }
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { repository.deleteBrew(brew.id).onSuccess { route = null }.onFailure { onError(it.message ?: "Couldn't delete brew.") } }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
-                "settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }) { route = null }
+                "settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, onClose = { route = null }) {
+                    ScaleSettings(state.scale, LocalScale.current.live, pairScale) {
+                        state.scale?.let { forgetScale(context, it) }
+                        repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
+                    }
+                }
                 else -> when (tab) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
                     "History" -> HistoryScreen(state.brews) { openRecord(it) }
@@ -186,7 +195,7 @@ private fun HistoryScreen(brews: List<BrewRecord>, onRecord: (String) -> Unit) {
 }
 
 @Composable
-private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit) {
+private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit, onPairScale: () -> Unit) {
     var encoded by rememberSaveable(initial.id) { mutableStateOf(Json.encodeToString(initial)) }
     val draft = remember(encoded) { Json.decodeFromString<BrewDraft>(encoded) }
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
@@ -196,22 +205,40 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     var discard by remember { mutableStateOf(false) }
     var showPlan by rememberSaveable { mutableStateOf(false) }
     val clock = LocalClock.current
-    // The live notification changes the timer and stage behind this screen; follow it.
-    LaunchedEffect(initial.timer, initial.stage) {
-        if (draft.timer != initial.timer || draft.stage != initial.stage) encoded = Json.encodeToString(draft.copy(timer = initial.timer, stage = initial.stage))
+    // The live notification and the scale change the timer, stage and scale data behind this screen; follow them.
+    LaunchedEffect(initial.timer, initial.stage, initial.scale) {
+        if (draft.timer != initial.timer || draft.stage != initial.stage || draft.scale != initial.scale) {
+            encoded = Json.encodeToString(draft.copy(timer = initial.timer, stage = initial.stage, scale = initial.scale))
+        }
     }
     val view = if (draft.stage == DraftStage.SHEET && draft.timer != null && draft.recipe != null) TimerNow(draft.recipe, draft.timer, rememberNow()) else null
-    KeepScreenOn(view?.active == true && state.timerSettings.keepScreenOn)
+    val scale = LocalScale.current
+    // The scale guides this brew while it is paired, connected, and not set aside for this brew.
+    val scaleOn = state.scale != null && !draft.withoutScale && scale.live.connected
+    val armed = scaleOn && view == null && draft.stage == DraftStage.SHEET && draft.scale != null && draft.scaleStep == ScaleStep.ARMED
+    KeepScreenOn((view?.active == true || armed) && state.timerSettings.keepScreenOn)
     var validTotal by rememberSaveable { mutableStateOf(true) }
+    // The scale and the live notification write the timer and scale data directly, and this screen's copy
+    // can lag them by a frame. An action keeps their latest values unless it changes them itself.
+    val latest = { repository.state.value.draft?.takeIf { it.id == draft.id } ?: draft }
+    fun merged(updated: BrewDraft): BrewDraft {
+        val newest = latest()
+        return updated.copy(
+            timer = if (updated.timer == draft.timer) newest.timer else updated.timer,
+            scale = if (updated.scale == draft.scale) newest.scale else updated.scale,
+            stage = if (updated.stage == draft.stage) newest.stage else updated.stage,
+        )
+    }
     fun change(updated: BrewDraft) {
-        encoded = Json.encodeToString(updated)
-        repository.updateDraft(updated).onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
+        val next = merged(updated)
+        encoded = Json.encodeToString(next)
+        repository.updateDraft(next).onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
     }
     fun timer(action: BrewTimer.(Recipe, Long) -> BrewTimer) {
         val recipe = draft.recipe ?: return
-        change(draft.copy(timer = draft.timer?.action(recipe, clock())))
+        change(draft.copy(timer = latest().timer?.action(recipe, clock())))
     }
-    fun finish() = change(draft.copy(stage = DraftStage.REVIEW, timer = draft.timer?.finish(draft.recipe!!, clock())))
+    fun finish() = change(draft.copy(stage = DraftStage.REVIEW, timer = latest().timer?.finish(draft.recipe!!, clock())))
     fun back() {
         when (draft.stage) {
             DraftStage.REVIEW -> { validTotal = true; change(draft.copy(stage = DraftStage.SHEET, timer = draft.timer?.unfinished())) }
@@ -225,16 +252,29 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
             change(selectItem(draft, repository.state.value, kind, id))
             picker = null
         }, onClose = { picker = null })
-    } else Page(when (draft.stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, footer = {
+    } else Page(when (draft.stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, actions = {
+        val paired = state.scale
+        if (draft.stage == DraftStage.SHEET && paired != null && !draft.withoutScale) ScaleChip(paired.name, scale.live.connected)
+    }, footer = {
         when (draft.stage) {
             DraftStage.SETUP -> PrimaryAction("Use this plan", enabled = ready(draft, state)) { change(draft.copy(stage = DraftStage.SHEET)) }
-            DraftStage.SHEET -> if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DraftStage.SHEET -> if (view == null && armed) ArmedFooter(
+                // Only a scale seen steady at 0 g since its tare can measure toward the targets; any other start follows the clock.
+                onStartNow = { showPlan = false; change(if (scale.live.zeroed) draft.copy(timer = BrewTimer(startedAt = clock(), byWeight = true)) else draft.copy(timer = BrewTimer(startedAt = clock()), scale = null)) },
+                onFinishWithout = ::finish,
+            ) else if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Tap as you begin the first pour.", Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                PrimaryAction("Start timer") { showPlan = false; change(draft.copy(timer = BrewTimer(startedAt = clock()))) }
+                // Before the scale is armed, the timer runs by the clock alone.
+                PrimaryAction("Start timer") { showPlan = false; change(draft.copy(timer = BrewTimer(startedAt = clock()), scale = null)) }
                 TextButton(onClick = ::finish, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Finish without timing") }
-            } else TimerFooter(view, { timer { recipe, now -> pause(recipe, now) } }, { timer { recipe, now -> resume(recipe, now) } }, { timer { recipe, now -> skip(recipe, now) } }, { timer { _, now -> undone(now) } }, ::finish)
+            } else {
+                // The scale started this timer moments ago; Undo puts the sheet back to waiting for the first pour.
+                val justStarted = draft.scale != null && view.timer.byWeight && view.step == 0 && clock() - view.timer.startedAt < UNDO_MILLIS
+                TimerFooter(view, { timer { recipe, now -> pause(recipe, now) } }, { timer { recipe, now -> resume(recipe, now) } }, { timer { recipe, now -> skip(recipe, now) } }, { timer { _, now -> undone(now) } }, ::finish,
+                    onUndoStart = if (justStarted) ({ change(draft.copy(timer = null)) }) else null)
+            }
             DraftStage.REVIEW -> PrimaryAction("Save brew", enabled = validDate && validTotal) {
-                repository.updateDraft(draft).fold(
+                repository.updateDraft(merged(draft)).fold(
                     onSuccess = { repository.saveBrew(draft.id).onSuccess { onSaved(it.id) }.onFailure { onError("Couldn't save brew. Try again.") } },
                     onFailure = { onError("Couldn't save brew. Try again.") },
                 )
@@ -247,9 +287,21 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 TextButton(onClick = { discard = true }, modifier = Modifier.fillMaxWidth()) { Text("Discard brew") }
             }
             DraftStage.SHEET -> if (view == null) {
+                if (state.scale == null && !state.scaleOfferDismissed) ScaleOffer(onPairScale) { repository.dismissScaleOffer().onFailure { onError(it.message ?: "Couldn't save settings.") } }
                 PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
+                if (scaleOn) {
+                    val data = draft.scale ?: ScaleData()
+                    ScalePrep(
+                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, scale.live, draft.recipe.dose,
+                        onTare = { scale.tare(); if (draft.scale == null || draft.scaleStep == ScaleStep.BREWER) change(draft.copy(scale = data, scaleStep = ScaleStep.COFFEE)) },
+                        // The weighed dose sets this brew's plan; the recipe in the Library keeps its own.
+                        onUse = { dose -> change(draft.copy(recipe = draft.recipe.scaledTo(dose), scale = data.copy(weighedDose = dose), scaleStep = ScaleStep.ARMED)); scale.tare() },
+                        onSkip = { change(draft.copy(scale = data, scaleStep = ScaleStep.ARMED)); scale.tare() },
+                        onWithout = { change(draft.copy(withoutScale = true, scale = null, scaleStep = ScaleStep.BREWER)) },
+                    )
+                }
                 PlanSchedule(draft.recipe)
-            } else TimerSheet(view, showPlan) { showPlan = it }
+            } else TimerSheet(view, showPlan, { showPlan = it }, scale.live.takeIf { draft.scale != null }, draft.scale)
             DraftStage.REVIEW -> {
                 Panel {
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -261,7 +313,13 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                     }
                 }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
-                draft.timer?.let { timer -> TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) } }
+                draft.timer?.let { timer ->
+                    TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
+                    draft.scale?.let { data ->
+                        LiftOffer(timer, data) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
+                        Panel { MeasuredRows(draft.recipe!!, data) }
+                    }
+                }
                 JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
             }
         }
@@ -419,7 +477,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         SecondaryAction("Repeat", onClick = onRepeat)
         Text("Preparation", style = MaterialTheme.typography.titleLarge)
         PlanSummary(brew.beans, brew.grinder, brew.setting, brew.recipe)
-        brew.timing?.let { TimingPanel(brew.recipe, it) }
+        brew.timing?.let { TimingPanel(brew.recipe, it, brew.scale) }
         PlanSchedule(brew.recipe)
         Panel {
             Text("Beans", style = MaterialTheme.typography.titleMedium)

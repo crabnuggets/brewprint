@@ -42,8 +42,22 @@ A pour or a wait in a timed brew. A recipe with N pulses has N pours and up to N
 The running time of a timed brew, counted from the start of the first pour.
 
 **Total brew time**:
-The time from the start of the first pour to "Finish brew", saved with a timed brew record.
+The time from the start of the first pour to "Finish brew", saved with a timed brew record. The review can correct it, for example to the moment the dripper was lifted.
 _Avoid_: Pour time, extraction time
+
+**Coffee scale**:
+A Bluetooth scale that reports weight and flow to the app during a brew. Optional; a brew without one is timed by the clock alone.
+_Avoid_: Smart scale
+
+**Weighed dose**:
+The dose read from the coffee scale before a brew. Using it rescales that brew's pulses to keep the recipe's brew ratio; the recipe itself is unchanged.
+
+**Measured water**:
+The scale's steady reading once flow stops after the last pour. It sits beside the planned total brew water and is never beverage weight.
+_Avoid_: Yield
+
+**Reached**:
+The scale's steady reading after a pulse's pour, shown beside its cumulative target.
 
 **Bloom**:
 An initial wetting of the coffee before subsequent pours. A recipe may label its first pulse as the bloom.
