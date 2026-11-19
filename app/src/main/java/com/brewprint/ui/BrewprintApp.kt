@@ -96,24 +96,23 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     val chrome = remember { Chrome() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    // Deleting is immediate; "Undo" for 5 seconds puts the record back as it was.
-    val pendingDeletes = remember { mutableStateListOf<DeletedBrew>() }
+    // A deleted brew is hidden at once and removed from storage only when the Undo window ends.
+    val pendingDeletes = remember { mutableStateListOf<String>() }
     var undoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val accessibility = androidx.compose.ui.platform.LocalAccessibilityManager.current
     fun delete(id: String) {
-        repository.deleteBrew(id).onSuccess { removed ->
-            if (route == "record") route = null
-            pendingDeletes += removed
-            undoJob?.cancel()
-            undoJob = scope.launch {
-                val wait = accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
-                val message = if (pendingDeletes.size == 1) "Brew deleted" else "${pendingDeletes.size} brews deleted"
-                val result = withTimeoutOrNull(wait) { snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Indefinite) }
-                if (result == SnackbarResult.ActionPerformed) pendingDeletes.forEach { brew -> repository.restoreBrew(brew).onFailure { onError(it.message ?: "Couldn't restore brew.") } }
-                pendingDeletes.clear()
-            }
-        }.onFailure { onError(it.message ?: "Couldn't delete brew.") }
+        if (route == "record") route = null
+        pendingDeletes += id
+        undoJob?.cancel()
+        undoJob = scope.launch {
+            val wait = accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
+            val message = if (pendingDeletes.size == 1) "Brew deleted" else "${pendingDeletes.size} brews deleted"
+            val result = withTimeoutOrNull(wait) { snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Indefinite) }
+            if (result != SnackbarResult.ActionPerformed) pendingDeletes.forEach { brew -> repository.deleteBrew(brew).onFailure { onError(it.message ?: "Couldn't delete brew.") } }
+            pendingDeletes.clear()
+        }
     }
+    val shown = if (pendingDeletes.isEmpty()) state else state.copy(brews = state.brews.filterNot { it.id in pendingDeletes })
     val navVisible = route == null && !libraryEditing
     chrome.navSpace = if (navVisible) 78.dp else 0.dp
     Scaffold(
@@ -132,6 +131,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                    else -> (slideInHorizontally(tween(340)) { -it / 16 } + fadeIn(tween(300))) togetherWith (slideOutHorizontally(tween(340)) { it / 8 } + fadeOut(tween(200)))
                }
            }) { screen ->
+            Box(Modifier.fillMaxSize().inert(transition.targetState == androidx.compose.animation.EnterExitState.PostExit)) {
             when (screen) {
                 "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
                     // Only the screen being opened may close itself; the one animating out after a save has no draft by design.
@@ -147,9 +147,10 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 }
                 else -> when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
-                    "History" -> HistoryScreen(state.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
-                    else -> BrewHome(state, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
+                    "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
+                    else -> BrewHome(shown, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
                 }
+            }
             }
            }
           }
@@ -378,6 +379,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     val lastSheet = remember { mutableStateOf(timerView) }
     SideEffect { if (stage == draft.stage) lastSheet.value = timerView }
     val stageView = (if (stage == draft.stage) timerView else lastSheet.value).takeIf { stage == DraftStage.SHEET }
+    Box(Modifier.fillMaxSize().inert(transition.targetState == androidx.compose.animation.EnterExitState.PostExit)) {
     Page(when (stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, pinHeader = stageView != null, actions = {
         val paired = state.scale
         if (stage == DraftStage.SHEET && paired != null && !draft.withoutScale) { ScaleChip(paired.name, scale.live.connected, reading = !scale.live.silent); Spacer(Modifier.width(8.dp)) }
@@ -461,6 +463,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
             }
         }
+    }
     }
     }
     if (dial && draft.grinder != null) GrinderDial(draft.setting, state.grinders.find { it.id == draft.grinder.id }?.lastSetting, state.grinders.find { it.id == draft.grinder.id }?.finish ?: draft.grinder.finish, { change(draft.copy(setting = it)) }, { finish ->

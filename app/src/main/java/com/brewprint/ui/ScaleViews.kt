@@ -373,7 +373,6 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
         val targetTop = shownTarget?.let { (y(it) - labelHeight / 2f).coerceAtLeast(if (showTotal && abs(y(it) - y(total)) < labelHeight) labelHeight else 0f) } ?: 0f
         val merged = shownTarget != null && abs(y(shownTarget) - y(total)) < 4.dp.toPx()
         if (showTotal) {
-            if (!merged) drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
             // When the two labels would overlap, the total's sits just above the target's instead.
             val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
             val totalTop = if (clash) (targetTop - totalLabel.size.height) else y(total) - totalLabel.size.height / 2f

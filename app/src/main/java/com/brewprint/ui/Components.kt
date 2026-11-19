@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.BlurEffect
@@ -171,9 +172,9 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             when {
                 value <= headerHeight -> headerShown = true
                 travel > SCROLL_SLOP -> headerShown = false
-                travel < -SCROLL_SLOP -> headerShown = true
+                travel < 0 -> headerShown = true
             }
-            chrome.navShown = value == 0 || value >= max || travel < -SCROLL_SLOP || (chrome.navShown && travel <= SCROLL_SLOP)
+            chrome.navShown = value == 0 || value >= max || travel < 0 || (chrome.navShown && travel <= SCROLL_SLOP)
         }
     }
     val shown = headerShown || pinHeader || rememberTouchExploration()
@@ -186,7 +187,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
                 Spacer(Modifier.height(with(density) { headerHeight.toDp() }))
                 Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
-                if (back == null) Spacer(Modifier.height(chrome.navSpace))
+                Spacer(Modifier.height(chrome.navSpace))
             }
             Row(
                 Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.graphicsLayer { translationY = offset }
@@ -300,6 +301,11 @@ internal fun SecondaryAction(text: String, enabled: Boolean = true, icon: ImageV
         if (icon != null) { Icon(icon, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)) }
         Text(text, Modifier.padding(vertical = 4.dp))
     }
+}
+
+/** Content animating out: still drawn, but it takes no touches and is hidden from TalkBack. */
+internal fun Modifier.inert(on: Boolean): Modifier = if (!on) this else clearAndSetSemantics { }.pointerInput(Unit) {
+    awaitPointerEventScope { while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() } }
 }
 
 /** A filled button sized by its caller, with the shared press feedback. */

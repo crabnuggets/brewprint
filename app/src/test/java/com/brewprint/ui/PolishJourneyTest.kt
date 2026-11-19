@@ -120,10 +120,22 @@ class PolishJourneyTest {
         compose.onNodeWithText("Ethiopia natural").performClick()
         tap("Delete brew")
         compose.onNodeWithText("Brew deleted").assertExists()
-        compose.runOnIdle { assertTrue(repository.state.value.brews.isEmpty()) }
+        compose.onNodeWithText("Ethiopia natural").assertDoesNotExist()
         capture("history-undo-light")
         compose.onNodeWithText("Undo").performClick()
+        compose.onNodeWithText("Ethiopia natural").assertExists()
         compose.runOnIdle { assertEquals(listOf(record), repository.state.value.brews) }
+    }
+
+    @Test fun `a delete is written once the Undo window ends`() {
+        open { saveScaleRecord() }
+        compose.onNodeWithText("History").performClick()
+        compose.onNodeWithText("Ethiopia natural").performTouchInput { swipeLeft() }
+        compose.runOnIdle { assertEquals(1, repository.state.value.brews.size) }
+        compose.mainClock.advanceTimeBy(UNDO_MILLIS + 1_000)
+        compose.waitForIdle()
+        compose.onNodeWithText("Brew deleted").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(repository.state.value.brews.isEmpty()) }
     }
 
     @Test fun `swiping a History row left deletes it with Undo, and right repeats it`() {
@@ -132,7 +144,7 @@ class PolishJourneyTest {
         compose.onNodeWithText("History").performClick()
         compose.onNodeWithText("Ethiopia natural").performTouchInput { swipeLeft() }
         compose.onNodeWithText("Brew deleted").assertExists()
-        compose.runOnIdle { assertTrue(repository.state.value.brews.isEmpty()) }
+        compose.onNodeWithText("Ethiopia natural").assertDoesNotExist()
         compose.onNodeWithText("Undo").performClick()
         compose.runOnIdle { assertEquals(listOf(record), repository.state.value.brews) }
         compose.onNodeWithText("Ethiopia natural").performTouchInput { swipeRight() }
