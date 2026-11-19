@@ -166,7 +166,7 @@ fun LibraryScreen(
                 }
             }
         }, confirmButton = {
-            TextButton(enabled = !needsReplacement || replacementId != null, onClick = {
+            SoftTextButton(enabled = !needsReplacement || replacementId != null, onClick = {
                 val result = when (kind) {
                     "beans" -> repository.archiveBeans(detailId!!)
                     "grinders" -> repository.archiveGrinder(detailId!!, replacementId)
@@ -174,13 +174,13 @@ fun LibraryScreen(
                 }
                 if (save(result)) { archive = false; detailId = null }
             }) { Text("Archive") }
-        }, dismissButton = { TextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
+        }, dismissButton = { SoftTextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
     }
     if (settingDialog && grinder != null) AlertDialog(onDismissRequest = { settingDialog = false }, title = { Text("Update last recorded setting") }, text = {
         LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
-    }, confirmButton = { TextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
+    }, confirmButton = { SoftTextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
         if (save(repository.updateGrinderSetting(grinder.id, parseGrindSetting(settingText)!!))) settingDialog = false
-    }) { Text("Update setting") } }, dismissButton = { TextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
+    }) { Text("Update setting") } }, dismissButton = { SoftTextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
 }
 
 @Composable
@@ -248,7 +248,7 @@ internal fun LibraryPage(title: String, onBack: (() -> Unit)?, content: @Composa
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null) {
+internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null, modifier: Modifier = Modifier) {
     var interacted by rememberSaveable { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
     val visibleError = error.takeIf { interacted }
@@ -264,7 +264,7 @@ internal fun LibraryField(value: String, onChange: (String) -> Unit, label: Stri
                 if (required) Text("Required", style = MaterialTheme.typography.labelSmall)
             }
         },
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+        modifier = modifier.fillMaxWidth().onFocusChanged { focus ->
             if (focus.isFocused) wasFocused = true
             else if (wasFocused) interacted = true
         }.semantics { if (visibleError != null) this.error(visibleError) },
@@ -281,7 +281,7 @@ internal fun LibraryField(value: String, onChange: (String) -> Unit, label: Stri
 
 @Composable
 internal fun DiscardLibraryDialog(visible: Boolean, keepEditing: () -> Unit, discard: () -> Unit) {
-    if (visible) AlertDialog(onDismissRequest = keepEditing, title = { Text("Discard changes?") }, confirmButton = { TextButton(onClick = discard) { Text("Discard") } }, dismissButton = { TextButton(onClick = keepEditing) { Text("Keep editing") } })
+    if (visible) AlertDialog(onDismissRequest = keepEditing, title = { Text("Discard changes?") }, confirmButton = { SoftTextButton(onClick = discard) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = keepEditing) { Text("Keep editing") } })
 }
 
 @Composable

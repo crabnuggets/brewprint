@@ -29,10 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Coffee
@@ -42,6 +42,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -85,7 +87,8 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
         surfaceTint = Color(0xFFF2F2F4),
         surfaceVariant = Color(0xFF24252A), onSurfaceVariant = Color(0xFF9EA0AA),
         outline = Color(0xFF777984), outlineVariant = Color(0xFF2C2D32),
-        secondaryContainer = Color(0xFF26272C), onSecondaryContainer = Color(0xFFF7F7F8),
+        secondaryContainer = Color(0xFF2B2C32), onSecondaryContainer = Color(0xFFF7F7F8),
+        inverseSurface = Color(0xFFE9E9EC), inverseOnSurface = Color(0xFF111214), inversePrimary = Color(0xFF111214),
     ) else lightColorScheme(
         primary = Color(0xFF111214), onPrimary = Color.White,
         secondary = Color(0xFF4E505A), onSecondary = Color.White,
@@ -96,7 +99,8 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
         surfaceTint = Color(0xFF121316),
         surfaceVariant = Color(0xFFF0F0F4), onSurfaceVariant = Color(0xFF686A74),
         outline = Color(0xFF898B96), outlineVariant = Color(0xFFE4E5EA),
-        secondaryContainer = Color(0xFFECEDF1), onSecondaryContainer = Color(0xFF0E0F12),
+        secondaryContainer = Color(0xFFE7E8ED), onSecondaryContainer = Color(0xFF0E0F12),
+        inverseSurface = Color(0xFF2A2B30), inverseOnSurface = Color(0xFFF2F2F4), inversePrimary = Color(0xFFF2F2F4),
     )
     val base = Typography()
     MaterialTheme(
@@ -154,10 +158,12 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             chrome.navShown = value == 0 || value >= max || travel < -SCROLL_SLOP || (chrome.navShown && travel <= SCROLL_SLOP)
         }
     }
-    val shown = headerShown || pinHeader
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val exploring = remember(context) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled == true }
+    val shown = headerShown || pinHeader || exploring
     val offset by animateFloatAsState(if (shown) 0f else -headerHeight.toFloat(), tween(280), label = "header")
     Column(Modifier.fillMaxSize().imePadding()) {
-        Box(Modifier.fillMaxWidth().weight(1f)) {
+        Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             val density = LocalDensity.current
             Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
                 Spacer(Modifier.height(with(density) { headerHeight.toDp() }))
@@ -171,7 +177,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (back != null) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
-                Text(title, style = if (back == null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
+                Text(title, style = if (back == null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).semantics { heading() })
                 actions()
             }
         }
@@ -210,7 +216,7 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
                         Icon(when (destination) {
                             "Brew" -> if (selected) Icons.Filled.Coffee else Icons.Outlined.Coffee
                             "History" -> if (selected) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.AutoMirrored.Outlined.FormatListBulleted
-                            else -> if (selected) Icons.AutoMirrored.Filled.MenuBook else Icons.AutoMirrored.Outlined.MenuBook
+                            else -> if (selected) Icons.AutoMirrored.Filled.LibraryBooks else Icons.AutoMirrored.Outlined.LibraryBooks
                         }, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                         if (selected) Text(destination, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                     }
@@ -285,7 +291,7 @@ internal fun SoftButton(onClick: () -> Unit, modifier: Modifier = Modifier, enab
 @Composable
 internal fun SoftTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
     val source = remember { MutableInteractionSource() }
-    Button(onClick, modifier.heightIn(min = 40.dp).pressScale(source), enabled = enabled, shape = RoundedCornerShape(12.dp), colors = softColors(), elevation = null,
+    Button(onClick, modifier.heightIn(min = 40.dp).pressScale(source), enabled = enabled, shape = MaterialTheme.shapes.small, colors = softColors(), elevation = null,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), interactionSource = source, content = content)
 }
 
@@ -309,7 +315,7 @@ internal fun IconAction(icon: ImageVector, label: String, modifier: Modifier = M
 @Composable
 internal fun <T, K> BlurSwap(value: T, key: (T) -> K, modifier: Modifier = Modifier, alignment: Alignment = Alignment.TopStart, content: @Composable (T) -> Unit) {
     AnimatedContent(value, modifier, contentAlignment = alignment, contentKey = key, label = "blur-swap",
-        transitionSpec = { fadeIn(tween(220, delayMillis = 120)) togetherWith fadeOut(tween(150)) using SizeTransform(clip = false) { _, _ -> tween(300) } },
+        transitionSpec = { fadeIn(tween(240, delayMillis = 60)) togetherWith fadeOut(tween(150)) using SizeTransform(clip = false) { _, _ -> tween(300) } },
     ) { shown ->
         val blur by transition.animateFloat({ tween(if (targetState == EnterExitState.Visible) 340 else 150) }, label = "blur") { if (it == EnterExitState.Visible) 0f else 10f }
         Box(Modifier.graphicsLayer {
@@ -326,6 +332,12 @@ internal fun <T> Roll(value: T, modifier: Modifier = Modifier, content: @Composa
     }) { content(it) }
 }
 
+/** A section title: one style across screens, and a heading for TalkBack navigation. */
+@Composable
+internal fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+}
+
 @Composable
 internal fun DisclosureRow(label: String, expanded: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }, shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -338,5 +350,5 @@ internal fun DisclosureRow(label: String, expanded: Boolean, onClick: () -> Unit
 
 @Composable
 fun DiscardDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
-    AlertDialog(onDismissRequest = onKeep, title = { Text("Discard changes?") }, confirmButton = { TextButton(onClick = onDiscard) { Text("Discard") } }, dismissButton = { TextButton(onClick = onKeep) { Text("Keep editing") } })
+    AlertDialog(onDismissRequest = onKeep, title = { Text("Discard changes?") }, confirmButton = { SoftTextButton(onClick = onDiscard) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = onKeep) { Text("Keep editing") } })
 }

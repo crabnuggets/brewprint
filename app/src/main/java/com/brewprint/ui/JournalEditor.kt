@@ -13,7 +13,7 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
     var explore by rememberSaveable { mutableStateOf(false) }
     var cooling by rememberSaveable { mutableStateOf(journal.asItCools.isNotBlank()) }
     var roaster by rememberSaveable { mutableStateOf(false) }
-    Text("How was this cup?", style = MaterialTheme.typography.titleLarge)
+    SectionTitle("How was this cup?")
     Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), label = { Text("Your notes") }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
     DisclosureRow(if (explore) "Hide taste exploration" else "Explore the taste", explore) { explore = !explore }

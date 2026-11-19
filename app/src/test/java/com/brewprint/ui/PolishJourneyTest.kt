@@ -137,6 +137,35 @@ class PolishJourneyTest {
         compose.runOnIdle { assertEquals(record.recipe, repository.state.value.draft?.recipe) }
     }
 
+    @Test fun `two deletes in a row share one Undo that restores both`() {
+        lateinit var first: BrewRecord
+        lateinit var second: BrewRecord
+        open { first = saveScaleRecord(); second = saveScaleRecord() }
+        compose.onNodeWithText("History").performClick()
+        compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeLeft() }
+        compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeLeft() }
+        compose.onNodeWithText("2 brews deleted").assertExists()
+        compose.onNodeWithText("Undo").performClick()
+        compose.runOnIdle { assertEquals(setOf(first, second), repository.state.value.brews.toSet()) }
+    }
+
+    @Test fun `using the dripper lift while the total is being edited replaces the field`() {
+        open {
+            val timer = BrewTimer(startedAt = now - 270_000, step = 18, stepAt = now - 54_000, pulseStarts = starts.map { it * 1000L }, finishedAt = now, byWeight = true)
+            updateDraft(startDraft().getOrThrow().copy(beans = beans, grinder = grinder, setting = 24, recipe = recipe, stage = DraftStage.REVIEW, timer = timer,
+                scale = ScaleData(weighedDose = 20.0, water = 304.2, reached = reached, liftSeconds = 252))).getOrThrow()
+        }
+        tap("Resume brew")
+        tap("Change total")
+        compose.onNode(hasText("Total brew time") and hasSetTextAction()).performTextReplacement("4:3x")
+        compose.onNodeWithText("Save brew").assertIsNotEnabled()
+        tap("Use 4:12")
+        compose.onNode(hasText("Total brew time") and hasSetTextAction()).assertDoesNotExist()
+        compose.onNodeWithText("4:12").assertExists()
+        compose.onNodeWithText("Save brew").assertIsEnabled()
+        compose.runOnIdle { assertEquals(252, repository.state.value.draft?.timer?.totalOverride) }
+    }
+
     @Test fun `History rows offer Delete and Repeat to screen readers`() {
         open { saveScaleRecord() }
         compose.onNodeWithText("History").performClick()

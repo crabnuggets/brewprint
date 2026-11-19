@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -297,8 +298,14 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
     val target = view.schedule.getOrNull(if (view.phase == TimerPhase.POUR) view.pulse else view.pulse + 1)?.cumulativeWater
     Panel {
         val ratio = live.grams?.takeIf { live.following == null }?.let { "1:" + "%.1f".format(it / view.recipe.dose) } ?: "–"
-        Text("Ratio $ratio → 1:${formatAmount(view.recipe.ratio)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        WaterCurve(live.curve, view.poursEndSeconds + 30, view.recipe.totalWater, target = target, flows = live.flows)
+        Text(androidx.compose.ui.text.buildAnnotatedString {
+            append("Ratio ")
+            withStyle(androidx.compose.ui.text.SpanStyle(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) { append(ratio) }
+            append(" → 1:${formatAmount(view.recipe.ratio)}")
+        }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        // Read on focus, not announced: the step changes are announced by the focus card.
+        val summary = "Water on the scale " + (live.grams?.let { "${tenths(it)} grams" } ?: "not reading") + (target?.let { ", pour to ${formatAmount(it)} grams" } ?: "") + ", total ${formatAmount(view.recipe.totalWater)} grams."
+        WaterCurve(live.curve, view.poursEndSeconds + 30, view.recipe.totalWater, target = target, flows = live.flows, description = summary)
     }
 }
 
@@ -312,7 +319,7 @@ internal fun CurveLegend() {
     }
     Row(Modifier.clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         item("Actual") { drawLine(colors.onSurface, Offset(0f, center.y), Offset(size.width, center.y), 2.dp.toPx()) }
-        item("Plan") { drawLine(colors.outline.copy(alpha = .45f), Offset(0f, center.y), Offset(size.width, center.y), 3.dp.toPx()) }
+        item("Plan") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 3.dp.toPx()) }
         item("Total") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx()))) }
     }
 }
@@ -323,7 +330,7 @@ internal fun CurveLegend() {
  * labelled with its grams at the right end. [plan], on the record, is drawn faintly behind the curve. Decorative: the numbers are in the text around it.
  */
 @Composable
-internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, target: Double? = null, plan: List<Pair<Int, Double>> = emptyList(), flows: List<Double?> = emptyList()) {
+internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, target: Double? = null, plan: List<Pair<Int, Double>> = emptyList(), flows: List<Double?> = emptyList(), description: String = "") {
     val colors = MaterialTheme.colorScheme
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium
@@ -334,9 +341,10 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
     val top = maxOf(total, target ?: 0.0, curve.filterNotNull().maxOrNull() ?: 0.0, 1.0) * 1.06
     val flowTop = maxOf(flows.filterNotNull().maxOrNull() ?: 0.0, 8.0)
     val span = maxOf(seconds, curve.size, plan.maxOfOrNull { it.first } ?: 0, 1)
-    Canvas(Modifier.fillMaxWidth().height(if (withAxis) 128.dp else 104.dp).clearAndSetSemantics { }) {
+    Canvas(Modifier.fillMaxWidth().height(if (withAxis) 128.dp else 104.dp).clearAndSetSemantics { if (description.isNotEmpty()) contentDescription = description }) {
         val totalLabel = measurer.measure("${formatAmount(total)} g", labelStyle.copy(color = colors.onSurfaceVariant))
-        val targetLabel = shownTarget?.let { measurer.measure("${formatAmount(it)} g", labelStyle.copy(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) }
+        // When this pour's target is the total, its label says so.
+        val targetLabel = shownTarget?.let { measurer.measure("${formatAmount(it)} g" + if (!showTotal) " total" else "", labelStyle.copy(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) }
         val labelWidth = maxOf(totalLabel.size.width, targetLabel?.size?.width ?: 0) + 6.dp.toPx()
         val axisLabel = if (withAxis) measurer.measure("0:00", labelStyle) else null
         val plotTop = totalLabel.size.height / 2f
@@ -355,15 +363,16 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
         if (plan.isNotEmpty()) {
             val planned = Path()
             plan.forEachIndexed { index, (second, water) -> if (index == 0) planned.moveTo(x(second), y(water)) else planned.lineTo(x(second), y(water)) }
-            planned.lineTo(x(span), y(plan.last().second))
-            drawPath(planned, colors.outline.copy(alpha = .45f), style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
+            // The plan ends with its last pour, so it never covers the dotted total.
+            drawPath(planned, colors.outline, style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
         }
         val gap = 6.dp.toPx()
         if (showTotal) {
             drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
-            // When the two labels would overlap, the target's wins.
+            // When the two labels would overlap, the total's sits just above the target's instead.
             val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
-            if (!clash) drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, y(total) - totalLabel.size.height / 2f))
+            val totalTop = if (clash && shownTarget != null) y(shownTarget) - totalLabel.size.height * 1.5f else y(total) - totalLabel.size.height / 2f
+            drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop.coerceAtLeast(0f)))
         }
         if (shownTarget != null && targetLabel != null) {
             drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
@@ -376,7 +385,9 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             else { if (open) path.lineTo(x(second), y(value)) else path.moveTo(x(second), y(value)); open = true }
         }
         drawPath(path, colors.onSurface, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
-        if (axisLabel != null) for (minute in 0..span / 60) {
+        // Minute ticks thin out on long brews, so labels never touch.
+        val every = listOf(1, 2, 5, 10, 15).firstOrNull { axisLabel == null || x(it * 60) >= axisLabel.size.width + 12.dp.toPx() } ?: 30
+        if (axisLabel != null) for (minute in 0..span / 60 step every) {
             val label = measurer.measure("$minute:00", labelStyle.copy(color = colors.onSurfaceVariant))
             val left = (x(minute * 60) - if (minute == 0) 0f else label.size.width / 2f).coerceAtMost(width - label.size.width)
             drawText(label, topLeft = Offset(left, size.height - label.size.height))
