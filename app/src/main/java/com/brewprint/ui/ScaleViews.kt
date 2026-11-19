@@ -304,7 +304,8 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
             append(" → 1:${formatAmount(view.recipe.ratio)}")
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         // Read on focus, not announced: the step changes are announced by the focus card.
-        val summary = "Water on the scale " + (live.grams?.let { "${tenths(it)} grams" } ?: "not reading") + (target?.let { ", pour to ${formatAmount(it)} grams" } ?: "") + ", total ${formatAmount(view.recipe.totalWater)} grams."
+        // While the sheet follows the clock, the last reading is not current and is not read out as if it were.
+        val summary = (live.grams?.takeIf { live.following == null }?.let { "Water on the scale ${tenths(it)} grams" } ?: "No current scale reading") + (target?.let { ", pour to ${formatAmount(it)} grams" } ?: "") + ", total ${formatAmount(view.recipe.totalWater)} grams."
         WaterCurve(live.curve, view.poursEndSeconds + 30, view.recipe.totalWater, target = target, flows = live.flows, description = summary)
     }
 }
@@ -364,22 +365,25 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             val planned = Path()
             plan.forEachIndexed { index, (second, water) -> if (index == 0) planned.moveTo(x(second), y(water)) else planned.lineTo(x(second), y(water)) }
             // The plan ends with its last pour, so it never covers the dotted total.
-            drawPath(planned, colors.outline, style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
+            drawPath(planned, colors.outline, style = Stroke(2.5.dp.toPx(), join = StrokeJoin.Round))
         }
         val gap = 6.dp.toPx()
         // When the target sits close under the total, both labels get their own row: the total's directly above the target's.
         val labelHeight = totalLabel.size.height.toFloat()
         val targetTop = shownTarget?.let { (y(it) - labelHeight / 2f).coerceAtLeast(if (showTotal && abs(y(it) - y(total)) < labelHeight) labelHeight else 0f) } ?: 0f
+        val merged = shownTarget != null && abs(y(shownTarget) - y(total)) < 4.dp.toPx()
         if (showTotal) {
-            drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
+            if (!merged) drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
             // When the two labels would overlap, the total's sits just above the target's instead.
             val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
             val totalTop = if (clash) (targetTop - totalLabel.size.height) else y(total) - totalLabel.size.height / 2f
             drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop))
+            if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.dp.toPx())
         }
         if (shownTarget != null && targetLabel != null) {
             drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
             drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, targetTop))
+            if (showTotal && abs(y(shownTarget) - y(total)) < labelHeight) drawLine(colors.onSurface.copy(alpha = .8f), Offset(width - gap, y(shownTarget)), Offset(size.width - targetLabel.size.width - 2.dp.toPx(), targetTop + labelHeight / 2f), 1.dp.toPx())
         }
         val path = Path()
         var open = false

@@ -169,16 +169,18 @@ class PolishJourneyTest {
         compose.runOnIdle { assertEquals(252, repository.state.value.draft?.timer?.totalOverride) }
     }
 
-    @Test fun `leaving History for another screen ends the Undo window`() {
-        lateinit var kept: BrewRecord
-        open { saveScaleRecord(); kept = saveScaleRecord() }
+    @Test fun `Undo stays reachable above the next screen's footer`() {
+        lateinit var deleted: BrewRecord
+        open { deleted = saveScaleRecord(); saveScaleRecord() }
         compose.onNodeWithText("History").performClick()
         compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeLeft() }
-        compose.onNodeWithText("Brew deleted").assertExists()
         compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeRight() }
         compose.onNodeWithText("New brew").assertExists()
-        compose.onNodeWithText("Brew deleted").assertDoesNotExist()
-        compose.runOnIdle { assertEquals(listOf(kept.id), repository.state.value.brews.map { it.id }) }
+        val bar = compose.onNodeWithText("Brew deleted").fetchSemanticsNode().boundsInRoot
+        val footer = compose.onNodeWithText("Use this plan").fetchSemanticsNode().boundsInRoot
+        assertTrue("Undo bar ${bar.bottom} should sit above the footer action ${footer.top}", bar.bottom <= footer.top)
+        compose.onNodeWithText("Undo").performClick()
+        compose.runOnIdle { assertTrue(repository.state.value.brews.any { it.id == deleted.id }) }
     }
 
     @Config(qualifiers = "w360dp-h780dp-xxhdpi")

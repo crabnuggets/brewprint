@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -144,6 +145,8 @@ internal fun rememberTouchExploration(): Boolean {
 internal class Chrome {
     var navShown by mutableStateOf(true)
     var navSpace by mutableStateOf(0.dp)
+    /** Height of the current page's pinned footer, so the Undo bar can sit above it. */
+    var footerSpace by mutableStateOf(0.dp)
 }
 internal val LocalChrome = staticCompositionLocalOf { Chrome() }
 
@@ -176,6 +179,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
     val shown = headerShown || pinHeader || rememberTouchExploration()
     val offset by animateFloatAsState(if (shown) 0f else -headerHeight.toFloat(), tween(280), label = "header")
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val scrolledUnder by remember(scroll) { derivedStateOf { scroll.value > headerHeight } }
     Column(Modifier.fillMaxSize().imePadding()) {
         Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             val density = LocalDensity.current
@@ -187,7 +191,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             Row(
                 Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.graphicsLayer { translationY = offset }
                     .background(MaterialTheme.colorScheme.background)
-                    .then(if (scroll.value > headerHeight) Modifier.drawBehind { drawLine(outlineVariant, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx()) } else Modifier)
+                    .then(if (scrolledUnder) Modifier.drawBehind { drawLine(outlineVariant, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx()) } else Modifier)
                     .padding(start = if (back == null) 24.dp else 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -197,9 +201,11 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             }
         }
         // A hairline marks where content continues under the footer, so a cut-off line reads as scrollable.
-        val bottomPadding = with(LocalDensity.current) { 24.dp.roundToPx() }
+        val density = LocalDensity.current
+        val bottomPadding = with(density) { 24.dp.roundToPx() }
         if (footer != null && scroll.maxValue - scroll.value > bottomPadding) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        if (footer != null) Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp, vertical = 12.dp).animateContentSize(tween(300))) { footer() }
+        if (footer != null) Box(Modifier.fillMaxWidth().onSizeChanged { chrome.footerSpace = with(density) { it.height.toDp() } }.background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp, vertical = 12.dp).animateContentSize(tween(300))) { footer() }
+        else LaunchedEffect(Unit) { chrome.footerSpace = 0.dp }
     }
 }
 
@@ -213,7 +219,7 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 6.dp,
         ) {
-            Row(Modifier.fillMaxWidth().height(58.dp).selectableGroup().padding(horizontal = 7.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(60.dp).selectableGroup().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 listOf("Brew", "History", "Library").forEach { destination ->
                     val selected = destination == selectedTab
                     // The selected destination shows its name beside its icon; the others keep their names for screen readers.
@@ -222,7 +228,7 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
                             .background(if (selected) MaterialTheme.colorScheme.soft else Color.Transparent)
                             .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(destination) })
                             .semantics { if (!selected) text = AnnotatedString(destination) }
-                            .heightIn(min = 44.dp).widthIn(min = 76.dp)
+                            .heightIn(min = 48.dp).widthIn(min = 76.dp)
                             .animateContentSize(tween(280))
                             .padding(start = if (selected) 14.dp else 0.dp, end = if (selected) 18.dp else 0.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -333,7 +339,8 @@ internal fun <T, K> BlurSwap(value: T, key: (T) -> K, modifier: Modifier = Modif
         transitionSpec = { fadeIn(tween(240, delayMillis = 60)) togetherWith fadeOut(tween(150)) using SizeTransform(clip = false) { _, _ -> androidx.compose.animation.core.snap() } },
     ) { shown ->
         val blur by transition.animateFloat({ tween(if (targetState == EnterExitState.Visible) 340 else 150) }, label = "blur") { if (it == EnterExitState.Visible) 0f else 10f }
-        Box(Modifier.graphicsLayer {
+        val leaving = transition.targetState == EnterExitState.PostExit
+        Box((if (leaving) Modifier.clearAndSetSemantics { } else Modifier).graphicsLayer {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur > .05f) renderEffect = BlurEffect(blur.dp.toPx(), blur.dp.toPx(), TileMode.Decal)
         }) { content(shown) }
     }

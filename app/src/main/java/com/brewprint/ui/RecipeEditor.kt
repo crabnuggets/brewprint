@@ -7,6 +7,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.*
@@ -220,10 +221,10 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
         Text("Scheduled pours end at ${formatDuration(schedule.last())}", style = MaterialTheme.typography.bodyMedium)
         LibraryField(notes, { notes = it }, "Preparation notes, optional", multiline = true)
-        Button(shape = MaterialTheme.shapes.small, enabled = valid, onClick = {
+        PrimaryAction("Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
             val recipe = original.copy(id = id, name = name.trim(), dose = doseValue!!, ratio = ratioValue!!, notes = notes, pulses = pulses.mapIndexed { index, pulse -> Pulse(pulse.label, pulse.water.toDouble(), pulse.pour.toInt(), if (index == pulses.lastIndex) 0 else pulse.wait.toInt()) })
             if (onSave(recipe)) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save recipe") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }

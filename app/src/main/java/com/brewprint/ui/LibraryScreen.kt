@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -206,9 +207,9 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
         LibraryField(processing, { processing = it }, "Processing method, optional")
         LibraryField(expectedNotes, { expectedNotes = it }, "Expected tasting notes, optional", multiline = true)
         LibraryField(notes, { notes = it }, "General notes, optional", multiline = true)
-        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && roaster.isNotBlank(), onClick = {
+        PrimaryAction("Save beans", enabled = name.isNotBlank() && roaster.isNotBlank(), icon = Icons.Outlined.Check) {
             if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes))) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save beans") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }
@@ -234,9 +235,9 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DialFinish.entries.forEach { finish -> FilterChip(selected = finishName == finish.name, onClick = { finishName = finish.name }, label = { Text(finishLabel(finish)) }) }
         }
-        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && (setting.isBlank() || parseGrindSetting(setting) != null), onClick = {
+        PrimaryAction("Save grinder", enabled = name.isNotBlank() && (setting.isBlank() || parseGrindSetting(setting) != null), icon = Icons.Outlined.Check) {
             if (onSave(original.copy(id = id, name = name.trim(), lastSetting = parseGrindSetting(setting), referenceNotes = reference, finish = DialFinish.valueOf(finishName)))) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save grinder") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }

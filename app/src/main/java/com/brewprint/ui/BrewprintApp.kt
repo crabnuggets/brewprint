@@ -113,9 +113,6 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             }
         }.onFailure { onError(it.message ?: "Couldn't delete brew.") }
     }
-    LaunchedEffect(route) {
-        if (route != null && undoJob != null) { undoJob?.cancel(); undoJob = null; pendingDeletes.clear() }
-    }
     val navVisible = route == null && !libraryEditing
     chrome.navSpace = if (navVisible) 78.dp else 0.dp
     Scaffold(
@@ -155,9 +152,10 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             }
            }
           }
-            if (navVisible) FloatingNavigation(tab, chrome.navShown || rememberTouchExploration(), Modifier.align(Alignment.BottomCenter)) { tab = it }
+            val navShown = navVisible && (chrome.navShown || rememberTouchExploration())
+            if (navVisible) FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter)) { tab = it }
             // The Undo bar moves with the navigation instead of jumping.
-            val lift by androidx.compose.animation.core.animateDpAsState(if (navVisible && chrome.navShown) 78.dp else 8.dp, tween(280), label = "snackbar")
+            val lift by androidx.compose.animation.core.animateDpAsState(if (navShown) 78.dp else if (route != null) chrome.footerSpace + 8.dp else 8.dp, tween(280), label = "snackbar")
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = lift).padding(horizontal = 8.dp)) {
                 // Monochrome: the action reads in the bar's own text color, set apart by weight.
                 Snackbar(it, shape = MaterialTheme.shapes.small, actionColor = MaterialTheme.colorScheme.inverseOnSurface)
@@ -556,7 +554,7 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
             val water = formatAmount(recipe.totalWater)
             val spoken = "Coffee dose $dose grams, brew ratio 1 to $ratio, total brew water $water grams. ${grinder.name}, $setting ticks."
             Column(Modifier.align(Alignment.CenterVertically).clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("$dose g · 1:$ratio · $water g", style = MaterialTheme.typography.titleMedium)
+                Text("$dose g · 1:$ratio · $water g", style = MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium))
                 Text("${grinder.name} · $setting ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
             if (onCorrect != null) IconAction(Icons.Outlined.Tune, "Change setup", Modifier.align(Alignment.CenterVertically), onClick = onCorrect)
@@ -644,7 +642,12 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         Panel {
             Text("Beans", style = MaterialTheme.typography.titleMedium)
             Text(brew.beans.roaster)
-            listOf("Origin" to brew.beans.origin, "Variety / cultivar" to brew.beans.variety, "Processing method" to brew.beans.processing, "Expected tasting notes" to brew.beans.expectedNotes, "Bean notes" to brew.beans.notes, "Grinder reference" to brew.grinder.referenceNotes).filter { it.second.isNotBlank() }.forEach { (label, value) -> Text("$label: $value") }
+            listOf("Origin" to brew.beans.origin, "Variety / cultivar" to brew.beans.variety, "Processing method" to brew.beans.processing, "Expected tasting notes" to brew.beans.expectedNotes, "Bean notes" to brew.beans.notes, "Grinder reference" to brew.grinder.referenceNotes).filter { it.second.isNotBlank() }.forEach { (label, value) ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(value, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
         }
         SecondaryAction("Edit brew", icon = Icons.Outlined.Edit, onClick = onEdit)
         SoftTextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Delete brew") }

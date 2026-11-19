@@ -359,7 +359,7 @@ internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Un
                 FooterButton(if (view.paused) "Resume" else "Pause", if (view.paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, modifier, filled = view.paused, onClick = if (view.paused) onResume else onPause)
                 FooterButton(skip, Icons.Outlined.SkipNext, modifier, onClick = onSkip)
             }
-            if (LocalDensity.current.fontScale >= 1.3f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons(Modifier.fillMaxWidth()) }
+            if (LocalDensity.current.fontScale >= 1.6f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons(Modifier.fillMaxWidth()) }
             else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { buttons(Modifier.weight(1f)) }
             SoftTextButton(onClick = onFinish, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Finish brew")
@@ -372,8 +372,8 @@ internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Un
 private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, filled: Boolean = false, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     // Pause becoming Resume keeps the same button: its fill and label cross-fade instead of swapping controls.
-    val container by animateColorAsState(if (filled) colors.primary else colors.soft, tween(260), label = "fill")
-    val ink by animateColorAsState(if (filled) colors.onPrimary else colors.onSecondaryContainer, tween(260), label = "ink")
+    val container = if (filled) colors.primary else colors.soft
+    val ink = if (filled) colors.onPrimary else colors.onSecondaryContainer
     val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Button(onClick, modifier.heightIn(min = 56.dp).pressScale(source), shape = MaterialTheme.shapes.small, colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = ink),
         elevation = null, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), interactionSource = source) {
