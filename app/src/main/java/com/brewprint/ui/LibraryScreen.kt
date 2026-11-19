@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -73,7 +74,7 @@ fun LibraryScreen(
         return
     }
     if (detailId != null) {
-        BackHandler(onBack = closeDetail)
+        BackHandler(LocalScreenActive.current, closeDetail)
         LibraryPage(when (kind) { "beans" -> beans?.name; "grinders" -> grinder?.name; else -> recipe?.name } ?: "Library", closeDetail) {
             if (beans != null && kind == "beans") {
                 DetailLine("Roaster", beans.roaster)
@@ -88,8 +89,8 @@ fun LibraryScreen(
                 DetailLine("Reference notes", grinder.referenceNotes)
                 DetailLine("Dial finish", finishLabel(grinder.finish))
                 if (state.defaultGrinderId == grinder.id) Text("Default grinder", style = MaterialTheme.typography.labelLarge)
-                else OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
+                else SoftButton(shape = MaterialTheme.shapes.small, onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
+                SoftButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
             }
             if (recipe != null && kind == "recipes") {
                 Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleLarge)
@@ -105,22 +106,22 @@ fun LibraryScreen(
                 val last = recipe.schedule().lastOrNull()
                 last?.let { Text("Scheduled pours end at ${formatDuration(it.startSeconds + it.pulse.pourSeconds)}. Allow for drawdown.") }
                 DetailLine("Preparation notes", recipe.notes)
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = {
+                SoftButton(shape = MaterialTheme.shapes.small, onClick = {
                     val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
                     if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate recipe") }
             }
-            Button(shape = MaterialTheme.shapes.small, onClick = { editing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Edit ${kindLabel(kind)}") }
-            TextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
+            PrimaryAction("Edit ${kindLabel(kind)}") { editing = true }
+            SoftTextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
-        if (onClose != null) BackHandler(onBack = onClose)
+        if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
         LibraryPage(if (requestedKind == null) "Library" else "Choose ${kindLabel(requestedKind)}", onClose) {
             val kinds = requestedKind?.let(::listOf) ?: listOf("recipes", "beans", "grinders")
             kinds.forEach { currentKind ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(currentKind.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
+                    SectionTitle(currentKind.replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
+                    SoftTextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
                 }
                 val items: List<Pair<String, Pair<String, String>>> = when (currentKind) {
                     "beans" -> state.beans.filterNot { it.archived }.map { it.id to (it.name to it.roaster) }
@@ -144,7 +145,7 @@ fun LibraryScreen(
                             Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) TextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
+                    if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) SoftTextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -159,14 +160,14 @@ fun LibraryScreen(
                 if (needsReplacement) {
                     Text("Choose a new default grinder.")
                     replacements.forEach { option ->
-                        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
+                        SoftButton(shape = MaterialTheme.shapes.small, onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
                             Text(option.name + if (replacementId == option.id) " · Selected" else "")
                         }
                     }
                 }
             }
         }, confirmButton = {
-            TextButton(enabled = !needsReplacement || replacementId != null, onClick = {
+            SoftTextButton(enabled = !needsReplacement || replacementId != null, onClick = {
                 val result = when (kind) {
                     "beans" -> repository.archiveBeans(detailId!!)
                     "grinders" -> repository.archiveGrinder(detailId!!, replacementId)
@@ -174,13 +175,13 @@ fun LibraryScreen(
                 }
                 if (save(result)) { archive = false; detailId = null }
             }) { Text("Archive") }
-        }, dismissButton = { TextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
+        }, dismissButton = { SoftTextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
     }
     if (settingDialog && grinder != null) AlertDialog(onDismissRequest = { settingDialog = false }, title = { Text("Update last recorded setting") }, text = {
         LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
-    }, confirmButton = { TextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
+    }, confirmButton = { SoftTextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
         if (save(repository.updateGrinderSetting(grinder.id, parseGrindSetting(settingText)!!))) settingDialog = false
-    }) { Text("Update setting") } }, dismissButton = { TextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
+    }) { Text("Update setting") } }, dismissButton = { SoftTextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
 }
 
 @Composable
@@ -197,7 +198,7 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     var discard by rememberSaveable { mutableStateOf(false) }
     val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes)
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
     LibraryPage(if (initial == null) "Add beans" else "Edit beans", back) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
         LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
@@ -206,9 +207,9 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
         LibraryField(processing, { processing = it }, "Processing method, optional")
         LibraryField(expectedNotes, { expectedNotes = it }, "Expected tasting notes, optional", multiline = true)
         LibraryField(notes, { notes = it }, "General notes, optional", multiline = true)
-        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && roaster.isNotBlank(), onClick = {
+        PrimaryAction("Save beans", enabled = name.isNotBlank() && roaster.isNotBlank(), icon = Icons.Outlined.Check) {
             if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes))) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save beans") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }
@@ -225,7 +226,7 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
     var discard by rememberSaveable { mutableStateOf(false) }
     val dirty = name != original.name || setting != (original.lastSetting?.toString() ?: "") || reference != original.referenceNotes || finishName != original.finish.name
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
     LibraryPage(if (initial == null) "Add grinder" else "Edit grinder", back) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a grinder name." else null, required = true)
         LibraryField(setting, { setting = it }, "Last recorded setting, ticks, optional", KeyboardType.Number, error = if (setting.isNotBlank() && parseGrindSetting(setting) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks")
@@ -234,9 +235,9 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DialFinish.entries.forEach { finish -> FilterChip(selected = finishName == finish.name, onClick = { finishName = finish.name }, label = { Text(finishLabel(finish)) }) }
         }
-        Button(shape = MaterialTheme.shapes.small, enabled = name.isNotBlank() && (setting.isBlank() || parseGrindSetting(setting) != null), onClick = {
+        PrimaryAction("Save grinder", enabled = name.isNotBlank() && (setting.isBlank() || parseGrindSetting(setting) != null), icon = Icons.Outlined.Check) {
             if (onSave(original.copy(id = id, name = name.trim(), lastSetting = parseGrindSetting(setting), referenceNotes = reference, finish = DialFinish.valueOf(finishName)))) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save grinder") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }
@@ -248,7 +249,7 @@ internal fun LibraryPage(title: String, onBack: (() -> Unit)?, content: @Composa
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null) {
+internal fun LibraryField(value: String, onChange: (String) -> Unit, label: String, keyboard: KeyboardType = KeyboardType.Text, error: String? = null, multiline: Boolean = false, helper: String? = null, required: Boolean = false, prefix: (@Composable () -> Unit)? = null, modifier: Modifier = Modifier) {
     var interacted by rememberSaveable { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
     val visibleError = error.takeIf { interacted }
@@ -264,7 +265,7 @@ internal fun LibraryField(value: String, onChange: (String) -> Unit, label: Stri
                 if (required) Text("Required", style = MaterialTheme.typography.labelSmall)
             }
         },
-        modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+        modifier = modifier.fillMaxWidth().onFocusChanged { focus ->
             if (focus.isFocused) wasFocused = true
             else if (wasFocused) interacted = true
         }.semantics { if (visibleError != null) this.error(visibleError) },
@@ -281,7 +282,7 @@ internal fun LibraryField(value: String, onChange: (String) -> Unit, label: Stri
 
 @Composable
 internal fun DiscardLibraryDialog(visible: Boolean, keepEditing: () -> Unit, discard: () -> Unit) {
-    if (visible) AlertDialog(onDismissRequest = keepEditing, title = { Text("Discard changes?") }, confirmButton = { TextButton(onClick = discard) { Text("Discard") } }, dismissButton = { TextButton(onClick = keepEditing) { Text("Keep editing") } })
+    if (visible) AlertDialog(onDismissRequest = keepEditing, title = { Text("Discard changes?") }, confirmButton = { SoftTextButton(onClick = discard) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = keepEditing) { Text("Keep editing") } })
 }
 
 @Composable

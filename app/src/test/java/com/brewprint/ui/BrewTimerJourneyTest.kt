@@ -48,7 +48,8 @@ class BrewTimerJourneyTest {
         tap("Resume brew")
     }
 
-    private fun tap(text: String) = compose.onNodeWithText(text).apply {
+    // Icon actions such as "Change date" are found by their spoken name.
+    private fun tap(text: String) = (if (compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) compose.onNodeWithContentDescription(text) else compose.onNodeWithText(text)).apply {
         if (!isDisplayed()) performScrollTo()
     }.performClick()
     private fun pass(seconds: Int) {
@@ -73,7 +74,8 @@ class BrewTimerJourneyTest {
         shows("2:04")
         tap("Save brew")
         shows("Timing"); shows("First pour to Finish brew.")
-        compose.onAllNodesWithText("On schedule").assertCountEquals(3)
+        // Each pulse is one spoken row; on screen it reads "On time".
+        compose.onAllNodes(hasContentDescription("started on time", substring = true)).assertCountEquals(3)
         compose.runOnIdle {
             assertEquals(BrewTiming(totalSeconds = 124, pulseStarts = listOf(0, 40, 80)), repository.state.value.brews.single().timing)
         }

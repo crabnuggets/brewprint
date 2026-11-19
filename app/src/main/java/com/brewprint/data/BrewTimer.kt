@@ -177,6 +177,14 @@ fun formatStartDifference(actualSeconds: Int, plannedSeconds: Int): String? {
     return (if (size < 60) "$size s" else formatDuration(size)) + if (difference < 0) " early" else " late"
 }
 
+/** How far a start was from its plan, signed: "+9 s" late, "−12 s" early, "+1:06"; null when on time. */
+fun formatStartOffset(actualSeconds: Int, plannedSeconds: Int): String? {
+    val difference = actualSeconds - plannedSeconds
+    if (difference == 0) return null
+    val size = kotlin.math.abs(difference)
+    return (if (difference < 0) "−" else "+") + if (size < 60) "$size s" else formatDuration(size)
+}
+
 /** Parses "3:24" or "204" into seconds. */
 fun parseDuration(text: String): Int? {
     val parts = text.trim().split(":")

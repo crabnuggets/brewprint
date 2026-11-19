@@ -16,6 +16,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,16 +43,16 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
         // A timer may already be running; show it now that Android allows it.
         BrewTimerService.sync(context)
     }
-    BackHandler { onClose() }
+    BackHandler(LocalScreenActive.current) { onClose() }
     Page("Settings", onClose) {
-        Text("Appearance", style = MaterialTheme.typography.titleMedium)
-        Appearance.entries.forEach { option -> Surface(onClick = { onAppearance(option) }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        SectionTitle("Appearance")
+        Appearance.entries.forEach { option -> Surface(modifier = Modifier.fillMaxWidth().selectable(selected = option == appearance, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onAppearance(option) }), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = option == appearance, onClick = { onAppearance(option) })
+                RadioButton(selected = option == appearance, onClick = null)
                 Text(option.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.padding(start = 12.dp))
             }
         } }
-        Text("Brew timer", style = MaterialTheme.typography.titleMedium)
+        SectionTitle("Brew timer")
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Column(Modifier.padding(vertical = 4.dp)) {
                 SwitchRow("Live notification", "Shows the running brew on your lock screen", timer.liveNotification) { on ->
@@ -67,7 +68,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
                         Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
                     }
                     Text("Notifications for Brewprint are turned off. The timer still runs in the app.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
+                    SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
                         context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open Android settings") }
                 }

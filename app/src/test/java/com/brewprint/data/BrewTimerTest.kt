@@ -169,6 +169,11 @@ class BrewTimerTest {
         assertEquals("12 s early", formatStartDifference(103, 115))
         assertEquals("1:05 late", formatStartDifference(180, 115))
         assertNull(formatStartDifference(115, 115))
+        // The record's one-line form: signed, so a column of offsets stays narrow.
+        assertEquals("+9 s", formatStartOffset(99, 90))
+        assertEquals("−12 s", formatStartOffset(103, 115))
+        assertEquals("+1:06", formatStartOffset(216, 150))
+        assertNull(formatStartOffset(115, 115))
     }
 
     @Test fun `data saved before the timer loads unchanged`() {

@@ -34,10 +34,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -139,8 +144,8 @@ internal fun ScaleOffer(onPair: () -> Unit, onDismiss: () -> Unit) {
         Text("Brew with a scale?", style = MaterialTheme.typography.titleMedium)
         Text("Starts the timer at your first pour and moves on when each pour reaches its target. You can pair one later in Settings.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Not now") }
-            OutlinedButton(onClick = onPair, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Pair a scale") }
+            SoftTextButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Not now") }
+            SoftButton(onClick = onPair, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Pair a scale") }
         }
     }
 }
@@ -196,7 +201,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
             Text("The scale didn't tare", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
             Reading("On scale", live.grams)
             Text("Tap Tare again, or press the scale's tare button.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+            PrimaryButton(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tare") }
         } else when (step) {
             ScaleStep.BREWER -> {
                 Text("Put the brewer on the scale", style = MaterialTheme.typography.titleMedium)
@@ -204,7 +209,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 if (reconnected) Text("Tare the brewer again. Take the coffee out first if you've added it.", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = colors.onSurface, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) { Reading("On scale", live.grams) }
-                    Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                    PrimaryButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tare") }
                 }
             }
             // Until the scale reads about 0 g, coffee must wait: grounds added now would be tared away or taken as the dose.
@@ -223,8 +228,8 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 // The weighed dose rescales this brew's pours; say so before the choice, not after.
                 if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatAmount(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
-                    Button(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
+                    SoftTextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
+                    PrimaryButton(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)) {
                         Text(if (coffee != null) "Use ${formatAmount(coffee)} g" else "Use dose")
                     }
                 }
@@ -234,11 +239,11 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 val label = if (live.zeroed) "On scale, tared" + weighedDose?.let { " · Weighed ${formatAmount(it)} g" }.orEmpty() else "On scale"
                 Box(Modifier.weight(1f)) { Reading(label, live.grams) }
                 // Off zero with no tare pending, nothing changes until the user tares, so Tare becomes the step's action.
-                if (live.needsTare()) Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
-                else OutlinedButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                if (live.needsTare()) PrimaryButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tare") }
+                else SoftButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
             }
         }
-        TextButton(onClick = onWithout, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Brew without the scale") }
+        SoftTextButton(onClick = onWithout, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Brew without the scale") }
     }
 }
 
@@ -268,8 +273,8 @@ internal fun ArmedFooter(live: ScaleLive, onStartNow: () -> Unit, onFinishWithou
                 style = if (waiting) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge)
         }
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            if (live.zeroed) TextButton(onClick = onStartNow, modifier = Modifier.heightIn(min = 48.dp)) { Text("Start timer now") }
-            TextButton(onClick = onFinishWithout, modifier = Modifier.heightIn(min = 48.dp)) { Text("Finish without timing") }
+            if (live.zeroed) SoftTextButton(onClick = onStartNow, modifier = Modifier.heightIn(min = 48.dp)) { Text("Start timer now") }
+            SoftTextButton(onClick = onFinishWithout, modifier = Modifier.heightIn(min = 48.dp)) { Text("Finish without timing") }
         }
     }
 }
@@ -285,69 +290,144 @@ internal fun ScaleBanner(following: String) {
     }
 }
 
-/** Ratio so far against where the plan ends, over the water curve with the current and next targets dashed. */
+/** Ratio so far against where the plan ends, over the water curve with the target to pour to now and the total labelled. */
 @Composable
 internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
     val colors = MaterialTheme.colorScheme
-    val next = if (view.phase == TimerPhase.POUR) view.pulse else view.pulse + 1
-    val targets = listOfNotNull(view.schedule.getOrNull(next), view.schedule.getOrNull(next + 1)).map { it.cumulativeWater }
+    // During a pour, its own target; during a wait, the next pour's: the same number as "Pour to" or "Then pour to".
+    val target = view.schedule.getOrNull(if (view.phase == TimerPhase.POUR) view.pulse else view.pulse + 1)?.cumulativeWater
     Panel {
         val ratio = live.grams?.takeIf { live.following == null }?.let { "1:" + "%.1f".format(it / view.recipe.dose) } ?: "–"
-        Text("Ratio $ratio → 1:${formatAmount(view.recipe.ratio)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        WaterCurve(live.curve, targets, view.poursEndSeconds + 30, live.flows)
+        Text(androidx.compose.ui.text.buildAnnotatedString {
+            append("Ratio ")
+            withStyle(androidx.compose.ui.text.SpanStyle(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) { append(ratio) }
+            append(" → 1:${formatAmount(view.recipe.ratio)}")
+        }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        // Read on focus, not announced: the step changes are announced by the focus card.
+        // While the sheet follows the clock, the last reading is not current and is not read out as if it were.
+        val summary = (live.grams?.takeIf { live.following == null }?.let { "Water on the scale ${tenths(it)} grams" } ?: "No current scale reading") + (target?.let { ", pour to ${formatAmount(it)} grams" } ?: "") + ", total ${formatAmount(view.recipe.totalWater)} grams."
+        WaterCurve(live.curve, view.poursEndSeconds + 30, view.recipe.totalWater, target = target, flows = live.flows, description = summary)
+    }
+}
+
+/** What the record's chart lines mean: the actual curve, the plan, and the total. */
+@Composable
+internal fun CurveLegend() {
+    val colors = MaterialTheme.colorScheme
+    @Composable fun item(label: String, draw: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit) = Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Canvas(Modifier.size(width = 16.dp, height = 8.dp)) { draw() }
+        Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+    Row(Modifier.clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        item("Actual") { drawLine(colors.onSurface, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
+        item("Plan") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
+        item("Total") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx()))) }
     }
 }
 
 /**
- * Water over brew time, one reading a second; gaps stay gaps, and readings below 0 g draw at 0. [flows], when given, is drawn as a shaded band
- * along the bottom third. Decorative: the numbers are in the text around it.
+ * Water over brew time, one reading a second; gaps stay gaps, and readings below 0 g draw at 0. [flows], when given, is drawn as a
+ * shaded band along the bottom third. [target] is the target to pour to now, dark and dashed; [total] is faint and dotted; each is
+ * labelled with its grams at the right end. [plan], on the record, is drawn faintly behind the curve. Decorative: the numbers are in the text around it.
  */
 @Composable
-internal fun WaterCurve(curve: List<Double?>, targets: List<Double>, seconds: Int, flows: List<Double?> = emptyList()) {
+internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, target: Double? = null, plan: List<Pair<Int, Double>> = emptyList(), flows: List<Double?> = emptyList(), description: String = "") {
     val colors = MaterialTheme.colorScheme
-    val line = colors.onSurface
-    val dashed = colors.outline
-    val base = colors.outlineVariant
-    val shade = colors.outlineVariant
-    val top = maxOf(targets.maxOrNull() ?: 0.0, curve.filterNotNull().maxOrNull() ?: 0.0, 1.0) * 1.08
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelMedium
+    val withAxis = plan.isNotEmpty()
+    // The last pour's target is the total, so it is drawn once, as the target.
+    val shownTarget = target
+    val showTotal = target == null || abs(target - total) > .05
+    val top = maxOf(total, target ?: 0.0, curve.filterNotNull().maxOrNull() ?: 0.0, 1.0) * 1.06
     val flowTop = maxOf(flows.filterNotNull().maxOrNull() ?: 0.0, 8.0)
-    val span = maxOf(seconds, curve.size, 1)
-    Canvas(Modifier.fillMaxWidth().height(96.dp).clearAndSetSemantics { }) {
-        val x = { second: Int -> second.toFloat() / span * size.width }
+    val span = maxOf(seconds, curve.size, plan.maxOfOrNull { it.first } ?: 0, 1)
+    Canvas(Modifier.fillMaxWidth().height(if (withAxis) 128.dp else 104.dp).clearAndSetSemantics { if (description.isNotEmpty()) contentDescription = description }) {
+        val totalLabel = measurer.measure("${formatAmount(total)} g", labelStyle.copy(color = colors.onSurfaceVariant))
+        // When this pour's target is the total, its label says so.
+        val targetLabel = shownTarget?.let { measurer.measure("${formatAmount(it)} g" + if (!showTotal) " total" else "", labelStyle.copy(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) }
+        val labelWidth = maxOf(totalLabel.size.width, targetLabel?.size?.width ?: 0) + 6.dp.toPx()
+        val axisLabel = if (withAxis) measurer.measure("0:00", labelStyle) else null
+        val plotTop = totalLabel.size.height / 2f
+        val plotBottom = size.height - (axisLabel?.let { it.size.height + 4.dp.toPx() } ?: 0f)
+        val width = size.width - labelWidth
+        val x = { second: Int -> second.toFloat() / span * width }
         // Below 0 g the tared brewer or cup is off the scale, so the reading sits on the baseline instead of below the card.
-        val y = { value: Double -> size.height - (value.coerceAtLeast(0.0) / top * size.height).toFloat() }
+        val y = { value: Double -> plotBottom - (value.coerceAtLeast(0.0) / top * (plotBottom - plotTop)).toFloat() }
         flows.forEachIndexed { second, flow ->
             if (flow != null && flow > 0) {
-                val height = (flow / flowTop * size.height / 3).toFloat()
-                drawRect(shade, Offset(x(second), size.height - height), androidx.compose.ui.geometry.Size(maxOf(x(second + 1) - x(second), 1f), height))
+                val height = (flow / flowTop * (plotBottom - plotTop) / 3).toFloat()
+                drawRect(colors.outline.copy(alpha = .5f), Offset(x(second), plotBottom - height), androidx.compose.ui.geometry.Size(maxOf(x(second + 1) - x(second), 1f), height))
             }
         }
-        drawLine(base, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1.dp.toPx())
-        targets.forEach { drawLine(dashed, Offset(0f, y(it)), Offset(size.width, y(it)), strokeWidth = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))) }
+        drawLine(colors.outlineVariant, Offset(0f, plotBottom), Offset(width, plotBottom), strokeWidth = 1.dp.toPx())
+        if (plan.isNotEmpty()) {
+            val planned = Path()
+            plan.forEachIndexed { index, (second, water) -> if (index == 0) planned.moveTo(x(second), y(water)) else planned.lineTo(x(second), y(water)) }
+            // The plan ends with its last pour, so it never covers the dotted total.
+            drawPath(planned, colors.outline, style = Stroke(2.5.dp.toPx(), join = StrokeJoin.Round))
+        }
+        val gap = 6.dp.toPx()
+        // When the target sits close under the total, both labels get their own row: the total's directly above the target's.
+        val labelHeight = totalLabel.size.height.toFloat()
+        val targetTop = shownTarget?.let { (y(it) - labelHeight / 2f).coerceAtLeast(if (showTotal && abs(y(it) - y(total)) < labelHeight) labelHeight else 0f) } ?: 0f
+        val merged = shownTarget != null && abs(y(shownTarget) - y(total)) < 4.dp.toPx()
+        if (showTotal) {
+            // When the two labels would overlap, the total's sits just above the target's instead.
+            val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
+            val totalTop = if (clash) (targetTop - totalLabel.size.height) else y(total) - totalLabel.size.height / 2f
+            drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop))
+            if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
+        }
+        if (shownTarget != null && targetLabel != null) {
+            drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap - if (merged && showTotal) 32.dp.toPx() else 0f, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
+            drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, targetTop))
+            if (showTotal && abs(y(shownTarget) - y(total)) < labelHeight) drawLine(colors.onSurface.copy(alpha = .8f), Offset(width - gap, y(shownTarget)), Offset(size.width - targetLabel.size.width - 2.dp.toPx(), targetTop + labelHeight / 2f), 1.dp.toPx())
+        }
         val path = Path()
         var open = false
         curve.forEachIndexed { second, value ->
             if (value == null) open = false
             else { if (open) path.lineTo(x(second), y(value)) else path.moveTo(x(second), y(value)); open = true }
         }
-        drawPath(path, line, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
+        drawPath(path, colors.onSurface, style = Stroke((if (withAxis) 2.5 else 2.0).dp.toPx(), join = StrokeJoin.Round))
+        if (showTotal) drawLine(colors.outline, Offset(if (merged) width - gap - 28.dp.toPx() else 0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
+        // Minute ticks thin out on long brews, so labels never touch.
+        val every = listOf(1, 2, 5, 10, 15).firstOrNull { axisLabel == null || x(it * 60) >= axisLabel.size.width + 12.dp.toPx() } ?: 30
+        if (axisLabel != null) for (minute in 0..span / 60 step every) {
+            val label = measurer.measure("$minute:00", labelStyle.copy(color = colors.onSurfaceVariant))
+            val left = (x(minute * 60) - if (minute == 0) 0f else label.size.width / 2f).coerceAtMost(width - label.size.width)
+            drawText(label, topLeft = Offset(left, size.height - label.size.height))
+        }
     }
 }
 
-/** Measured dose and water beside the plan, in the Finish brew review and the saved record. */
+/**
+ * Water, ratio and dose in one row, each with its plan beneath: in the Finish brew review, at drawdown, and on the record.
+ * Without scale data the planned values are shown and labelled as planned.
+ */
 @Composable
-internal fun MeasuredRows(recipe: Recipe, data: ScaleData) {
+internal fun MeasuredTrio(recipe: Recipe, data: ScaleData?) {
     val colors = MaterialTheme.colorScheme
-    @Composable fun row(label: String, value: String, note: String?) = FlowRow(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = colors.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
-            if (note != null) Text(note, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    val water = data?.water
+    val cells = listOf(
+        Triple("Water", if (data == null) "${formatAmount(recipe.totalWater)} g" else water?.let { "${tenths(it)} g" } ?: "—", if (data == null) "planned" else "planned ${formatAmount(recipe.totalWater)} g"),
+        Triple("Ratio", if (data == null) "1:${formatAmount(recipe.ratio)}" else water?.let { "1:" + "%.1f".format(it / recipe.dose) } ?: "—", if (data == null) "planned" else "planned 1:${formatAmount(recipe.ratio)}"),
+        Triple("Dose", "${formatAmount(recipe.dose)} g", if (data?.weighedDose != null) "weighed" else if (data == null) "planned" else "recipe"),
+    )
+    @Composable fun cell(cell: Triple<String, String, String>, modifier: Modifier) {
+        val (label, value, note) = cell
+        fun spoken(text: String) = text.replace(" g", " grams").replace("1:", "1 to ")
+        val description = "$label " + (if (value == "—") "not recorded" else spoken(value)) + ", " + spoken(note)
+        Column(modifier.clearAndSetSemantics { contentDescription = description }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(value, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+            Text(note, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1)
         }
     }
-    row("Dose", "${formatAmount(recipe.dose)} g", if (data.weighedDose != null) "weighed" else null)
-    row("Total brew water", data.water?.let { "${tenths(it)} g" } ?: "Not recorded", "planned ${formatAmount(recipe.totalWater)} g")
-    data.water?.let { row("Ratio", "1:" + "%.1f".format(it / recipe.dose), "planned 1:${formatAmount(recipe.ratio)}") }
+    // Large text stacks the three, so no value is cut.
+    if (LocalDensity.current.fontScale >= 1.15f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { cells.forEach { cell(it, Modifier.fillMaxWidth()) } }
+    else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { cells.forEachIndexed { index, it -> cell(it, Modifier.weight(listOf(1.2f, 1f, .8f)[index])) } }
 }
 
 /** Offers the moment the dripper came off as the total, when it differs from the Finish tap. */
@@ -358,7 +438,7 @@ internal fun LiftOffer(timer: BrewTimer, data: ScaleData, onUse: (Int) -> Unit) 
     if ((timer.totalOverride ?: measured) == lift) return
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("Dripper lifted at ${formatDuration(lift)}", Modifier.align(Alignment.CenterVertically), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = { onUse(lift) }) { Text("Use ${formatDuration(lift)}") }
+        SoftTextButton(onClick = { onUse(lift) }) { Text("Use ${formatDuration(lift)}") }
     }
 }
 
@@ -369,18 +449,18 @@ internal fun ScaleSettings(scale: PairedScale?, live: ScaleLive, onAdd: () -> Un
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(ScaleLink.allowed(context)) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { allowed = ScaleLink.allowed(context); ScaleLink.sync(context) }
-    Text("Coffee scale", style = MaterialTheme.typography.titleMedium)
+    SectionTitle("Coffee scale")
     Panel {
         if (scale == null) {
             Text("Pair a Bluetooth scale to start the timer at your first pour and end each pour at its target.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Add a scale") }
+            SoftButton(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Add a scale") }
         } else {
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.align(Alignment.CenterVertically)) {
                     Text(scale.name, style = MaterialTheme.typography.titleMedium)
                     Text(if (live.connected) "Connected" + (live.battery?.let { " · Battery $it%" } ?: "") else "Not connected", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
-                OutlinedButton(onClick = onForget, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Forget") }
+                SoftButton(onClick = onForget, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Forget") }
             }
             if (!allowed) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -388,7 +468,7 @@ internal fun ScaleSettings(scale: PairedScale?, live: ScaleLive, onAdd: () -> Un
                     Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
                 }
                 Text("Nearby devices is turned off for Brewprint. Brews are timed by the clock.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
+                SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
                     context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }) { Text("Open Android settings") }
             }

@@ -13,7 +13,7 @@ fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -
     var explore by rememberSaveable { mutableStateOf(false) }
     var cooling by rememberSaveable { mutableStateOf(journal.asItCools.isNotBlank()) }
     var roaster by rememberSaveable { mutableStateOf(false) }
-    Text("How was this cup?", style = MaterialTheme.typography.titleLarge)
+    SectionTitle("How was this cup?")
     Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), label = { Text("Your notes") }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())
     DisclosureRow(if (explore) "Hide taste exploration" else "Explore the taste", explore) { explore = !explore }
@@ -66,7 +66,7 @@ private fun Intensity(label: String, help: String, value: String?, notes: String
 private fun Choice(options: List<String>, value: String?, onChange: (String?) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option -> FilterChip(selected = value == option, onClick = { onChange(if (value == option) null else option) }, label = { Text(option) }) }
-        if (value != null) TextButton(onClick = { onChange(null) }) { Text("Clear") }
+        if (value != null) SoftTextButton(onClick = { onChange(null) }) { Text("Clear") }
     }
 }
 
@@ -80,7 +80,10 @@ private fun Tags(options: List<String>, values: List<String>, onChange: (List<St
 
 @Composable
 fun JournalSummary(journal: Journal) {
-    if (journal.impression.isNotBlank()) Text(journal.impression, style = MaterialTheme.typography.bodyLarge)
+    if (journal.impression.isNotBlank()) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("How was this cup?", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(journal.impression, style = MaterialTheme.typography.bodyLarge)
+    }
     listOf(
         "Aroma" to journal.aroma,
         "Flavor" to (journal.flavorTags + journal.flavor).filter { it.isNotBlank() }.joinToString(", "),

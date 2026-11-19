@@ -16,10 +16,33 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - Follow the device appearance by default, with an in-app override for light or dark appearance.
 - Use softly rounded rectangles for controls and containers.
 - Use softly filled form fields with subtle rounded borders. Show required indicators in a neutral tone, and show errors after the user edits or leaves a field. Untouched empty fields stay neutral; invalid required values still block saving.
-- Use a custom monochrome floating bottom navigation with a softly rounded selected state and no inner rectangular fill or shadow.
+- Use a custom monochrome floating bottom navigation with a softly rounded selected state and no inner rectangular fill or shadow. Keep it compact: the selected destination shows its icon and label side by side in a soft pill, and the other destinations show icons only, with their names kept for screen readers.
 - Place an icon Back action beside the title on create, edit, detail, and picker screens.
 - Use the understated typography of option A from the generated comparison.
 - Reduce unnecessary subtext. Every line should help the user understand information or take an action.
+- Stay monochrome, and separate levels by contrast and weight rather than color. Section titles are darker and heavier than body text; secondary labels are lighter. A title, a label, and an action should never share one tone.
+- Do not outline buttons. A primary action is filled near-black (near-white in dark appearance). A secondary action has a soft gray fill. Text-only actions also get a soft fill so they read as buttons, not prose. Buttons are softly rounded rectangles (16 dp), not pills, and shrink slightly while pressed. Use an icon on an action only where it adds meaning, such as Pause, skip, and Save.
+- Show an inline "Change …" action as a 40 dp round icon button with a soft fill, beside the value it changes: a pencil for a value edited in place (date, total brew time), and a sliders icon for "Change setup", which leaves the screen. Each keeps its name for screen readers and as a long-press tooltip, and has a 48 dp touch target. Full-width actions such as "Repeat" and "Edit brew" keep their text labels.
+
+## Screen chrome while scrolling
+
+- **Header.** A screen's header, with its title, Back action, and header actions, slides away as the content scrolls down and returns as soon as it scrolls up. Android Back keeps working while it is hidden. On the brew sheet the header stays while a timer runs, so the scale status is always in view.
+- **Bottom navigation.** The floating navigation hides as the content scrolls down and returns when it scrolls up or reaches the end.
+- **Footer actions.** Actions pinned to the bottom of a screen, such as Pause, the skip action, and "Save brew", never hide. On the running brew sheet they take one row of buttons with "Finish brew" as a smaller action beneath.
+
+## Lists and gestures
+
+Swiping a History row left deletes that brew, with "Undo" for 5 seconds. Swiping it right repeats it. The same actions stay on the brew record, and screen readers offer them as actions on the row, so swiping is never required. Library rows do not swipe; archiving can need a choice of replacement grinder.
+
+## Motion
+
+Motion should feel calm and continuous rather than snappy: about 250–400 ms with a gentle ease-out, and nothing that bounces.
+
+- **Screens.** Opening a screen slides it in a short distance while it fades in; Back reverses it. Switching destinations cross-fades.
+- **Focus card.** On each step change, the state word, labels, and large numbers swap with a short blur cross-fade, for example "On scale" to "Time left" when a pour ends. It starts on the same step change as the vibration and sound, so they land together. Numbers that count within a step roll to their next value instead of jumping; the blur is kept for step changes.
+- **Cards.** Cards grow and shrink smoothly when their content changes, such as the full plan, the scale steps, and the Undo bar.
+- **Chrome.** The header and bottom navigation slide in and out with the scroll. Button labels that change in place, such as Pause and Resume or the skip label, cross-fade.
+- **Reduced motion.** When Android's "Remove animations" is on, every change happens immediately. Where blur is unavailable (before Android 12), the swap is a plain cross-fade.
 
 The Android platform remains the target in the UX draft. Custom styling should retain its Back behavior, accessibility support, and other interaction requirements.
 
@@ -76,7 +99,7 @@ These details extend the whole-tick entry described in the UX draft. They do not
 - Exact light and dark palettes and any limited accent colors.
 - Which navigation elements or overlays receive the selective glass effects.
 - Exact typeface and sizes within the selected understated typography direction.
-- Exact corner radii for the softly rounded rectangles.
+- Exact corner radii for cards and other containers; buttons use 16 dp.
 - Initial wheel materials, default material, lighting, and where the user selects a material for each grinder.
 - Wheel gesture and rotation direction.
 - Dial opening animation and dismissal interaction, with no separate confirmation step.

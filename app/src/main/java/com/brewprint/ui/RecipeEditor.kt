@@ -7,6 +7,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.*
@@ -57,7 +58,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
     val originalRatio = original.ratio.takeIf { it > 0 }?.let(::formatAmount) ?: ""
     val dirty = name != original.name || dose != originalDose || ratio != originalRatio || notes != original.notes || pulses != initialPulses
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
 
     val doseValue = positiveDecimal(dose)
     val ratioValue = ratio.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }
@@ -139,7 +140,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                 Text(target?.let { "${formatAmount(it)} g" } ?: "Enter dose and ratio", style = if (target == null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.headlineSmall, color = if (target == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
             }
         }
-        Text("Pulses", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("Pulses")
         Column(Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).onGloballyPositioned { listCoordinates = it }, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             pulses.forEachIndexed { index, pulse ->
                 val currentWater = waterValues[index]
@@ -198,14 +199,14 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                 if (cumulativeValid) Text("Add ${formatAmount(currentWater!!)} g · Pour to ${formatAmount(roundedAmount(cumulative))} g total")
                                 LibraryField(pulse.pour, { value -> replace(pulse.id) { it.copy(pour = value) } }, "Pour duration, seconds", KeyboardType.Number, error = if (pulse.pour.toIntOrNull()?.let { it > 0 } != true) "Enter a positive whole number of seconds." else null, required = true)
                                 if (index < pulses.lastIndex) LibraryField(pulse.wait, { value -> replace(pulse.id) { it.copy(wait = value) } }, "Wait after pouring, seconds", KeyboardType.Number, error = if (pulse.wait.toIntOrNull()?.let { it >= 0 } != true) "Enter zero or a positive whole number." else null)
-                                if (pulses.size > 1) TextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
+                                if (pulses.size > 1) SoftTextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
                             }
                         }
                     }
                 }
             }
         }
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = {
+        SoftButton(shape = MaterialTheme.shapes.small, onClick = {
             val last = pulses.last()
             pulses = pulses.dropLast(1) + last.copy(wait = "0") + PulseInput("", last.water, last.pour, "0")
         }, modifier = Modifier.fillMaxWidth()) { Text("Add pulse") }
@@ -220,10 +221,10 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
         Text("Scheduled pours end at ${formatDuration(schedule.last())}", style = MaterialTheme.typography.bodyMedium)
         LibraryField(notes, { notes = it }, "Preparation notes, optional", multiline = true)
-        Button(shape = MaterialTheme.shapes.small, enabled = valid, onClick = {
+        PrimaryAction("Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
             val recipe = original.copy(id = id, name = name.trim(), dose = doseValue!!, ratio = ratioValue!!, notes = notes, pulses = pulses.mapIndexed { index, pulse -> Pulse(pulse.label, pulse.water.toDouble(), pulse.pour.toInt(), if (index == pulses.lastIndex) 0 else pulse.wait.toInt()) })
             if (onSave(recipe)) onBack()
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Save recipe") }
+        }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }

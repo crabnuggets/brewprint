@@ -35,7 +35,8 @@ class UiScreenshotTest {
     @get:Rule val temporary = TemporaryFolder()
     private val directory = File(System.getProperty("user.home"), ".cache/brewprint-android/ui-refresh/screenshots")
 
-    private fun tap(text: String) = compose.onNodeWithText(text).apply {
+    // Icon actions such as "Change date" are found by their spoken name.
+    private fun tap(text: String) = (if (compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) compose.onNodeWithContentDescription(text) else compose.onNodeWithText(text)).apply {
         if (!isDisplayed()) performScrollTo()
     }.performClick()
 
@@ -238,7 +239,7 @@ class UiScreenshotTest {
         capture("timer-08-review")
         tap("Save brew")
         capture("timer-09-record")
-        compose.onNodeWithText("Start times come from the timer. Pours are not measured.").performScrollTo()
+        compose.onNodeWithText("Started shows how far each pulse was from the plan: + late, − early. Pours are not measured.").performScrollTo()
         capture("timer-10-record-timing")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Settings").performClick()

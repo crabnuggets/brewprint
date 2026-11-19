@@ -38,7 +38,8 @@ class UiRefreshTest {
         }
     }
 
-    private fun tap(text: String) = compose.onNodeWithText(text).apply {
+    // Icon actions such as "Change date" are found by their spoken name.
+    private fun tap(text: String) = (if (compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) compose.onNodeWithContentDescription(text) else compose.onNodeWithText(text)).apply {
         if (!isDisplayed()) performScrollTo()
     }.performClick()
 

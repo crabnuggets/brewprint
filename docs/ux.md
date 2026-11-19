@@ -144,7 +144,7 @@ With a paired scale connected, the brew sheet shows a scale card above the plan:
 ### During the brew
 
 - **Start.** A rise of at least 2 g above the tared zero, with flow sustained for about 300 ms, starts the timer, backdated to the first rising sample. "Timer started · Undo" shows for 5 seconds. Lifting and replacing the brewer does not start it.
-- **Focus card.** During a pour, "Pour to" sits beside "On scale", the live reading. The bar fills by grams, and the detail line reads "12.6 g to go · 3.4 g/s" with the seconds left, or "+3 s" once the planned pour time has passed. Under the plan strip, a card shows the ratio so far and where the plan ends ("Ratio 1:8.7 → 1:16"), with a live water and flow curve and the current and next targets dashed.
+- **Focus card.** During a pour, "Pour to" sits beside "On scale", the live reading. The bar fills by grams, and the detail line reads "12.6 g to go · 3.4 g/s" with the seconds left, or "+3 s" once the planned pour time has passed. Under the plan strip, a card shows the ratio so far and where the plan ends ("Ratio 1:8.7 → 1:16"), with a live water and flow curve. The target to pour to now (during a wait, the next pour's) is a darker dashed line and the total brew water a faint dotted line, each labelled with its grams at the right end.
 - **Pour end.** A pour reaches its target at the first reading of at least the target minus 1 g, overshoot included, and stays reached. The card then shows "Wait", counting to the next pulse's scheduled start. Reaching the target before the planned pour time ends lengthens the wait and leaves the schedule alone. Short of the target, the card stays on "Pour"; once the scale reaches the target after the planned pour time, later steps move later by the overrun. "Pour done" keeps its meaning: the pour ends now and later steps move earlier. A pour held short of its target does not delay the forgotten-brew stop.
 - **Early pulse.** During a wait, once flow has been about 0 for 1 second, a new rise of at least 2 g above that steady reading starts the next pulse through the same path as "Start pulse N", recorded as early, with Undo. Pause, Undo, and the scale returning disarm this until flow has again been about 0 for 1 second.
 - **Lifting the dripper.** A drop of more than 5 g below the last steady reading pauses weight guidance, for example while swirling, and steps follow the clock. When the reading returns to within 3 g of the steady reading, guidance resumes.
@@ -153,19 +153,26 @@ With a paired scale connected, the brew sheet shows a scale card above the plan:
 
 ### Finishing
 
-"Finish brew" stays a tap and sets the total brew time. If the dripper was lifted after the last pour, the review offers "Dripper lifted at 3:24 · Use 3:24" beside the total. The review adds "Dose" (marked "weighed" when measured) and "Total brew water" with the measured water beside the planned amount. There is no title and no beverage weight.
+"Finish brew" stays a tap and sets the total brew time. In the review's results card, "Dose" is marked "weighed" when measured, and "Water" and "Ratio" show the measured values with the planned ones beneath. If the dripper was lifted after the last pour, the card offers "Dripper lifted at 3:24 · Use 3:24" under the total. There is no beverage weight.
 
 The live notification is unchanged during a scale brew: its chip still shows the target and seconds left.
 
 ## Saving and reviewing a brew
 
-"Finish brew" opens a short review with optional brew observations. Show the chosen plan and equipment, with a way back to correct setup before saving. Prefill the brew date and time when the draft starts and allow editing it to log an earlier brew.
+"Finish brew" opens a short review with optional brew observations. In order:
 
-A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. A pulse that started on time reads "On schedule"; otherwise it shows the time and the difference, such as "12 s early". An untimed brew has no Timing section. Without a scale, the app does not measure water amounts or pour durations.
+1. The beans as the title, with the recipe and tick setting beneath, and "Change setup" to go back and correct setup before saving.
+2. The brew date and time, prefilled when the draft starts, with "Change date" to log an earlier brew.
+3. A results card. A timed brew shows "Total brew time" with "Change total"; a scale brew adds the measured "Water", "Ratio", and "Dose". Without a scale, the card shows the planned dose, water, and ratio, labelled as planned. An untimed brew without a scale has no results card.
+4. "How was this cup?"
 
-A scale brew's record also shows, in "Timing and water", a measured row (dose, water, ratio), the water curve against the planned targets, and a "Reached" column with the steady reading after each pulse, or "Not recorded" when the scale gave no steady reading before the next pulse's water began. If the next pulse begins before the reading settles, after a late pour's short wait or "Start pulse N", a steady reading still counts until the reading rises 2 g above where that pulse began, or above the last pulse's target if its pour stopped up to 1 g short of it. Water stays on the scale, so a steady reading seen after a gap, within the same wait, still counts. The tasting journal stays first on the record.
+The three "Change …" actions are icon buttons with those names.
 
-History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" requires confirmation and removes only that record. Library items use archive rather than deletion in this version.
+A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. Each pulse takes one line: its name, planned start, and how its actual start differed, as "On time", "+9 s" (late), or "−12 s" (early). Screen readers hear "9 seconds late" and "12 seconds early". An untimed brew has no Timing section. Without a scale, the app does not measure water amounts or pour durations.
+
+A scale brew's record also shows, in "Timing and water", a measured row (dose, water, ratio), the water curve over a faint line of the plan (rising during each planned pour, flat during each wait) and the total brew water, and a "Reached" column with the steady reading after each pulse, or "—" when the scale gave no steady reading before the next pulse's water began. A note under the table says what "—" means. If the next pulse begins before the reading settles, after a late pour's short wait or "Start pulse N", a steady reading still counts until the reading rises 2 g above where that pulse began, or above the last pulse's target if its pour stopped up to 1 g short of it. Water stays on the scale, so a steady reading seen after a gap, within the same wait, still counts. The tasting journal stays first on the record.
+
+History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" removes only that record and offers "Undo" for 5 seconds, which restores it. In History, swiping a row left deletes it the same way and swiping right repeats it. Library items use archive rather than deletion in this version.
 
 If saving fails, retain the draft and show "Couldn't save brew. Try again." Do not show a completed record or update remembered values until saving succeeds. Repeated taps on Save must create only one record.
 
@@ -239,6 +246,8 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - A pour that overruns into a short wait still records Reached if the reading settles before the next pulse's water lands.
 - Swirling the dripper during a wait neither starts the next pulse nor loses the scale.
 - Switching the scale off mid-brew follows the clock and keeps a gap in the saved curve.
+- A ten-pulse record at the default text size shows each pulse's timing on one line on a 360 dp wide phone.
+- Swiping a brew away in History and tapping Undo restores it unchanged.
 
 ## Assumptions to revisit
 
