@@ -58,7 +58,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
     val originalRatio = original.ratio.takeIf { it > 0 }?.let(::formatAmount) ?: ""
     val dirty = name != original.name || dose != originalDose || ratio != originalRatio || notes != original.notes || pulses != initialPulses
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
 
     val doseValue = positiveDecimal(dose)
     val ratioValue = ratio.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }

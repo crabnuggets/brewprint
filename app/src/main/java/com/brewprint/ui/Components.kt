@@ -303,6 +303,9 @@ internal fun SecondaryAction(text: String, enabled: Boolean = true, icon: ImageV
     }
 }
 
+/** False inside a screen that is animating out, so its Back handler stands aside. */
+internal val LocalScreenActive = compositionLocalOf { true }
+
 /** Content animating out: still drawn, but it takes no touches and is hidden from TalkBack. */
 internal fun Modifier.inert(on: Boolean): Modifier = if (!on) this else clearAndSetSemantics { }.pointerInput(Unit) {
     awaitPointerEventScope { while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() } }

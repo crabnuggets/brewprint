@@ -97,21 +97,28 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     // A deleted brew is hidden at once and removed from storage only when the Undo window ends.
-    val pendingDeletes = remember { mutableStateListOf<String>() }
+    val pendingDeletes = rememberSaveable(saver = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<String>, String>({ it.toList() }, { it.toMutableStateList() })) { mutableStateListOf() }
+    var undoDeadline by rememberSaveable { mutableStateOf(0L) }
     var undoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val accessibility = androidx.compose.ui.platform.LocalAccessibilityManager.current
-    fun delete(id: String) {
-        if (route == "record") route = null
-        pendingDeletes += id
+    fun offerUndo() {
         undoJob?.cancel()
         undoJob = scope.launch {
-            val wait = accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
+            val wait = undoDeadline - clock()
             val message = if (pendingDeletes.size == 1) "Brew deleted" else "${pendingDeletes.size} brews deleted"
-            val result = withTimeoutOrNull(wait) { snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Indefinite) }
+            val result = if (wait > 0) withTimeoutOrNull(wait) { snackbar.showSnackbar(message, actionLabel = "Undo", duration = SnackbarDuration.Indefinite) } else null
             if (result != SnackbarResult.ActionPerformed) pendingDeletes.forEach { brew -> repository.deleteBrew(brew).onFailure { onError(it.message ?: "Couldn't delete brew.") } }
             pendingDeletes.clear()
         }
     }
+    fun delete(id: String) {
+        if (route == "record") route = null
+        pendingDeletes += id
+        undoDeadline = clock() + (accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS)
+        offerUndo()
+    }
+    // After recreation, a window still open is offered again for the time left; one that has ended is written.
+    LaunchedEffect(Unit) { if (pendingDeletes.isNotEmpty()) offerUndo() }
     val shown = if (pendingDeletes.isEmpty()) state else state.copy(brews = state.brews.filterNot { it.id in pendingDeletes })
     val navVisible = route == null && !libraryEditing
     chrome.navSpace = if (navVisible) 78.dp else 0.dp
@@ -131,7 +138,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                    else -> (slideInHorizontally(tween(340)) { -it / 16 } + fadeIn(tween(300))) togetherWith (slideOutHorizontally(tween(340)) { it / 8 } + fadeOut(tween(200)))
                }
            }) { screen ->
-            Box(Modifier.fillMaxSize().inert(transition.targetState == androidx.compose.animation.EnterExitState.PostExit)) {
+            val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+            Box(Modifier.fillMaxSize().inert(leaving)) { CompositionLocalProvider(LocalScreenActive provides !leaving) {
             when (screen) {
                 "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
                     // Only the screen being opened may close itself; the one animating out after a save has no draft by design.
@@ -151,7 +159,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                     else -> BrewHome(shown, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
                 }
             }
-            }
+            } }
            }
           }
             val navShown = navVisible && (chrome.navShown || rememberTouchExploration())
@@ -365,7 +373,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     LaunchedEffect(scale.live.connected) {
         if (!scale.live.connected && draft.afterScaleLost() != draft) change(draft.afterScaleLost())
     }
-    BackHandler(enabled = picker == null && !dial) { back() }
+    BackHandler(enabled = LocalScreenActive.current && picker == null && !dial) { back() }
     if (picker != null) {
         LibraryScreen(state, repository, onError, requestedKind = picker, onPicked = { kind, id ->
             change(selectItem(draft, repository.state.value, kind, id))
@@ -632,7 +640,7 @@ private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: 
 
 @Composable
 private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> Unit, onRepeat: () -> Unit, onNotes: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    BackHandler { onClose() }
+    BackHandler(LocalScreenActive.current) { onClose() }
     Page("Brew record", onClose) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(brew.beans.name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
@@ -666,7 +674,7 @@ private fun NotesScreen(brew: BrewRecord, pending: Journal?, repository: BrewRep
     val journal = remember(encoded) { Json.decodeFromString<Journal>(encoded) }
     var discard by remember { mutableStateOf(false) }
     fun back() { if (journal != brew.journal) discard = true else onClose() }
-    BackHandler { back() }
+    BackHandler(LocalScreenActive.current) { back() }
     Page("Tasting notes", ::back, footer = {
         PrimaryAction("Save notes", icon = Icons.Outlined.Check) {
             repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
@@ -693,7 +701,7 @@ private fun EditRecord(brew: BrewRecord, state: AppState, repository: BrewReposi
     var dateText by rememberSaveable(brew.id) { mutableStateOf(dateInput(brew.startedAt)) }
     val original = BrewDraft(id = brew.id, startedAt = brew.startedAt, beans = brew.beans, grinder = brew.grinder, setting = brew.setting, recipe = brew.recipe, journal = brew.journal, allowArchivedBeans = true)
     fun back() { if (draft != original || settingText != brew.setting.toString() || dateText != dateInput(brew.startedAt)) discard = true else onClose() }
-    BackHandler(enabled = picker == null) { back() }
+    BackHandler(enabled = LocalScreenActive.current && picker == null) { back() }
     if (picker != null) LibraryScreen(state, repository, onError, requestedKind = picker, onPicked = { kind, id ->
         val selected = selectItem(draft, repository.state.value, kind, id)
         encoded = Json.encodeToString(selected)

@@ -74,7 +74,7 @@ fun LibraryScreen(
         return
     }
     if (detailId != null) {
-        BackHandler(onBack = closeDetail)
+        BackHandler(LocalScreenActive.current, closeDetail)
         LibraryPage(when (kind) { "beans" -> beans?.name; "grinders" -> grinder?.name; else -> recipe?.name } ?: "Library", closeDetail) {
             if (beans != null && kind == "beans") {
                 DetailLine("Roaster", beans.roaster)
@@ -115,7 +115,7 @@ fun LibraryScreen(
             SoftTextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
-        if (onClose != null) BackHandler(onBack = onClose)
+        if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
         LibraryPage(if (requestedKind == null) "Library" else "Choose ${kindLabel(requestedKind)}", onClose) {
             val kinds = requestedKind?.let(::listOf) ?: listOf("recipes", "beans", "grinders")
             kinds.forEach { currentKind ->
@@ -198,7 +198,7 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     var discard by rememberSaveable { mutableStateOf(false) }
     val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes)
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
     LibraryPage(if (initial == null) "Add beans" else "Edit beans", back) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
         LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
@@ -226,7 +226,7 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
     var discard by rememberSaveable { mutableStateOf(false) }
     val dirty = name != original.name || setting != (original.lastSetting?.toString() ?: "") || reference != original.referenceNotes || finishName != original.finish.name
     val back = { if (dirty) discard = true else onBack() }
-    BackHandler(onBack = back)
+    BackHandler(LocalScreenActive.current, back)
     LibraryPage(if (initial == null) "Add grinder" else "Edit grinder", back) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a grinder name." else null, required = true)
         LibraryField(setting, { setting = it }, "Last recorded setting, ticks, optional", KeyboardType.Number, error = if (setting.isNotBlank() && parseGrindSetting(setting) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks")

@@ -43,7 +43,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
         // A timer may already be running; show it now that Android allows it.
         BrewTimerService.sync(context)
     }
-    BackHandler { onClose() }
+    BackHandler(LocalScreenActive.current) { onClose() }
     Page("Settings", onClose) {
         SectionTitle("Appearance")
         Appearance.entries.forEach { option -> Surface(modifier = Modifier.fillMaxWidth().selectable(selected = option == appearance, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onAppearance(option) }), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {

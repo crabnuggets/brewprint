@@ -127,6 +127,30 @@ class PolishJourneyTest {
         compose.runOnIdle { assertEquals(listOf(record), repository.state.value.brews) }
     }
 
+    @Test fun `the Undo window survives the screen being recreated`() {
+        val data = temporary.newFolder("restore")
+        repository = BrewRepository(object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun getFilesDir(): File = data
+        })
+        repository.upsertBeans(beans).getOrThrow()
+        repository.upsertGrinder(grinder).getOrThrow()
+        repository.upsertRecipe(recipe).getOrThrow()
+        repository.saveScaleRecord()
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        restoration.setContent {
+            val state by repository.state.collectAsState()
+            CompositionLocalProvider(LocalClock provides { now }) { BrewprintTheme(appearance) { BrewprintApp(state, repository) } }
+        }
+        compose.onNodeWithText("History").performClick()
+        compose.onNodeWithText("Ethiopia natural").performTouchInput { swipeLeft() }
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("Brew deleted").assertExists()
+        compose.onNodeWithText("Ethiopia natural").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(UNDO_MILLIS + 1_000)
+        compose.waitForIdle()
+        compose.runOnIdle { assertTrue(repository.state.value.brews.isEmpty()) }
+    }
+
     @Test fun `a delete is written once the Undo window ends`() {
         open { saveScaleRecord() }
         compose.onNodeWithText("History").performClick()

@@ -380,7 +380,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
         }
         if (shownTarget != null && targetLabel != null) {
-            drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
+            drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap - if (merged && showTotal) 32.dp.toPx() else 0f, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
             drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, targetTop))
             if (showTotal && abs(y(shownTarget) - y(total)) < labelHeight) drawLine(colors.onSurface.copy(alpha = .8f), Offset(width - gap, y(shownTarget)), Offset(size.width - targetLabel.size.width - 2.dp.toPx(), targetTop + labelHeight / 2f), 1.dp.toPx())
         }
@@ -391,7 +391,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             else { if (open) path.lineTo(x(second), y(value)) else path.moveTo(x(second), y(value)); open = true }
         }
         drawPath(path, colors.onSurface, style = Stroke((if (withAxis) 2.5 else 2.0).dp.toPx(), join = StrokeJoin.Round))
-        if (showTotal && !merged) drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
+        if (showTotal) drawLine(colors.outline, Offset(if (merged) width - gap - 28.dp.toPx() else 0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
         // Minute ticks thin out on long brews, so labels never touch.
         val every = listOf(1, 2, 5, 10, 15).firstOrNull { axisLabel == null || x(it * 60) >= axisLabel.size.width + 12.dp.toPx() } ?: 30
         if (axisLabel != null) for (minute in 0..span / 60 step every) {
