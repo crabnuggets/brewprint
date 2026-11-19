@@ -163,7 +163,7 @@ The live notification is unchanged during a scale brew: its chip still shows the
 
 A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. A pulse that started on time reads "On schedule"; otherwise it shows the time and the difference, such as "12 s early". An untimed brew has no Timing section. Without a scale, the app does not measure water amounts or pour durations.
 
-A scale brew's record also shows, in "Timing and water", a measured row (dose, water, ratio), the water curve against the planned targets, and a "Reached" column with the steady reading after each pulse, or "Not recorded" when the scale gave no steady reading before the next pulse. Water stays on the scale, so a steady reading seen after a gap, within the same wait, still counts. The tasting journal stays first on the record.
+A scale brew's record also shows, in "Timing and water", a measured row (dose, water, ratio), the water curve against the planned targets, and a "Reached" column with the steady reading after each pulse, or "Not recorded" when the scale gave no steady reading before the next pulse's water began. If the next pulse begins before the reading settles, after a late pour's short wait or "Start pulse N", a steady reading still counts until the reading rises 2 g above where that pulse began, or above the last pulse's target if its pour stopped up to 1 g short of it. Water stays on the scale, so a steady reading seen after a gap, within the same wait, still counts. The tasting journal stays first on the record.
 
 History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" requires confirmation and removes only that record. Library items use archive rather than deletion in this version.
 
@@ -236,6 +236,7 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - Weighing 15.2 g of coffee for a 15 g, 1:16 recipe rescales this brew to 243.2 g and leaves the Library recipe at 15 g.
 - Pouring from the armed sheet starts the timer at the first pour; lifting and replacing the brewer does not.
 - A pour that reaches its target early lengthens the wait; one that overruns moves later pulses later.
+- A pour that overruns into a short wait still records Reached if the reading settles before the next pulse's water lands.
 - Swirling the dripper during a wait neither starts the next pulse nor loses the scale.
 - Switching the scale off mid-brew follows the clock and keeps a gap in the saved curve.
 

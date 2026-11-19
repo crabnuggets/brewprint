@@ -48,6 +48,12 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     private var lastStep = -1
     /** The highest reading since the current step began. */
     private var high = 0.0
+    /**
+     * Where this pour began while the last pulse's Reached was still open: the reading then, or the last pulse's target
+     * when that pour ended no more than [TARGET_SLACK] short of it. Until the reading rises [RISE_GRAMS] above it, no water for this
+     * pulse has landed, so a steady reading is still the last pulse's.
+     */
+    private var carryFrom: Double? = null
     private var brewId: String? = null
     private val curve = mutableListOf<Double?>()
     /** The start of the timer [curve] belongs to, so a timer started again after Undo begins its own curve. */
@@ -168,10 +174,19 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         val view = TimerNow(recipe, timer, now)
         if (!view.active) return flush()
         record(timer, now, grams, flow)
-        // Drawdown keeps the last pour's peak, so a dripper already off at its first reading still shows as a fall.
-        // The peak is capped at the final target, so a brief press on the brewer cannot become a lift.
         if (view.step != lastStep) {
+            // Only a forward step this reader saw, with the scale connected and the dripper on, can carry the last pulse
+            // over. Undo stepping back into a pour must not: its reading already holds this pulse's water.
+            val followed = lastStep in 0 until view.step && !lost && !dripperOff
+            carryFrom = if (followed && view.phase == TimerPhase.POUR && view.pulse > 0 && data.reached.getOrNull(view.pulse - 1) == null) {
+                // A pour the scale ended at its target minus the slack starts the window from the target, so the slack
+                // cannot use up the window. A pour ended well short, by "Pour done", starts it from the reading.
+                val target = view.schedule[view.pulse - 1].cumulativeWater
+                if (grams >= target - TARGET_SLACK) maxOf(grams, target) else grams
+            } else null
             lastStep = view.step
+            // Drawdown keeps the last pour's peak, so a dripper already off at its first reading still shows as a fall.
+            // The peak is capped at the final target, so a brief press on the brewer cannot become a lift.
             high = if (view.phase == TimerPhase.DRAWDOWN) maxOf(minOf(high, view.schedule.last().cumulativeWater), grams) else grams
             detect = false
         }
@@ -205,8 +220,17 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         }
         if (quiet) steady = grams
         when (view.phase) {
-            TimerPhase.POUR -> if (timer.byWeight && !view.paused && grams >= view.schedule[view.pulse].cumulativeWater - TARGET_SLACK) {
-                repository.updateTimer { d, t, r -> d.copy(timer = t.reachTarget(r, now)) }
+            TimerPhase.POUR -> {
+                // After a late pour's short wait, or "Start pulse N", this pour can begin before the last one settled.
+                val from = carryFrom
+                if (from != null && high >= from + RISE_GRAMS) carryFrom = null
+                else if (from != null && quiet) {
+                    carryFrom = null
+                    save { it.copy(reached = it.reached.with(view.pulse - 1, grams)) }
+                }
+                if (timer.byWeight && !view.paused && grams >= view.schedule[view.pulse].cumulativeWater - TARGET_SLACK) {
+                    repository.updateTimer { d, t, r -> d.copy(timer = t.reachTarget(r, now)) }
+                }
             }
             TimerPhase.WAIT -> {
                 if (quiet && !view.paused && !detect) {

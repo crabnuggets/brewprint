@@ -22,6 +22,8 @@ class ScaleBrewTest {
     private val sent = mutableListOf<ByteArray>()
     private var now = 1_000_000L
     private var grams = 0.0
+    /** The scale's own flow, which trails the stream. */
+    private var reported = 0.0
     // Pours at 0:00 and 0:30, to 40 g and 100 g.
     private val recipe = Recipe(name = "Two-pulse", dose = 10.0, ratio = 10.0, pulses = listOf(Pulse("Bloom", 40.0, 10, 20), Pulse(water = 60.0, pourSeconds = 10)))
 
@@ -55,6 +57,93 @@ class ScaleBrewTest {
         feed(1200)
         feed(1000, flow = 5.0, to = 100.0)
         assertNotNull(draft.timer)
+    }
+
+    /**
+     * Readings every 100 ms for [millis] while water lands at [rate] grams a second, as a real scale reports them:
+     * its flow trails the stream, a drip keeps it just above 0 g/s, and the weight wobbles by 0.1 g.
+     */
+    private fun pourLike(millis: Long, rate: Double) {
+        repeat((millis / 100).toInt()) { i ->
+            now += 100
+            grams += rate / 10
+            reported = reported * 0.8 + rate * 0.2
+            brew.reading(now, grams + if (i % 2 == 0) 0.1 else -0.1, reported + 0.25, overload = false)
+        }
+    }
+
+    /** Pours of 30 g planned at 10 s each, with [waitSeconds] between them; armed at a steady zero. */
+    private fun armPulses(waitSeconds: Int): Recipe {
+        val pulses = Recipe(name = "Pulses", dose = 9.0, ratio = 10.0, pulses = List(3) { Pulse(water = 30.0, pourSeconds = 10, waitSeconds = if (it < 2) waitSeconds else 0) })
+        repository.updateDraft(draft.copy(recipe = pulses)).getOrThrow()
+        feed(1200)
+        return pulses
+    }
+
+    @Test fun `a pour that ran late still records reached when the reading settles after the clock starts the next pulse`() {
+        val pulses = armPulses(waitSeconds = 3)
+        // A slow pour reaches 29 g about 4.5 s past its planned time, so the wait gets only its planned 3 s.
+        // The pour runs on to 34 g, and as the scale's flow trails off, the reading settles after the clock has started pulse 2.
+        pourLike(17_000, 2.0)
+        val poured = grams
+        pourLike(2_500, 0.0)
+        val view = TimerNow(pulses, timer, now)
+        assertEquals(TimerPhase.POUR, view.phase)
+        assertEquals(1, view.pulse)
+        pourLike(16_000, 2.0)
+        assertEquals(poured, draft.scale!!.reached[0]!!, 0.11)
+    }
+
+    @Test fun `with no wait, a steady reading before the next pulse's water still counts`() {
+        val pulses = armPulses(waitSeconds = 0)
+        // The clock starts pulse 2 at 29 g, and the pour runs on 1 g past the target, to 31 g.
+        pourLike(15_500, 2.0)
+        assertEquals(1, TimerNow(pulses, timer, now).pulse)
+        val poured = grams
+        pourLike(2_500, 0.0)
+        pourLike(16_000, 2.0)
+        assertEquals(poured, draft.scale!!.reached[0]!!, 0.11)
+    }
+
+    @Test fun `starting the next pulse before the reading settles still records reached`() {
+        val pulses = armPulses(waitSeconds = 10)
+        pourLike(16_000, 2.0)
+        val poured = grams
+        pourLike(1_000, 0.0)
+        repository.updateTimer { d, t, r -> d.copy(timer = t.skip(r, now)) }
+        assertEquals(TimerPhase.POUR, TimerNow(pulses, timer, now).phase)
+        pourLike(2_500, 0.0)
+        pourLike(16_000, 2.0)
+        assertEquals(poured, draft.scale!!.reached[0]!!, 0.11)
+    }
+
+    @Test fun `pouring straight on into the next pulse leaves reached not recorded, even if the pour stops briefly`() {
+        armPulses(waitSeconds = 3)
+        pourLike(22_000, 2.0)
+        pourLike(2_500, 0.0)
+        pourLike(10_000, 2.0)
+        assertNull(draft.scale!!.reached.getOrNull(0))
+    }
+
+    @Test fun `pour done well short of the target does not stretch reached into the next pulse's water`() {
+        val pulses = armPulses(waitSeconds = 0)
+        pourLike(11_000, 2.0)
+        repository.updateTimer { d, t, r -> d.copy(timer = t.skip(r, now)) }
+        pourLike(2_500, 2.0)
+        assertEquals(1, TimerNow(pulses, timer, now).pulse)
+        pourLike(2_500, 0.0)
+        assertNull(draft.scale!!.reached.getOrNull(0))
+    }
+
+    @Test fun `undoing pour done does not record the next pulse's water as reached`() {
+        armPulses(waitSeconds = 3)
+        pourLike(22_000, 2.0)
+        repository.updateTimer { d, t, r -> d.copy(timer = t.skip(r, now)) }
+        pourLike(1_500, 0.0)
+        repository.changeDraft { it.copy(timer = it.timer!!.undone(now)) }
+        assertEquals(2, timer.step)
+        pourLike(2_500, 0.0)
+        assertNull(draft.scale!!.reached.getOrNull(0))
     }
 
     @Test fun `a rise from a steady zero starts the timer at the first rising reading`() {
