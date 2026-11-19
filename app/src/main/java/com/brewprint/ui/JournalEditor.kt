@@ -66,7 +66,7 @@ private fun Intensity(label: String, help: String, value: String?, notes: String
 private fun Choice(options: List<String>, value: String?, onChange: (String?) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option -> FilterChip(selected = value == option, onClick = { onChange(if (value == option) null else option) }, label = { Text(option) }) }
-        if (value != null) TextButton(onClick = { onChange(null) }) { Text("Clear") }
+        if (value != null) SoftTextButton(onClick = { onChange(null) }) { Text("Clear") }
     }
 }
 

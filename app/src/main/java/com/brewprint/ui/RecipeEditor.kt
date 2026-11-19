@@ -198,14 +198,14 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                 if (cumulativeValid) Text("Add ${formatAmount(currentWater!!)} g · Pour to ${formatAmount(roundedAmount(cumulative))} g total")
                                 LibraryField(pulse.pour, { value -> replace(pulse.id) { it.copy(pour = value) } }, "Pour duration, seconds", KeyboardType.Number, error = if (pulse.pour.toIntOrNull()?.let { it > 0 } != true) "Enter a positive whole number of seconds." else null, required = true)
                                 if (index < pulses.lastIndex) LibraryField(pulse.wait, { value -> replace(pulse.id) { it.copy(wait = value) } }, "Wait after pouring, seconds", KeyboardType.Number, error = if (pulse.wait.toIntOrNull()?.let { it >= 0 } != true) "Enter zero or a positive whole number." else null)
-                                if (pulses.size > 1) TextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
+                                if (pulses.size > 1) SoftTextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
                             }
                         }
                     }
                 }
             }
         }
-        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = {
+        SoftButton(shape = MaterialTheme.shapes.small, onClick = {
             val last = pulses.last()
             pulses = pulses.dropLast(1) + last.copy(wait = "0") + PulseInput("", last.water, last.pour, "0")
         }, modifier = Modifier.fillMaxWidth()) { Text("Add pulse") }

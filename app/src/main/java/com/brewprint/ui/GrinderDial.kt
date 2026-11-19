@@ -72,7 +72,7 @@ fun GrinderDial(value: Int?, lastSetting: Int?, finish: DialFinish, onValue: (In
             Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Grind setting, ticks", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
+                    SoftTextButton(onClick = onDismiss) { Text("Close") }
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth().padding(start = 20.dp)) {
                     val stacked = maxWidth < 300.dp || LocalDensity.current.fontScale > 1.3f

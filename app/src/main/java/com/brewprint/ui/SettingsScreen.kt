@@ -67,7 +67,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
                         Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
                     }
                     Text("Notifications for Brewprint are turned off. The timer still runs in the app.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
+                    SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
                         context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Open Android settings") }
                 }

@@ -36,7 +36,7 @@ class WaterCurveTest {
         compose.setContent {
             MaterialTheme {
                 Column(Modifier.background(Color.White).padding(16.dp)) {
-                    WaterCurve(curve, listOf(40.0, 300.0), curve.size)
+                    WaterCurve(curve, curve.size, total = 300.0, target = 40.0)
                     Box(Modifier.fillMaxWidth().height(200.dp).testTag("below"))
                 }
             }

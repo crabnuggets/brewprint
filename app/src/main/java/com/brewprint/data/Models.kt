@@ -178,6 +178,9 @@ data class BrewDraft(
 @Serializable
 data class NoteEdit(val brewId: String, val journal: Journal)
 
+/** A brew record just deleted, kept so "Undo" can put it back. Not saved. */
+data class DeletedBrew(val brew: BrewRecord, val noteEdit: NoteEdit?)
+
 @Serializable
 data class AppState(
     val beans: List<Beans> = emptyList(),

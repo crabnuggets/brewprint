@@ -218,8 +218,17 @@ class BrewRepository(context: Context) {
         current.copy(brews = current.brews.map { if (it.id == brew.id) brew else it }.sortedByDescending { it.startedAt }) to Unit
     }
 
-    fun deleteBrew(id: String): Result<Unit> = change { current ->
-        current.copy(brews = current.brews.filterNot { it.id == id }, noteEdits = current.noteEdits.filterNot { it.brewId == id }) to Unit
+    /** Removes one brew record and returns it, with any unsaved note edits, so [restoreBrew] can undo it. */
+    fun deleteBrew(id: String): Result<DeletedBrew> = change { current ->
+        val brew = current.brews.firstOrNull { it.id == id } ?: error("Brew not found.")
+        current.copy(brews = current.brews.filterNot { it.id == id }, noteEdits = current.noteEdits.filterNot { it.brewId == id }) to
+            DeletedBrew(brew, current.noteEdits.firstOrNull { it.brewId == id })
+    }
+
+    /** Puts back a brew removed by [deleteBrew], unchanged. */
+    fun restoreBrew(deleted: DeletedBrew): Result<Unit> = change { current ->
+        if (current.brews.any { it.id == deleted.brew.id }) current to Unit
+        else current.copy(brews = (current.brews + deleted.brew).sortedByDescending { it.startedAt }, noteEdits = current.noteEdits + listOfNotNull(deleted.noteEdit)) to Unit
     }
 
     fun saveNoteEdit(brewId: String, journal: Journal): Result<Unit> = change { current ->

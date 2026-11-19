@@ -88,8 +88,8 @@ fun LibraryScreen(
                 DetailLine("Reference notes", grinder.referenceNotes)
                 DetailLine("Dial finish", finishLabel(grinder.finish))
                 if (state.defaultGrinderId == grinder.id) Text("Default grinder", style = MaterialTheme.typography.labelLarge)
-                else OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
+                else SoftButton(shape = MaterialTheme.shapes.small, onClick = { save(repository.setDefaultGrinder(grinder.id)) }, modifier = Modifier.fillMaxWidth()) { Text("Make default grinder") }
+                SoftButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
             }
             if (recipe != null && kind == "recipes") {
                 Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleLarge)
@@ -105,13 +105,13 @@ fun LibraryScreen(
                 val last = recipe.schedule().lastOrNull()
                 last?.let { Text("Scheduled pours end at ${formatDuration(it.startSeconds + it.pulse.pourSeconds)}. Allow for drawdown.") }
                 DetailLine("Preparation notes", recipe.notes)
-                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = {
+                SoftButton(shape = MaterialTheme.shapes.small, onClick = {
                     val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
                     if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate recipe") }
             }
             Button(shape = MaterialTheme.shapes.small, onClick = { editing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Edit ${kindLabel(kind)}") }
-            TextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
+            SoftTextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
         if (onClose != null) BackHandler(onBack = onClose)
@@ -120,7 +120,7 @@ fun LibraryScreen(
             kinds.forEach { currentKind ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(currentKind.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
+                    SoftTextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
                 }
                 val items: List<Pair<String, Pair<String, String>>> = when (currentKind) {
                     "beans" -> state.beans.filterNot { it.archived }.map { it.id to (it.name to it.roaster) }
@@ -144,7 +144,7 @@ fun LibraryScreen(
                             Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) TextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
+                    if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) SoftTextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
                 }
                 Spacer(Modifier.height(12.dp))
             }
@@ -159,7 +159,7 @@ fun LibraryScreen(
                 if (needsReplacement) {
                     Text("Choose a new default grinder.")
                     replacements.forEach { option ->
-                        OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
+                        SoftButton(shape = MaterialTheme.shapes.small, onClick = { replacementId = option.id }, modifier = Modifier.fillMaxWidth()) {
                             Text(option.name + if (replacementId == option.id) " · Selected" else "")
                         }
                     }

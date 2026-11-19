@@ -163,7 +163,7 @@ The live notification is unchanged during a scale brew: its chip still shows the
 
 1. The beans as the title, with the recipe and tick setting beneath, and "Change setup" to go back and correct setup before saving.
 2. The brew date and time, prefilled when the draft starts, with "Change date" to log an earlier brew.
-3. A results card. A timed brew shows "Brew time" with "Change total"; a scale brew adds the measured "Water", "Ratio", and "Dose". Without a scale, the card shows the planned dose, water, and ratio, labelled as planned. An untimed brew without a scale has no results card.
+3. A results card. A timed brew shows "Total brew time" with "Change total"; a scale brew adds the measured "Water", "Ratio", and "Dose". Without a scale, the card shows the planned dose, water, and ratio, labelled as planned. An untimed brew without a scale has no results card.
 4. "How was this cup?"
 
 The three "Change …" actions are icon buttons with those names.

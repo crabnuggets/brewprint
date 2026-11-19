@@ -2,6 +2,8 @@
 
 package com.brewprint.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SkipNext
@@ -27,6 +31,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -81,54 +88,69 @@ internal fun TimerSheet(view: TimerNow, showPlan: Boolean, onShowPlan: (Boolean)
             if (!allDone) "Next" else if (done == view.pulseCount) "All ${view.pulseCount} pulses done" else "$done of ${view.pulseCount} pulses done",
             Modifier.align(Alignment.CenterVertically), style = MaterialTheme.typography.titleMedium,
         )
-        OutlinedButton(onClick = { onShowPlan(true) }, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
+        SoftTextButton(onClick = { onShowPlan(true) }) {
             Text(if (allDone || done == 0) "Show plan" else "$done done, show plan")
         }
     }
     if (view.phase == TimerPhase.POUR || view.phase == TimerPhase.WAIT) NextRows(view, compact = scale != null)
 }
 
+/** The state word and whose turn it is. A new step swaps it with a blur, starting on the same step change as the cue. */
+private data class FocusTop(val step: Any, val state: String, val who: String?, val paused: Boolean)
+
+/** The two large numbers. Within a step they update in place; a new step swaps them with a blur. */
+private data class FocusNumbers(val step: Any, val targetLabel: String, val target: String, val targetSoft: Boolean, val rightLabel: String, val right: String, val rightUnit: String, val rightCounts: Boolean)
+
 @Composable
 private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
     val colors = MaterialTheme.colorScheme
     val pulseOf = "${view.pulse + 1} of ${view.pulseCount}"
     val pouring = view.phase == TimerPhase.POUR
+    val step = Triple(view.phase, view.pulse, view.paused)
     Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.animateContentSize(tween(300)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val state = when {
-                        view.paused -> "Paused"
-                        pouring -> "Pour"
-                        view.phase == TimerPhase.WAIT -> "Wait"
-                        view.phase == TimerPhase.DRAWDOWN -> "Drawdown"
-                        else -> "Timer stopped"
-                    }
-                    Row(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (view.paused) Icon(Icons.Outlined.Pause, null, Modifier.size(28.dp))
-                        Text(state, style = MaterialTheme.typography.headlineLarge)
-                    }
-                    val who = when {
-                        view.paused && pouring -> "Pour, pulse $pulseOf"
-                        view.paused -> "Wait after pulse $pulseOf"
-                        pouring -> "Pulse $pulseOf"
-                        view.phase == TimerPhase.WAIT -> "After pulse $pulseOf"
-                        else -> null
-                    }
-                    if (who != null) Text(who, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                val state = when {
+                    view.paused -> "Paused"
+                    pouring -> "Pour"
+                    view.phase == TimerPhase.WAIT -> "Wait"
+                    view.phase == TimerPhase.DRAWDOWN -> "Drawdown"
+                    else -> "Timer stopped"
                 }
-                if (pouring || view.phase == TimerPhase.WAIT) Column(horizontalAlignment = Alignment.End) {
+                val who = when {
+                    view.paused && pouring -> "Pour, pulse $pulseOf"
+                    view.paused -> "Wait after pulse $pulseOf"
+                    pouring -> "Pulse $pulseOf"
+                    view.phase == TimerPhase.WAIT -> "After pulse $pulseOf"
+                    else -> null
+                }
+                BlurSwap(FocusTop(step, state, who, view.paused), { it.step }, Modifier.weight(1f)) { top ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (top.paused) Icon(Icons.Outlined.Pause, null, Modifier.size(28.dp))
+                            Text(top.state, style = MaterialTheme.typography.headlineLarge)
+                        }
+                        if (top.who != null) Text(top.who, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (pouring || view.phase == TimerPhase.WAIT) Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = Alignment.End) {
                     Text("Brew time", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    Text(formatDuration(view.brewSeconds), style = MaterialTheme.typography.titleLarge)
+                    Roll(formatDuration(view.brewSeconds)) { Text(it, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)) }
                 }
             }
             if (pouring || view.phase == TimerPhase.WAIT) {
                 val target = view.schedule[if (pouring) view.pulse else view.pulse + 1].cumulativeWater
                 val onScale = scale?.grams?.takeIf { pouring && !view.paused }
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Numeral(if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", soft = !pouring || onScale != null)
-                    if (onScale != null) Numeral("On scale", tenths(onScale), "g", alignEnd = true)
-                    else Numeral(if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at", view.leftSeconds.toString(), "s", alignEnd = true)
+                val numbers = FocusNumbers(
+                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), !pouring || onScale != null,
+                    if (onScale != null) "On scale" else if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at",
+                    onScale?.let(::tenths) ?: view.leftSeconds.toString(), if (onScale != null) "g" else "s", onScale == null,
+                )
+                BlurSwap(numbers, { it.step }, Modifier.fillMaxWidth()) { shown ->
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Numeral(shown.targetLabel, shown.target, "g", soft = shown.targetSoft)
+                        Numeral(shown.rightLabel, shown.right, shown.rightUnit, alignEnd = true, roll = shown.rightCounts)
+                    }
                 }
                 val pulse = view.recipe.pulses[view.pulse]
                 if (onScale != null) {
@@ -149,11 +171,11 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
                     Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
             } else if (view.phase == TimerPhase.DRAWDOWN) {
-                Numeral("Brew time", formatDuration(view.brewSeconds), "")
+                Numeral("Brew time", formatDuration(view.brewSeconds), "", roll = true)
                 Text("Scheduled pours ended at ${formatDuration(view.poursEndSeconds)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 if (data != null) {
                     HorizontalDivider(color = colors.outlineVariant)
-                    MeasuredRows(view.recipe, data)
+                    MeasuredTrio(view.recipe, data)
                 }
             } else {
                 Text(stoppedText(view) + ".", style = MaterialTheme.typography.bodyLarge)
@@ -164,13 +186,15 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
 }
 
 @Composable
-private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false) {
+private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false, roll: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(value, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = FontWeight.SemiBold))
-            if (unit.isNotEmpty()) Text(unit, Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+            val number: @Composable (String) -> Unit = { Text(it, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold)) }
+            // A counting number rolls to its next value; a reading such as grams on the scale updates in place.
+            if (roll) Roll(value) { number(it) } else number(value)
+            if (unit.isNotEmpty()) Text(unit, Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium))
         }
     }
 }
@@ -296,7 +320,7 @@ private fun FullPlan(view: TimerNow) {
     }
 }
 
-/** Footer actions for a running timer. Buttons stack at large text sizes. [onUndoStart] is given just after the scale started the timer. */
+/** Footer actions for a running timer: one row of buttons, with Finish brew smaller beneath. Buttons stack at large text sizes. [onUndoStart] is given just after the scale started the timer. */
 @Composable
 internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Unit, onSkip: () -> Unit, onUndo: () -> Unit, onFinish: () -> Unit, onUndoStart: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
@@ -309,15 +333,20 @@ internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Un
             }
         }
         val skip = view.skipLabel
-        if (skip == null) PrimaryAction("Finish brew", onClick = onFinish) else {
+        if (skip == null) PrimaryAction("Finish brew", icon = Icons.Outlined.Flag, onClick = onFinish) else {
+            // Pause and Resume, and the skip label, cross-fade in place.
             val buttons: @Composable (Modifier) -> Unit = { modifier ->
-                if (view.paused) FooterButton("Resume", Icons.Outlined.PlayArrow, modifier, filled = true, onClick = onResume)
-                else FooterButton("Pause", Icons.Outlined.Pause, modifier, onClick = onPause)
-                FooterButton(skip, Icons.Outlined.SkipNext, modifier, onClick = onSkip)
+                Crossfade(view.paused, modifier, tween(260), label = "pause") { paused ->
+                    if (paused) FooterButton("Resume", Icons.Outlined.PlayArrow, Modifier.fillMaxWidth(), filled = true, onClick = onResume)
+                    else FooterButton("Pause", Icons.Outlined.Pause, Modifier.fillMaxWidth(), onClick = onPause)
+                }
+                Crossfade(skip, modifier, tween(260), label = "skip") { FooterButton(it, Icons.Outlined.SkipNext, Modifier.fillMaxWidth(), onClick = onSkip) }
             }
             if (LocalDensity.current.fontScale >= 1.3f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons(Modifier.fillMaxWidth()) }
             else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { buttons(Modifier.weight(1f)) }
-            TextButton(onClick = onFinish, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Finish brew") }
+            SoftTextButton(onClick = onFinish, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Finish brew")
+            }
         }
     }
 }
@@ -330,11 +359,13 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
         Text(text, maxLines = 2)
     }
     val padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-    if (filled) Button(onClick, modifier.heightIn(min = 56.dp), shape = MaterialTheme.shapes.small, contentPadding = padding, content = content)
-    else OutlinedButton(onClick, modifier.heightIn(min = 56.dp), shape = MaterialTheme.shapes.small, contentPadding = padding, content = content)
+    if (filled) {
+        val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        Button(onClick, modifier.heightIn(min = 56.dp).pressScale(source), shape = MaterialTheme.shapes.small, contentPadding = padding, interactionSource = source, content = content)
+    } else SoftButton(onClick, modifier.heightIn(min = 56.dp), contentPadding = padding, content = content)
 }
 
-/** Timing saved with a brew record: the total, and each pulse's planned and actual start. A scale brew adds what the scale measured. */
+/** Timing saved with a brew record: the total, and each pulse's planned start and how far its actual start was from it, one line a pulse. A scale brew adds what the scale measured. */
 @Composable
 internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? = null) {
     val colors = MaterialTheme.colorScheme
@@ -350,40 +381,64 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
             timing.totalEdited -> "Edited.$paused"
             else -> "First pour to Finish brew.$paused"
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        val schedule = recipe.schedule()
         if (scale != null) {
             HorizontalDivider(color = colors.outlineVariant)
-            MeasuredRows(recipe, scale)
-            WaterCurve(scale.curve, recipe.schedule().map { it.cumulativeWater }, maxOf(timing.totalSeconds ?: 0, scale.curve.size))
+            MeasuredTrio(recipe, scale)
+            HorizontalDivider(color = colors.outlineVariant)
+            CurveLegend()
+            WaterCurve(scale.curve, maxOf(timing.totalSeconds ?: 0, scale.curve.size), recipe.totalWater, plan = planLine(recipe))
         }
         HorizontalDivider(color = colors.outlineVariant)
-        Row(Modifier.fillMaxWidth()) {
-            Text("Pulse", Modifier.weight(1.2f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            Text("Planned", Modifier.weight(.8f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            Text("Started", Modifier.weight(1.3f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            if (scale != null) Text("Reached", Modifier.weight(1f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        // One line a pulse at the default text size, even on a 360 dp phone; larger text may wrap.
+        val oneLine = LocalDensity.current.fontScale < 1.3f
+        val weights = if (scale != null) listOf(1.25f, .7f, .95f, 1f) else listOf(1.3f, .8f, 1f)
+        @Composable fun RowScope.cell(text: String, index: Int, color: androidx.compose.ui.graphics.Color = colors.onSurface, weight: FontWeight? = null, style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyLarge) =
+            Text(text, Modifier.weight(weights[index]), color = color, fontWeight = weight, style = style, textAlign = if (index == 0) TextAlign.Start else TextAlign.End,
+                maxLines = if (oneLine) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth().clearAndSetSemantics { }) {
+            listOfNotNull("Pulse", "Plan", "Started", "Reached".takeIf { scale != null }).forEachIndexed { index, header -> cell(header, index, colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         }
-        recipe.schedule().forEachIndexed { index, scheduled ->
+        schedule.forEachIndexed { index, scheduled ->
             val actual = timing.pulseStarts.getOrNull(index)
-            val difference = actual?.let { formatStartDifference(it, scheduled.startSeconds) }
-            Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { }) {
-                Text(scheduled.pulse.label.ifBlank { "Pulse ${index + 1}" }, Modifier.weight(1.2f))
-                Text(formatDuration(scheduled.startSeconds), Modifier.weight(.8f), color = colors.onSurfaceVariant)
-                Column(Modifier.weight(1.3f)) {
-                    when {
-                        actual == null -> Text("Not started", color = colors.onSurfaceVariant)
-                        difference == null -> Text("On schedule", color = colors.onSurfaceVariant)
-                        else -> {
-                            Text(formatDuration(actual), fontWeight = FontWeight.SemiBold)
-                            Text(difference, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
+            val offset = actual?.let { formatStartOffset(it, scheduled.startSeconds) }
+            val name = scheduled.pulse.label.ifBlank { "Pulse ${index + 1}" }
+            val reached = scale?.reached?.getOrNull(index)
+            val spoken = "$name, ${spokenStart(scheduled.startSeconds)}, " + when {
+                actual == null -> "not started"
+                offset == null -> "started on time"
+                else -> "started " + spokenDifference(actual - scheduled.startSeconds)
+            } + if (scale != null) ", " + (reached?.let { "reached ${tenths(it)} grams" } ?: "no steady reading") else ""
+            Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = spoken }) {
+                cell(name, 0)
+                cell(formatDuration(scheduled.startSeconds), 1, colors.onSurfaceVariant)
+                when {
+                    actual == null -> cell("—", 2, colors.onSurfaceVariant)
+                    offset == null -> cell("On time", 2, colors.onSurfaceVariant)
+                    else -> cell(offset, 2, weight = FontWeight.SemiBold)
                 }
-                if (scale != null) Text(scale.reached.getOrNull(index)?.let { "${tenths(it)} g" } ?: "Not recorded", Modifier.weight(1f), color = colors.onSurfaceVariant)
+                if (scale != null) cell(reached?.let { "${tenths(it)} g" } ?: "—", 3, if (reached == null) colors.onSurfaceVariant else colors.onSurface)
             }
         }
-        Text(if (scale != null) "Start times come from the timer. Reached is the scale's steady reading after each pulse." else "Start times come from the timer. Pours are not measured.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("Started shows how far each pulse was from the plan: + late, − early. " + if (scale != null) "Reached is the scale's steady reading after each pulse; — means none was recorded." else "Pours are not measured.",
+            color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
+
+/** "9 seconds late", "1 minute 6 seconds early". */
+private fun spokenDifference(seconds: Int): String {
+    val size = kotlin.math.abs(seconds)
+    val minutes = size / 60
+    val rest = size % 60
+    val amount = listOfNotNull(minutes.takeIf { it > 0 }?.let { if (it == 1) "1 minute" else "$it minutes" }, rest.takeIf { it > 0 || minutes == 0 }?.let { if (it == 1) "1 second" else "$it seconds" }).joinToString(" ")
+    return amount + if (seconds < 0) " early" else " late"
+}
+
+/** The plan as written: water rises during each planned pour and holds during each wait. */
+internal fun planLine(recipe: Recipe): List<Pair<Int, Double>> =
+    listOf(0 to 0.0) + recipe.schedule().flatMapIndexed { index, scheduled ->
+        listOf(scheduled.startSeconds to scheduled.cumulativeWater - scheduled.pulse.water, scheduled.startSeconds + scheduled.pulse.pourSeconds to scheduled.cumulativeWater)
+    }
 
 /** Keeps the screen on while the sheet shows a running timer. */
 @Composable
@@ -423,14 +478,13 @@ internal fun TotalBrewTime(timer: BrewTimer, onValid: (Boolean) -> Unit, onChang
         val valid = editing.isBlank() || parseDuration(editing) != null
         LaunchedEffect(valid) { onValid(valid) }
         LibraryField(editing, { text = it; if (it.isBlank() || parseDuration(it) != null) onChange(parseDuration(it)) }, "Total brew time", error = if (!valid) "Use minutes and seconds, for example 3:24." else null, helper = "Minutes and seconds, for example 3:24. Leave blank to keep the timer's total.")
-    } else Surface(color = colors.surface, shape = MaterialTheme.shapes.small, border = BorderStroke(1.dp, colors.outlineVariant)) {
-        FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.heightIn(min = 48.dp).align(Alignment.CenterVertically), verticalArrangement = Arrangement.Center) {
-                Text("Total brew time", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                Text((total?.let(::formatDuration) ?: "Not recorded") + if (total != null && total != measured) " · Edited" else "", style = MaterialTheme.typography.titleMedium)
-            }
-            TextButton(onClick = { text = total?.let(::formatDuration).orEmpty() }, modifier = Modifier.align(Alignment.CenterVertically), contentPadding = PaddingValues(vertical = 8.dp)) { Text(if (total == null) "Enter total" else "Change total") }
+    } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) { }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Total brew time", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Text(total?.let(::formatDuration) ?: "Not recorded", style = if (total != null) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge)
+            if (total != null && total != measured) Text("Edited", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
+        IconAction(Icons.Outlined.Edit, if (total == null) "Enter total" else "Change total") { text = total?.let(::formatDuration).orEmpty() }
     }
     if (measured == null) Text("The timer stopped itself. Enter the total if you know it.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
 }
