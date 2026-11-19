@@ -22,12 +22,12 @@ Use three bottom navigation destinations:
 - History: completed brew records, newest first. Open a record to inspect, edit, or repeat it.
 - Library: recipes, beans, and grinders, grouped into three plainly labeled lists.
 
-Create and edit screens open above these destinations. Android Back returns to the previous screen. Unsaved form edits prompt "Discard changes?" with "Keep editing" and "Discard". An active brew draft saves automatically and offers "Resume brew" on the Brew screen after navigation or an app restart. Support one active draft at a time for this version.
+Create and edit screens open above these destinations. Android Back returns to the previous screen. A brew setup with nothing chosen, or a new one left as it opened from "New brew" or "Repeat", is discarded on Back, so it neither blocks "Repeat" nor keeps a stale start time. Unsaved form edits prompt "Discard changes?" with "Keep editing" and "Discard". An active brew draft saves automatically and offers "Resume brew" on the Brew screen after navigation or an app restart. Support one active draft at a time for this version.
 
 ## First brew journey
 
 1. Open the app to an empty Brew screen with "Record your first brew" and a short explanation of what will be saved. Skip a separate onboarding slideshow.
-2. Tap "New brew" to open setup. Required rows show "Add beans", "Add grinder", and "Choose or create recipe".
+2. Tap "New brew" to open setup. Required rows show "Add beans", "Add recipe", and "Add grinder". Each opens its create form directly.
 3. Add a grinder by name, enter its current tick setting, and optionally describe the reference point used for counting ticks. The first grinder becomes the default.
 4. Add beans with a name and roaster. The user may fill in origin, variety, and expected tasting notes now or later.
 5. Create a recipe with a name, dose, ratio, and pulses. A running total helps the user make the pulses match the target water amount.
@@ -35,7 +35,7 @@ Create and edit screens open above these destinations. Android Back returns to t
 7. Read the brew sheet while preparing the coffee. It shows the chosen beans, grinder setting, dose, ratio, and ordered pulse instructions. Tap "Start timer" at the first pour to be guided through the pulses, or "Finish without timing".
 8. Tap "Finish brew", optionally add observations, then tap "Save brew". The app opens the saved record and makes it available in History.
 
-Creating a library item during setup returns directly to that setup without losing other choices. Save is available once required fields are valid; optional metadata never blocks a brew.
+Creating a library item during setup returns directly to that setup without losing other choices. When there is nothing to choose from, a setup row opens the create form directly. Save is available once required fields are valid; optional metadata never blocks a brew.
 
 ## Everyday journey
 
@@ -43,7 +43,7 @@ Open Brew, tap "New brew", and review the remembered beans, recipe, grinder, and
 
 For a small grind adjustment, change "Grind setting, ticks" in setup. Saving the brew records that value and updates that grinder's last recorded setting. Discarding the draft does neither. The grinder detail screen also has an explicit "Update last recorded setting" action for adjustments made without logging a brew.
 
-"Repeat" on a historical brew copies its saved beans, grinder, tick setting, and recipe plan into a new draft. It shows the old setting even if the grinder's current recorded setting differs. Setup displays both values in that case, for example "This brew: 24 ticks. Last recorded: 26 ticks." The user chooses the setting before continuing. Repeating never changes the original record.
+"Repeat" on a historical brew copies its saved beans, grinder, tick setting, and recipe plan into a new draft. It shows the old setting even if the grinder's current recorded setting differs. Setup displays both values in that case: the brew's setting, for example 24, with "Last recorded: 26 ticks" and "Use 26 ticks" beneath it. The user chooses the setting before continuing. Repeating never changes the original record.
 
 ## Library forms
 
@@ -128,7 +128,7 @@ A TIMEMORE Dot (the "Black Mirror" open protocol) can guide a timed brew. The sc
 
 ### Pairing and connection
 
-- **Pairing.** The first time a brew sheet opens with no scale paired, a card offers "Brew with a scale?" with "Pair a scale" and "Not now". "Not now" hides the card for good. "Pair a scale" opens Android's companion device picker, listing only nearby devices named like a TIMEMORE scale that speaks the open protocol (the Dot and the Basic3 Link), then asks for Nearby devices once. Settings → "Coffee scale" shows the paired scale with "Forget", or "Add a scale". If Nearby devices is refused, a "Blocked by Android" notice appears there with "Open Android settings", and brewing works without the scale.
+- **Pairing.** The first time a brew sheet opens with no scale paired, a card offers "Brew with a scale?" with "Pair a scale" and "Not now", and says a scale can be paired later in Settings. If Android finds no compatible scale, the app says "No compatible scale found. Turn it on and try again."; any other failure says "Couldn't pair the scale. Try again."; declining or cancelling the picker says nothing. "Not now" hides the card for good. "Pair a scale" opens Android's companion device picker, listing only nearby devices named like a TIMEMORE scale that speaks the open protocol (the Dot and the Basic3 Link), then asks for Nearby devices once. Settings → "Coffee scale" shows the paired scale with "Forget", or "Add a scale". If Nearby devices is refused, a "Blocked by Android" notice appears there with "Open Android settings", and brewing works without the scale.
 - **Connection.** Brewprint connects to the paired scale whenever the app is open, so a scale switched on beforehand is ready. It releases the scale when the app leaves the screen and no scale brew is running, so the TIMEMORE app can still use it. A scale brew keeps the connection with the screen off or the app in the background: the brew timer's service holds it, showing the live notification when that switch is on, or a plain ongoing "Brewing with <scale>" notification when it is off.
 
 ### Before the first pour
@@ -136,10 +136,10 @@ A TIMEMORE Dot (the "Black Mirror" open protocol) can guide a timed brew. The sc
 With a paired scale connected, the brew sheet shows a scale card above the plan:
 
 1. **Brewer.** "Put the brewer on the scale" with the live reading and "Tare".
-2. **Coffee.** After the tare, the card shows the coffee reading. Once it holds steady above 1 g, it offers "Use 15.2 g" and "Skip". "Use" records the weighed dose and rescales this brew's pulses to keep the recipe's ratio: 15.2 g at 1:16 becomes 243.2 g, each pulse scaled and rounded to 0.1 g, the last pulse taking the rounding. The Library recipe does not change. "Skip" keeps the recipe's dose. Either way the app then tares the scale, so the scale's own display matches the cumulative targets. If the scale does not reach about 0 g within 1.5 seconds of a tare, the card says "The scale didn't tare. Press its tare button." and the sheet does not arm until the scale reads about 0 g.
-3. **Armed.** The footer shows "Waiting for the first pour", with "Start timer now" and "Finish without timing". "Start timer now" is guided by the scale only once the scale has held steady at about 0 g since its last tare; before that, it starts a clock-only brew. The screen stays on from here. Leaving the app disarms; on return, the card shows the reading and asks for "Tare" if it is no longer about 0 g.
+2. **Coffee.** After the tare, the card shows only "Taring the brewer" until the scale reads about 0 g, then asks for the coffee and shows its reading, labelled "Dose ready" (and announced) once it holds steady. Choosing other beans or another recipe after the scale steps began starts them again, with the recipe's own dose. If the scale disconnects before a dose is chosen, even with the sheet closed, the card returns to "Put the brewer on the scale" with "Tare the brewer again. Take the coffee out first if you've added it." When the reading differs from the plan, a line says that using it adjusts the pours to keep the ratio. Once it holds steady above about 0 g (1 g), it offers "Use 15.2 g" and "Keep 15 g". "Use" records the weighed dose and rescales this brew's pulses to keep the recipe's ratio: 15.2 g at 1:16 becomes 243.2 g, each pulse scaled and rounded to 0.1 g, the last pulse taking the rounding. The Library recipe does not change. "Keep" keeps the recipe's dose. Either way the app then tares the scale, so the scale's own display matches the cumulative targets. If the scale does not reach about 0 g within 1.5 seconds of a tare, the card leads with "The scale didn't tare", says "Tap Tare again, or press the scale's tare button.", and offers "Tare"; the sheet does not arm until the scale reads about 0 g.
+3. **Armed.** Once the scale has held steady at about 0 g since its last tare, the card reads "On scale, tared · Weighed 15.2 g" (without the weighed part after "Keep") and the footer shows "Waiting for the first pour", with "Start timer now" and "Finish without timing". Before that, the footer offers only "Finish without timing" and shows "Waiting for the scale to read 0 g" while a tare is pending, "Waiting for the scale to settle" while the reading is near 0 g but not yet steady, or "Tare the scale to 0 g" with a filled "Tare" on the card when it is off zero, and no status while the card shows a failed tare; the card adds "Weighed 15.2 g" only once tared; "Brew without the scale" is the way to a clock-only start. If readings stop, the scale overloads, or the link drops after the scale steps began, before the first pour, the card says "No scale reading" with "Check that the scale is on, nearby, and not overloaded. Its reading comes back here." and shows no weight or footer status until a reading returns. The screen stays on from here. Leaving the app disarms; on return, the card shows the reading and asks for "Tare" if it is no longer about 0 g.
 
-"Brew without the scale" on the card makes this brew clock-only and keeps the pairing. Before arming, "Start timer" also starts a clock-only brew.
+"Brew without the scale" on the card makes this brew clock-only and keeps the pairing. While the brewer and coffee are weighed, the footer offers only "Finish without timing", so the card's own step leads; "Brew without the scale" is the way to a clock-only start.
 
 ### During the brew
 

@@ -5,7 +5,10 @@ package com.brewprint.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -36,6 +39,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     var recordId by rememberSaveable { mutableStateOf<String?>(null) }
     var notesReturn by rememberSaveable { mutableStateOf<String?>(null) }
     var draftReturn by rememberSaveable { mutableStateOf<String?>(null) }
+    // True when the draft was just made by New brew or Repeat, so leaving it unchanged discards it.
+    var draftFresh by rememberSaveable { mutableStateOf(false) }
     var error by remember { mutableStateOf(repository.loadError) }
     var libraryEditing by remember { mutableStateOf(false) }
     val onError: (String) -> Unit = { error = it }
@@ -46,12 +51,12 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
         if (openDraftRequest > 0 && draft != null) {
             // Going Back to the Brew screen leaves a timed draft on setup; the notification should open its sheet.
             if (draft.timer != null && draft.stage == DraftStage.SETUP) repository.updateDraft(draft.copy(stage = DraftStage.SHEET))
-            if (route != "draft") { draftReturn = null; route = "draft" }
+            if (route != "draft") { draftReturn = null; draftFresh = false; route = "draft" }
         }
     }
     state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && (state.timerSettings.vibrate || state.timerSettings.sound)) StepCue(draft.recipe, draft.timer, state.timerSettings) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val pairScale = rememberScalePairing { scale ->
+    val pairScale = rememberScalePairing(onFailed = { error = it }) { scale ->
         repository.setScale(scale).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { error = it.message ?: "Couldn't save the scale." }
     }
     fun resumeDraft() {
@@ -60,11 +65,11 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
         if (draft?.timer != null && draft.recipe != null && draft.stage != DraftStage.REVIEW && draft.timer.stopped(draft.recipe, clock())) {
             repository.updateDraft(draft.copy(stage = DraftStage.REVIEW)).onFailure { error = it.message ?: "Couldn't open brew." }
         }
-        draftReturn = null; route = "draft"
+        draftReturn = null; draftFresh = false; route = "draft"
     }
     fun openRecord(id: String) { recordId = id; route = "record" }
     fun repeat(id: String) {
-        repository.repeatBrew(id).onSuccess { draftReturn = route; route = "draft" }.onFailure { error = it.message ?: "Couldn't repeat brew." }
+        repository.repeatBrew(id).onSuccess { draftReturn = route; draftFresh = true; route = "draft" }.onFailure { error = it.message ?: "Couldn't repeat brew." }
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -75,7 +80,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             when (route) {
-                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale) }
+                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
                     ?: LaunchedEffect(Unit) { route = null }
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { repository.deleteBrew(brew.id).onSuccess { route = null }.onFailure { onError(it.message ?: "Couldn't delete brew.") } }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
@@ -89,7 +94,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 else -> when (tab) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
                     "History" -> HistoryScreen(state.brews) { openRecord(it) }
-                    else -> BrewHome(state, { repository.startDraft().onSuccess { draftReturn = null; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
+                    else -> BrewHome(state, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
                 }
             }
         }
@@ -125,7 +130,7 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
         val grinder = state.grinders.find { it.id == state.defaultGrinderId && !it.archived }
         if (grinder != null) Panel {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = "Last recorded setting, " + (grinder.lastSetting?.let { "$it ticks" } ?: "not recorded") + ", ${grinder.name}" }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Last recorded setting", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(grinder.lastSetting?.toString() ?: "Not recorded", style = if (grinder.lastSetting != null) MaterialTheme.typography.headlineLarge.copy(fontSize = 42.sp, lineHeight = 46.sp) else MaterialTheme.typography.titleLarge)
@@ -153,7 +158,7 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
                 }
                 Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
                 Text(recent.recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${formatAmount(recent.recipe.dose)} g · 1:${formatAmount(recent.recipe.ratio)} · ${recent.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${formatAmount(recent.recipe.dose)} g · 1:${formatAmount(recent.recipe.ratio)} · ${recent.setting} ticks", Modifier.clearAndSetSemantics { contentDescription = "Coffee dose ${formatAmount(recent.recipe.dose)} grams, brew ratio 1 to ${formatAmount(recent.recipe.ratio)}, ${recent.setting} ticks" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 SecondaryAction("Repeat", enabled = state.draft == null) { onRepeat(recent.id) }
                 TextButton(onClick = { onNotes(recent.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Outlined.EditNote, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(if (state.noteEdits.any { it.brewId == recent.id }) "Resume tasting notes" else if (recent.journal.isEmpty) "Add tasting notes" else "Edit tasting notes") }
@@ -195,9 +200,11 @@ private fun HistoryScreen(brews: List<BrewRecord>, onRecord: (String) -> Unit) {
 }
 
 @Composable
-private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit, onPairScale: () -> Unit) {
+private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit, onPairScale: () -> Unit, fresh: Boolean = false) {
     var encoded by rememberSaveable(initial.id) { mutableStateOf(Json.encodeToString(initial)) }
     val draft = remember(encoded) { Json.decodeFromString<BrewDraft>(encoded) }
+    // The draft as New brew or Repeat made it; null for a resumed draft, which is kept on Back.
+    val opened by rememberSaveable(initial.id) { mutableStateOf(if (fresh) Json.encodeToString(initial) else null) }
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
     var dial by rememberSaveable { mutableStateOf(false) }
     var validDate by rememberSaveable { mutableStateOf(true) }
@@ -206,15 +213,17 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     var showPlan by rememberSaveable { mutableStateOf(false) }
     val clock = LocalClock.current
     // The live notification and the scale change the timer, stage and scale data behind this screen; follow them.
-    LaunchedEffect(initial.timer, initial.stage, initial.scale) {
-        if (draft.timer != initial.timer || draft.stage != initial.stage || draft.scale != initial.scale) {
-            encoded = Json.encodeToString(draft.copy(timer = initial.timer, stage = initial.stage, scale = initial.scale))
+    LaunchedEffect(initial.timer, initial.stage, initial.scale, initial.scaleStep) {
+        if (draft.timer != initial.timer || draft.stage != initial.stage || draft.scale != initial.scale || draft.scaleStep != initial.scaleStep) {
+            encoded = Json.encodeToString(draft.copy(timer = initial.timer, stage = initial.stage, scale = initial.scale, scaleStep = initial.scaleStep))
         }
     }
     val view = if (draft.stage == DraftStage.SHEET && draft.timer != null && draft.recipe != null) TimerNow(draft.recipe, draft.timer, rememberNow()) else null
     val scale = LocalScale.current
     // The scale guides this brew while it is paired, connected, and not set aside for this brew.
     val scaleOn = state.scale != null && !draft.withoutScale && scale.live.connected
+    // A link that drops after the scale steps began keeps the scale card, saying there is no reading, so the timing mode never changes unannounced.
+    val scaleLost = state.scale != null && !draft.withoutScale && !scale.live.connected && draft.scale != null && draft.timer == null && draft.stage == DraftStage.SHEET
     val armed = scaleOn && view == null && draft.stage == DraftStage.SHEET && draft.scale != null && draft.scaleStep == ScaleStep.ARMED
     KeepScreenOn((view?.active == true || armed) && state.timerSettings.keepScreenOn)
     var validTotal by rememberSaveable { mutableStateOf(true) }
@@ -227,6 +236,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
             timer = if (updated.timer == draft.timer) newest.timer else updated.timer,
             scale = if (updated.scale == draft.scale) newest.scale else updated.scale,
             stage = if (updated.stage == draft.stage) newest.stage else updated.stage,
+            scaleStep = if (updated.scaleStep == draft.scaleStep) newest.scaleStep else updated.scaleStep,
         )
     }
     fun change(updated: BrewDraft) {
@@ -243,8 +253,17 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         when (draft.stage) {
             DraftStage.REVIEW -> { validTotal = true; change(draft.copy(stage = DraftStage.SHEET, timer = draft.timer?.unfinished())) }
             DraftStage.SHEET -> change(draft.copy(stage = DraftStage.SETUP))
-            DraftStage.SETUP -> repository.updateDraft(draft).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
+            // A setup with nothing chosen, or a new one left as it opened, is not worth resuming: leaving it discards it,
+            // so it neither blocks Repeat nor keeps a stale start time. Opening it again costs one tap.
+            DraftStage.SETUP -> if (draft.beans == null && draft.recipe == null && draft.grinder == null || opened?.let { Json.decodeFromString<BrewDraft>(it) } == draft) repository.discardDraft().onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard brew.") }
+            else repository.updateDraft(draft).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't save draft. Try again.") }
         }
+    }
+    // A scale that drops while the coffee is weighed may have lost its tare, so the brewer is tared again on return.
+    // Scale data on the brewer step comes only from this reset, so the saved draft itself carries the reconnect note.
+    val reconnected = draft.scale != null && draft.scaleStep == ScaleStep.BREWER
+    LaunchedEffect(scale.live.connected) {
+        if (!scale.live.connected && draft.afterScaleLost() != draft) change(draft.afterScaleLost())
     }
     BackHandler(enabled = picker == null && !dial) { back() }
     if (picker != null) {
@@ -254,16 +273,20 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         }, onClose = { picker = null })
     } else Page(when (draft.stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, actions = {
         val paired = state.scale
-        if (draft.stage == DraftStage.SHEET && paired != null && !draft.withoutScale) ScaleChip(paired.name, scale.live.connected)
+        if (draft.stage == DraftStage.SHEET && paired != null && !draft.withoutScale) { ScaleChip(paired.name, scale.live.connected, reading = !scale.live.silent); Spacer(Modifier.width(8.dp)) }
     }, footer = {
         when (draft.stage) {
             DraftStage.SETUP -> PrimaryAction("Use this plan", enabled = ready(draft, state)) { change(draft.copy(stage = DraftStage.SHEET)) }
             DraftStage.SHEET -> if (view == null && armed) ArmedFooter(
+                scale.live,
                 // Only a scale seen steady at 0 g since its tare can measure toward the targets; any other start follows the clock.
                 onStartNow = { showPlan = false; change(if (scale.live.zeroed) draft.copy(timer = BrewTimer(startedAt = clock(), byWeight = true)) else draft.copy(timer = BrewTimer(startedAt = clock()), scale = null)) },
                 onFinishWithout = ::finish,
-            ) else if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Tap as you begin the first pour.", Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            ) else if (view == null && (scaleOn || scaleLost)) {
+                // While the brewer and coffee are weighed, the card's own step leads; "Brew without the scale" is the way to a clock-only start.
+                TextButton(onClick = ::finish, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Finish without timing") }
+            } else if (view == null) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Tap at the first pour.", Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 // Before the scale is armed, the timer runs by the clock alone.
                 PrimaryAction("Start timer") { showPlan = false; change(draft.copy(timer = BrewTimer(startedAt = clock()), scale = null)) }
                 TextButton(onClick = ::finish, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Finish without timing") }
@@ -284,15 +307,21 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         when (draft.stage) {
             DraftStage.SETUP -> {
                 SetupFields(draft, state, { picker = it }, { dial = true }, ::change)
-                TextButton(onClick = { discard = true }, modifier = Modifier.fillMaxWidth()) { Text("Discard brew") }
+                if (draft.beans != null || draft.recipe != null || draft.grinder != null) TextButton(onClick = { discard = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Discard brew") }
             }
             DraftStage.SHEET -> if (view == null) {
-                if (state.scale == null && !state.scaleOfferDismissed) ScaleOffer(onPairScale) { repository.dismissScaleOffer().onFailure { onError(it.message ?: "Couldn't save settings.") } }
                 PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
-                if (scaleOn) {
+                val offer: @Composable () -> Unit = {
+                    if (state.scale == null && !state.scaleOfferDismissed) ScaleOffer(onPairScale) { repository.dismissScaleOffer().onFailure { onError(it.message ?: "Couldn't save settings.") } }
+                }
+                // On a narrow screen or with large text, the optional offer would push the first pour off screen, so it follows the plan.
+                val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                val roomy = configuration.screenWidthDp / configuration.fontScale >= 320
+                if (roomy) offer()
+                if (scaleOn || scaleLost) {
                     val data = draft.scale ?: ScaleData()
                     ScalePrep(
-                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, scale.live, draft.recipe.dose,
+                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, if (scaleLost) scale.live.copy(silent = true) else scale.live, draft.recipe.dose, draft.recipe.ratio, data.weighedDose, reconnected,
                         onTare = { scale.tare(); if (draft.scale == null || draft.scaleStep == ScaleStep.BREWER) change(draft.copy(scale = data, scaleStep = ScaleStep.COFFEE)) },
                         // The weighed dose sets this brew's plan; the recipe in the Library keeps its own.
                         onUse = { dose -> change(draft.copy(recipe = draft.recipe.scaledTo(dose), scale = data.copy(weighedDose = dose), scaleStep = ScaleStep.ARMED)); scale.tare() },
@@ -301,6 +330,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                     )
                 }
                 PlanSchedule(draft.recipe)
+                if (!roomy) offer()
             } else TimerSheet(view, showPlan, { showPlan = it }, scale.live.takeIf { draft.scale != null }, draft.scale)
             DraftStage.REVIEW -> {
                 Panel {
@@ -309,7 +339,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                             Text(draft.beans!!.name, style = MaterialTheme.typography.titleMedium)
                             Text("${draft.recipe!!.name} · ${draft.setting} ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                         }
-                        TextButton(onClick = { change(draft.copy(stage = DraftStage.SETUP)) }, modifier = Modifier.align(Alignment.CenterVertically), contentPadding = PaddingValues(vertical = 8.dp)) { Text("Correct setup") }
+                        TextButton(onClick = { change(draft.copy(stage = DraftStage.SETUP)) }, modifier = Modifier.align(Alignment.CenterVertically).heightIn(min = 48.dp), contentPadding = PaddingValues(vertical = 8.dp)) { Text("Change setup") }
                     }
                 }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
@@ -333,35 +363,48 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
 }
 
 private fun selectItem(draft: BrewDraft, state: AppState, kind: String, id: String): BrewDraft = when (kind) {
-    "beans" -> draft.copy(beans = state.beans.first { it.id == id }, allowArchivedBeans = false)
+    "beans" -> state.beans.first { it.id == id }.let { beans ->
+        // Other coffee after the scale steps began: the tare and any weighed dose belong to the old coffee,
+        // so the steps start again and the plan goes back to the recipe's own dose.
+        val restart = beans.id != draft.beans?.id && draft.timer == null && draft.scale != null
+        val recipe = if (restart && draft.scale?.weighedDose != null) state.recipes.firstOrNull { it.id == draft.recipe?.id } ?: draft.recipe else draft.recipe
+        draft.copy(beans = beans, allowArchivedBeans = false, recipe = recipe).let { if (restart) it.copy(scale = null, scaleStep = ScaleStep.BREWER) else it }
+    }
     "grinders" -> state.grinders.first { it.id == id }.let { draft.copy(grinder = it, setting = it.lastSetting) }
-    // The timer follows one recipe; choosing another clears it.
-    else -> state.recipes.first { it.id == id }.let { recipe -> draft.copy(recipe = recipe, timer = draft.timer.takeIf { recipe == draft.recipe }) }
+    // The timer and any weighed dose follow one recipe; choosing another clears them and starts the scale steps again.
+    else -> state.recipes.first { it.id == id }.let { recipe ->
+        if (recipe == draft.recipe) draft else draft.copy(recipe = recipe, timer = null, scale = null, scaleStep = ScaleStep.BREWER)
+    }
 }
 
 internal fun ready(draft: BrewDraft, state: AppState): Boolean = draft.beans != null && draft.recipe != null && draft.grinder != null && draft.setting?.let { parseGrindSetting(it.toString()) } != null && draft.recipe.validationErrors().isEmpty() && state.grinders.any { it.id == draft.grinder.id && !it.archived } && (state.beans.none { it.id == draft.beans.id && it.archived } || draft.allowArchivedBeans)
 
 @Composable
 private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> Unit, onDial: () -> Unit, onChange: (BrewDraft) -> Unit) {
-    SelectionCard("Beans", draft.beans?.name ?: "Add beans", draft.beans?.roaster, { onPick("beans") })
+    SelectionCard("Beans", draft.beans?.name ?: if (state.beans.none { !it.archived }) "Add beans" else "Choose beans", draft.beans?.roaster, { onPick("beans") })
     val archivedBeans = draft.beans != null && state.beans.any { it.id == draft.beans.id && it.archived }
     if (archivedBeans && !draft.allowArchivedBeans) Panel {
         Text("These beans are archived.")
         OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onChange(draft.copy(allowArchivedBeans = true)) }) { Text("Use anyway") }
         TextButton(onClick = { onPick("beans") }) { Text("Choose other beans") }
     } else if (archivedBeans) Text("Using archived beans", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    SelectionCard("Recipe", draft.recipe?.name ?: "Choose or create recipe", null, { onPick("recipes") })
-    SelectionCard("Grinder", draft.grinder?.name ?: "Add grinder", null, { onPick("grinders") })
+    SelectionCard("Recipe", draft.recipe?.name ?: if (state.recipes.none { !it.archived }) "Add recipe" else "Choose recipe", null, { onPick("recipes") })
+    SelectionCard("Grinder", draft.grinder?.name ?: if (state.grinders.none { !it.archived }) "Add grinder" else "Choose grinder", null, { onPick("grinders") })
     val activeGrinder = state.grinders.find { it.id == draft.grinder?.id && !it.archived }
     if (draft.grinder != null && activeGrinder == null) Text("This grinder is archived. Choose an active grinder to continue.", color = MaterialTheme.colorScheme.error)
     if (draft.grinder != null) Panel {
-        Text("Grind setting, ticks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // The label and the selected value are spoken together, apart from the recorded setting below.
+        Text("Grind setting, ticks", Modifier.clearAndSetSemantics { }, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(draft.setting?.toString() ?: "Not set", Modifier.weight(1f), style = MaterialTheme.typography.headlineLarge)
+            Text(draft.setting?.toString() ?: "Not set", Modifier.weight(1f).clearAndSetSemantics { contentDescription = "Grind setting, " + (draft.setting?.let { "$it ticks" } ?: "not set") }, style = MaterialTheme.typography.headlineLarge)
             OutlinedButton(shape = MaterialTheme.shapes.small, onClick = onDial) { Text("Adjust") }
         }
-        Text("Last recorded setting: ${activeGrinder?.lastSetting?.let { "$it ticks" } ?: "Not recorded"}", style = MaterialTheme.typography.bodyMedium)
-        if (draft.setting != null && activeGrinder?.lastSetting != null && draft.setting != activeGrinder.lastSetting) Text("This brew: ${draft.setting} ticks. Last recorded: ${activeGrinder.lastSetting} ticks.", style = MaterialTheme.typography.bodyMedium)
+        val recorded = activeGrinder?.lastSetting
+        // A repeated brew can carry an older setting; compare the two once and offer the recorded one in a tap.
+        if (draft.setting != null && recorded != null && draft.setting != recorded) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Last recorded: $recorded ticks", Modifier.align(Alignment.CenterVertically), style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = { onChange(draft.copy(setting = recorded)) }, modifier = Modifier.heightIn(min = 48.dp), contentPadding = PaddingValues(vertical = 8.dp)) { Text("Use $recorded ticks") }
+        } else Text("Last recorded setting: ${recorded?.let { "$it ticks" } ?: "Not recorded"}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
     draft.recipe?.let { recipe -> RecipeNumbers(recipe) }
 }
@@ -375,7 +418,7 @@ private fun SelectionCard(label: String, value: String, detail: String?, onClick
                 Text(value, style = MaterialTheme.typography.titleMedium)
                 if (!detail.isNullOrBlank()) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.Outlined.ChevronRight, "Choose $label")
+            Icon(Icons.Outlined.ChevronRight, null)
         }
     }
 }
@@ -385,7 +428,8 @@ private fun SelectionCard(label: String, value: String, detail: String?, onClick
 private fun RecipeNumbers(recipe: Recipe) {
     Panel {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            listOf("Coffee dose" to "${formatAmount(recipe.dose)} g", "Brew ratio" to "1:${formatAmount(recipe.ratio)}", "Total brew water" to "${formatAmount(recipe.totalWater)} g").forEach { (label, value) -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleLarge) } }
+            // Each metric is one spoken node, with the ratio read as "1 to 16".
+            listOf(Triple("Coffee dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Brew ratio", "1:${formatAmount(recipe.ratio)}", "Brew ratio 1 to ${formatAmount(recipe.ratio)}"), Triple("Total brew water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams")).forEach { (label, value, spoken) -> Column(Modifier.clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleLarge) } }
         }
     }
 }
@@ -395,44 +439,53 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
     Panel {
         Text(beans.name, style = MaterialTheme.typography.titleLarge)
         Text(recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleMedium)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
-                Text("${grinder.name} · $setting ticks", style = MaterialTheme.typography.bodyMedium)
+            val dose = formatAmount(recipe.dose)
+            val ratio = formatAmount(recipe.ratio)
+            val water = formatAmount(recipe.totalWater)
+            val spoken = "Coffee dose $dose grams, brew ratio 1 to $ratio, total brew water $water grams. ${grinder.name}, $setting ticks."
+            Column(Modifier.align(Alignment.CenterVertically).clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("$dose g · 1:$ratio · $water g", style = MaterialTheme.typography.titleMedium)
+                Text("${grinder.name} · $setting ticks", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
-            if (onCorrect != null) TextButton(onClick = onCorrect, contentPadding = PaddingValues(vertical = 8.dp)) { Text("Correct setup") }
+            if (onCorrect != null) TextButton(onClick = onCorrect, modifier = Modifier.align(Alignment.CenterVertically).heightIn(min = 48.dp), contentPadding = PaddingValues(vertical = 8.dp)) { Text("Change setup") }
         }
     }
 }
 
+/** The planned pours in the same row format as the running timer: start time, then what to pour, then the detail. */
 @Composable
 private fun PlanSchedule(recipe: Recipe) {
-    Text("Planned pours", style = MaterialTheme.typography.titleLarge)
-    Column {
+    val colors = MaterialTheme.colorScheme
+    if (recipe.notes.isNotBlank()) Panel { Text("Preparation notes", style = MaterialTheme.typography.titleMedium); Text(recipe.notes) }
+    Text("Planned pours", style = MaterialTheme.typography.titleMedium)
+    // The time and dot sit on the title's first line at any text size.
+    val line = with(androidx.compose.ui.platform.LocalDensity.current) { MaterialTheme.typography.titleMedium.lineHeight.toDp() }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         recipe.schedule().forEachIndexed { index, scheduled ->
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.width(48.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("${index + 1}", style = MaterialTheme.typography.labelLarge)
-                    }
-                    if (index < recipe.pulses.lastIndex) Box(Modifier.width(1.dp).weight(1f).background(MaterialTheme.colorScheme.outlineVariant))
+            val name = scheduled.pulse.label.ifBlank { "Pulse ${index + 1}" }
+            val added = formatAmount(scheduled.pulse.water)
+            val total = formatAmount(scheduled.cumulativeWater)
+            val wait = scheduled.pulse.waitSeconds.takeIf { index < recipe.pulses.lastIndex }
+            // The first pulse's total is its own amount, so it is not repeated.
+            val detail = listOfNotNull("To $total g total".takeIf { index > 0 }, "Pour ${scheduled.pulse.pourSeconds} s" + (wait?.let { ", wait $it s" } ?: "")).joinToString(". ")
+            val spoken = "$name, ${spokenStart(scheduled.startSeconds)}. Add $added grams" + (if (index > 0) ", pour to $total grams total" else "") +
+                ". Pour for ${scheduled.pulse.pourSeconds} seconds" + (wait?.let { ", then wait $it seconds" } ?: "") + "."
+            Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = spoken }, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.widthIn(min = 44.dp).height(line), contentAlignment = Alignment.CenterStart) {
+                    Text(formatDuration(scheduled.startSeconds), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
-                Column(Modifier.weight(1f).padding(bottom = if (index < recipe.pulses.lastIndex) 28.dp else 0.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(scheduled.pulse.label.ifBlank { "Pulse ${index + 1}" }, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                        Text(formatDuration(scheduled.startSeconds), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Text("Add ${formatAmount(scheduled.pulse.water)} g", style = MaterialTheme.typography.titleLarge)
-                    Text("Pour to ${formatAmount(scheduled.cumulativeWater)} g total", style = MaterialTheme.typography.bodyMedium)
-                    Text("Pour ${scheduled.pulse.pourSeconds} s" + if (index < recipe.pulses.lastIndex) " · Wait ${scheduled.pulse.waitSeconds} s" else "", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Box(Modifier.height(line), contentAlignment = Alignment.Center) { Box(Modifier.size(9.dp).border(1.5.dp, colors.outline, CircleShape)) }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("$name, add $added g", style = MaterialTheme.typography.titleMedium)
+                    Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
     }
     val end = recipe.schedule().lastOrNull()?.let { it.startSeconds + it.pulse.pourSeconds } ?: 0
-    Text("Scheduled pours end at ${formatDuration(end)}. Allow for drawdown.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    if (recipe.notes.isNotBlank()) Panel { Text("Preparation notes", style = MaterialTheme.typography.titleMedium); Text(recipe.notes) }
+    Text("Scheduled pours end at ${formatDuration(end)}. Allow for drawdown.", Modifier.clearAndSetSemantics { contentDescription = "Scheduled pours end ${spokenStart(end).removePrefix("starts ")}. Allow for drawdown." }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
 }
 
 private val entryFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT)
@@ -543,3 +596,12 @@ private fun EditRecord(brew: BrewRecord, state: AppState, repository: BrewReposi
     if (discard) DiscardDialog({ discard = false }, onClose)
 }
 
+
+/** A planned start read as elapsed time, since "0:40" is not spoken as a time into the brew. */
+internal fun spokenStart(seconds: Int): String {
+    if (seconds == 0) return "starts at the first pour"
+    val minutes = seconds / 60
+    val rest = seconds % 60
+    val parts = listOfNotNull(minutes.takeIf { it > 0 }?.let { if (it == 1) "1 minute" else "$it minutes" }, rest.takeIf { it > 0 }?.let { if (it == 1) "1 second" else "$it seconds" })
+    return "starts ${parts.joinToString(" ")} into the brew"
+}

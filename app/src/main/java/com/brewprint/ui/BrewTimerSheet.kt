@@ -82,7 +82,7 @@ internal fun TimerSheet(view: TimerNow, showPlan: Boolean, onShowPlan: (Boolean)
             Modifier.align(Alignment.CenterVertically), style = MaterialTheme.typography.titleMedium,
         )
         OutlinedButton(onClick = { onShowPlan(true) }, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
-            Text(if (allDone) "Show plan" else "$done done, show plan")
+            Text(if (allDone || done == 0) "Show plan" else "$done done, show plan")
         }
     }
     if (view.phase == TimerPhase.POUR || view.phase == TimerPhase.WAIT) NextRows(view, compact = scale != null)

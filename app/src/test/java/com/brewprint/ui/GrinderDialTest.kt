@@ -60,13 +60,17 @@ class GrinderDialTest {
         for (invalid in listOf("-1", "101", "24.0", "24.5", "1e1", "abc", "")) {
             field.performScrollTo().performTextReplacement(invalid)
             field.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
-            compose.runOnIdle { assertEquals(null, settings.last()) }
+            // An invalid entry never reaches the brew, so it keeps its last valid setting.
+            compose.runOnIdle { assertTrue(settings.isEmpty()) }
         }
         for (valid in listOf(0, 100)) {
             field.performTextReplacement(valid.toString())
             field.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error).not())
             compose.runOnIdle { assertEquals(valid, settings.last()) }
         }
+        field.performTextReplacement("")
+        field.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
+        compose.runOnIdle { assertEquals(100, settings.last()) }
     }
 
     @Test fun `wheel exposes accessible adjustments without visible increase decrease buttons`() {

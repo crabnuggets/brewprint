@@ -18,8 +18,10 @@ private const val DROP_GRAMS = 5.0
 private const val RETURN_GRAMS = 3.0
 /** A dripper weighs far more than this, and nothing else takes so much off the scale in drawdown. */
 private const val LIFT_GRAMS = 20.0
-private const val ZERO_GRAMS = 1.0
-private const val TARE_MILLIS = 1_500L
+/** A reading this close to 0 g counts as zero. */
+internal const val ZERO_GRAMS = 1.0
+/** How long a tare may take to reach about 0 g before it counts as failed. */
+internal const val TARE_MILLIS = 1_500L
 
 /**
  * Reads the scale into the active brew, as "Brewing with a scale" in docs/ux.md describes. Readings
@@ -56,11 +58,16 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     fun tare(now: Long) {
         tareAt = now
         zeroed = false
+        // A retry replaces the last failure; it is reported again only if this tare also fails.
+        tareFailed = false
+        mutableLive.update { it.copy(zeroed = false, taring = true, tareFailed = false) }
         ScaleProtocol.tareFrames().forEach(send)
     }
 
     fun connected(on: Boolean, now: Long) {
         if (!on) {
+            // Even with the sheet closed, a dose can't be weighed against a tare the scale may have lost.
+            repository.changeDraft { it.afterScaleLost() }
             lose(now)
             flush()
             quietSince = null
@@ -73,12 +80,25 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
     fun battery(percent: Int) = mutableLive.update { it.copy(battery = percent) }
 
     /**
+     * A tare that hasn't reached about 0 g by its deadline has failed, whether or not usable readings arrive,
+     * so a silent or overloaded scale can't leave "Taring the brewer" on screen.
+     */
+    fun expireTare(now: Long) {
+        val at = tareAt ?: return
+        if (now - at < TARE_MILLIS) return
+        tareAt = null
+        tareFailed = true
+        mutableLive.update { it.copy(taring = false, tareFailed = true) }
+    }
+
+    /**
      * The scale went silent, disconnected, overloaded or was forgotten: a running scale brew follows the clock.
      * This does not depend on the pairing, so forgetting the scale mid-brew still hands the brew to the clock.
-     * Before the first pour it drops the zero, so "Start timer now" cannot start a brew guided by a silent scale.
+     * With no timer, or no draft yet, it drops the zero and the stale weight, so neither looks live on the next sheet.
      */
     fun lose(now: Long) {
-        val draft = repository.state.value.draft ?: return
+        expireTare(now)
+        val draft = repository.state.value.draft ?: return disarm()
         val timer = draft.timer ?: return disarm()
         val recipe = draft.recipe ?: return
         if (draft.scale == null || !TimerNow(recipe, timer, now).active) return
@@ -89,19 +109,19 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         mutableLive.update { it.copy(following = following()) }
     }
 
-    /** The scale's zero is no longer known: the start waits for a fresh steady zero. */
+    /** Before the first pour the scale went silent or overloaded: its zero is no longer known and its last weight is stale, so neither is shown until a reading returns. */
     private fun disarm() {
         zeroed = false
         quietSince = null
         riseAt = null
-        mutableLive.update { it.copy(steady = false, zeroed = false) }
+        mutableLive.update { it.copy(steady = false, zeroed = false, grams = null, silent = true) }
     }
 
     fun reading(now: Long, grams: Double, flow: Double, overload: Boolean) {
-        if (overload) return lose(now)
+        if (overload) { expireTare(now); return lose(now) }
         // Only the scale's own zero makes its display match the targets, so a reading near 0 g is the proof of a tare.
-        if (abs(grams) <= ZERO_GRAMS / 2) { tareAt = null; tareFailed = false }
-        tareAt?.let { if (now - it >= TARE_MILLIS) { tareAt = null; tareFailed = true } }
+        if (abs(grams) <= ZERO_GRAMS) { tareAt = null; tareFailed = false }
+        expireTare(now)
         if (abs(flow) < QUIET_FLOW && (quietSince == null || abs(grams - quietGrams) <= STEADY_SPREAD)) {
             if (quietSince == null) { quietSince = now; quietGrams = grams }
         } else quietSince = null
@@ -112,7 +132,7 @@ class ScaleBrew(private val repository: BrewRepository, private val send: (ByteA
         // An untared scale cannot arm the start; a running brew keeps reading it either way.
         if (draft != null && (draft.timer != null || tareAt == null && !tareFailed)) follow(draft, now, grams, flow, quiet)
         mutableLive.update {
-            it.copy(connected = true, grams = grams, flow = flow.coerceAtLeast(0.0), steady = quiet, zeroed = zeroed, tareFailed = tareFailed,
+            it.copy(connected = true, silent = false, grams = grams, flow = flow.coerceAtLeast(0.0), steady = quiet, zeroed = zeroed, tareFailed = tareFailed, taring = tareAt != null,
                 following = following(), curve = curve.toList(), flows = flows.toList())
         }
     }

@@ -57,14 +57,13 @@ class BrewJourneyTest {
 
     @Test fun `first brew creates library items returns to setup and saves a repeatable record`() {
         tap("New brew")
-        tap("Add beans")
+        // With nothing to choose from, each row opens its create form directly.
         tap("Add beans")
         enter("Name", "Ethiopia natural")
         enter("Roaster", "Sample roaster")
         tap("Save beans")
         compose.runOnIdle { assertEquals("Ethiopia natural", repository.state.value.draft?.beans?.name) }
 
-        tap("Add grinder")
         tap("Add grinder")
         enter("Name", "Hand grinder")
         enter("Last recorded setting, ticks, optional", "24")
@@ -74,7 +73,6 @@ class BrewJourneyTest {
             assertEquals(24, repository.state.value.draft?.setting)
         }
 
-        tap("Choose or create recipe")
         tap("Add recipe")
         enter("Name", "One pour")
         enter("Coffee dose, g", "15")
@@ -83,7 +81,7 @@ class BrewJourneyTest {
         enter("Pour duration, seconds", "30")
         tap("Save recipe")
         tap("Use this plan")
-        compose.onNodeWithText("Pour to 240 g total").assertExists()
+        compose.onNodeWithContentDescription("Pulse 1, starts at the first pour. Add 240 grams. Pour for 30 seconds.").assertExists()
         tap("Finish without timing")
         enter("Your notes", "Cocoa, lighter than expected")
         tap("Save brew")
@@ -140,5 +138,22 @@ class BrewJourneyTest {
         tap("Repeat")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Brew record").assertExists()
+    }
+
+    @Test fun `leaving a new brew unchanged discards it and a changed one is kept`() {
+        seedBrew()
+        tap("New brew")
+        // The selected setting is spoken as one value.
+        compose.onNodeWithContentDescription("Grind setting, 24 ticks").assertExists()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.runOnIdle { assertNull(repository.state.value.draft) }
+        compose.onNodeWithText("Repeat").assertIsEnabled()
+        tap("New brew")
+        tap("Adjust")
+        compose.onNodeWithText("Enter value, ticks").performTextReplacement("25")
+        tap("Close")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.runOnIdle { assertEquals(25, repository.state.value.draft?.setting) }
+        compose.onNodeWithText("Resume brew").assertExists()
     }
 }

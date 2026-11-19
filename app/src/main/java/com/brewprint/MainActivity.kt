@@ -19,6 +19,9 @@ import com.brewprint.data.Appearance
 import com.brewprint.timer.BrewTimerService
 import com.brewprint.timer.EXTRA_OPEN_DRAFT
 import com.brewprint.scale.ScaleLink
+import com.brewprint.scale.TARE_MILLIS
+import android.os.Handler
+import android.os.Looper
 import com.brewprint.ui.BrewprintApp
 import com.brewprint.ui.BrewprintTheme
 import com.brewprint.ui.LocalScale
@@ -27,6 +30,7 @@ import com.brewprint.ui.ScaleUi
 class MainActivity : ComponentActivity() {
     /** Counts requests from the live notification to show the brew in progress. */
     private var openDraft by mutableIntStateOf(0)
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +48,11 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(state.scale) { ScaleLink.sync(this@MainActivity) }
             val brew = ScaleLink.brew(this@MainActivity)
             val live by brew.live.collectAsStateWithLifecycle()
-            CompositionLocalProvider(LocalScale provides ScaleUi(live) { brew.tare(System.currentTimeMillis()) }) {
+            // The tare's deadline is checked on time even if the scale sends nothing more.
+            CompositionLocalProvider(LocalScale provides ScaleUi(live) {
+                brew.tare(System.currentTimeMillis())
+                handler.postDelayed({ brew.expireTare(System.currentTimeMillis()) }, TARE_MILLIS + 50)
+            }) {
                 BrewprintTheme(state.appearance) { BrewprintApp(state, repository, openDraft) }
             }
         }
