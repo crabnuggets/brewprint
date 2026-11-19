@@ -299,7 +299,7 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
 }
 
 /**
- * Water over brew time, one reading a second; gaps stay gaps. [flows], when given, is drawn as a shaded band
+ * Water over brew time, one reading a second; gaps stay gaps, and readings below 0 g draw at 0. [flows], when given, is drawn as a shaded band
  * along the bottom third. Decorative: the numbers are in the text around it.
  */
 @Composable
@@ -314,7 +314,8 @@ internal fun WaterCurve(curve: List<Double?>, targets: List<Double>, seconds: In
     val span = maxOf(seconds, curve.size, 1)
     Canvas(Modifier.fillMaxWidth().height(96.dp).clearAndSetSemantics { }) {
         val x = { second: Int -> second.toFloat() / span * size.width }
-        val y = { value: Double -> size.height - (value / top * size.height).toFloat() }
+        // Below 0 g the tared brewer or cup is off the scale, so the reading sits on the baseline instead of below the card.
+        val y = { value: Double -> size.height - (value.coerceAtLeast(0.0) / top * size.height).toFloat() }
         flows.forEachIndexed { second, flow ->
             if (flow != null && flow > 0) {
                 val height = (flow / flowTop * size.height / 3).toFloat()
