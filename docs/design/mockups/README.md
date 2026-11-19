@@ -52,6 +52,16 @@ The [scale boards](bt-scale/index.html) were accepted by the owner on 2026-11-18
 | [Pairing to the first pour](bt-scale/s1.png) | Pairing offer, dose, armed, pour with live curve |
 | [Waits, a lost scale, finishing, the record](bt-scale/s2.png) | Wait, scale lost, drawdown, Finish brew review, saved record |
 
+## v2 polish (proposed)
+
+The [v2 polish boards](v2-polish/index.html) are **proposed, awaiting the owner's review**. They refine contrast, buttons, scrolling chrome, the brew sheet chart, Finish brew, and the brew record's timing table, in light and dark. They are hand-written HTML rendered to PNG at 412 dp phone width, with a 360 dp check for the timing table. Behavior is defined in [UI design direction](../../ui-design.md) and [UX journeys](../../ux.md), which supersede the boards where they differ. Motion is described on board 2 and is reviewed in the app.
+
+| Reference | Screens |
+| --- | --- |
+| [Look and feel](v2-polish/b1.png) | Brew, History scrolling and swiping, History dark with Undo, buttons and navigation parts |
+| [Brew sheet](v2-polish/b2.png) | Pour and wait with the labelled chart, dark pour, motion frames |
+| [Finish brew and the record](v2-polish/b3.png) | Finish brew results card, brew record, timing and water at 412 dp and 360 dp |
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.
