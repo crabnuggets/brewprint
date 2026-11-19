@@ -318,8 +318,8 @@ internal fun CurveLegend() {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
     Row(Modifier.clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        item("Actual") { drawLine(colors.onSurface, Offset(0f, center.y), Offset(size.width, center.y), 2.dp.toPx()) }
-        item("Plan") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 3.dp.toPx()) }
+        item("Actual") { drawLine(colors.onSurface, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
+        item("Plan") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
         item("Total") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx()))) }
     }
 }
@@ -356,7 +356,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
         flows.forEachIndexed { second, flow ->
             if (flow != null && flow > 0) {
                 val height = (flow / flowTop * (plotBottom - plotTop) / 3).toFloat()
-                drawRect(colors.outlineVariant, Offset(x(second), plotBottom - height), androidx.compose.ui.geometry.Size(maxOf(x(second + 1) - x(second), 1f), height))
+                drawRect(colors.outline.copy(alpha = .5f), Offset(x(second), plotBottom - height), androidx.compose.ui.geometry.Size(maxOf(x(second + 1) - x(second), 1f), height))
             }
         }
         drawLine(colors.outlineVariant, Offset(0f, plotBottom), Offset(width, plotBottom), strokeWidth = 1.dp.toPx())
@@ -367,16 +367,19 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             drawPath(planned, colors.outline, style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
         }
         val gap = 6.dp.toPx()
+        // When the target sits close under the total, both labels get their own row: the total's directly above the target's.
+        val labelHeight = totalLabel.size.height.toFloat()
+        val targetTop = shownTarget?.let { (y(it) - labelHeight / 2f).coerceAtLeast(if (showTotal && abs(y(it) - y(total)) < labelHeight) labelHeight else 0f) } ?: 0f
         if (showTotal) {
             drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
             // When the two labels would overlap, the total's sits just above the target's instead.
             val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
-            val totalTop = if (clash && shownTarget != null) y(shownTarget) - totalLabel.size.height * 1.5f else y(total) - totalLabel.size.height / 2f
-            drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop.coerceAtLeast(0f)))
+            val totalTop = if (clash) (targetTop - totalLabel.size.height) else y(total) - totalLabel.size.height / 2f
+            drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop))
         }
         if (shownTarget != null && targetLabel != null) {
             drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
-            drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, y(shownTarget) - targetLabel.size.height / 2f))
+            drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, targetTop))
         }
         val path = Path()
         var open = false
@@ -384,7 +387,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             if (value == null) open = false
             else { if (open) path.lineTo(x(second), y(value)) else path.moveTo(x(second), y(value)); open = true }
         }
-        drawPath(path, colors.onSurface, style = Stroke(2.dp.toPx(), join = StrokeJoin.Round))
+        drawPath(path, colors.onSurface, style = Stroke((if (withAxis) 2.5 else 2.0).dp.toPx(), join = StrokeJoin.Round))
         // Minute ticks thin out on long brews, so labels never touch.
         val every = listOf(1, 2, 5, 10, 15).firstOrNull { axisLabel == null || x(it * 60) >= axisLabel.size.width + 12.dp.toPx() } ?: 30
         if (axisLabel != null) for (minute in 0..span / 60 step every) {

@@ -139,7 +139,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                 Text(target?.let { "${formatAmount(it)} g" } ?: "Enter dose and ratio", style = if (target == null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.headlineSmall, color = if (target == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
             }
         }
-        Text("Pulses", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("Pulses")
         Column(Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).onGloballyPositioned { listCoordinates = it }, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             pulses.forEachIndexed { index, pulse ->
                 val currentWater = waterValues[index]

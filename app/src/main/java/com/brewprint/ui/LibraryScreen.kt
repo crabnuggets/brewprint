@@ -110,7 +110,7 @@ fun LibraryScreen(
                     if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate recipe") }
             }
-            Button(shape = MaterialTheme.shapes.small, onClick = { editing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Edit ${kindLabel(kind)}") }
+            PrimaryAction("Edit ${kindLabel(kind)}") { editing = true }
             SoftTextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
@@ -119,7 +119,7 @@ fun LibraryScreen(
             val kinds = requestedKind?.let(::listOf) ?: listOf("recipes", "beans", "grinders")
             kinds.forEach { currentKind ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(currentKind.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    SectionTitle(currentKind.replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
                     SoftTextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
                 }
                 val items: List<Pair<String, Pair<String, String>>> = when (currentKind) {

@@ -11,6 +11,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -164,6 +167,30 @@ class PolishJourneyTest {
         compose.onNodeWithText("4:12").assertExists()
         compose.onNodeWithText("Save brew").assertIsEnabled()
         compose.runOnIdle { assertEquals(252, repository.state.value.draft?.timer?.totalOverride) }
+    }
+
+    @Test fun `leaving History for another screen ends the Undo window`() {
+        lateinit var kept: BrewRecord
+        open { saveScaleRecord(); kept = saveScaleRecord() }
+        compose.onNodeWithText("History").performClick()
+        compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeLeft() }
+        compose.onNodeWithText("Brew deleted").assertExists()
+        compose.onAllNodesWithText("Ethiopia natural")[0].performTouchInput { swipeRight() }
+        compose.onNodeWithText("New brew").assertExists()
+        compose.onNodeWithText("Brew deleted").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(kept.id), repository.state.value.brews.map { it.id }) }
+    }
+
+    @Config(qualifiers = "w360dp-h780dp-xxhdpi")
+    @Test fun `a target just under the total keeps both labels readable`() {
+        compose.setContent {
+            BrewprintTheme(Appearance.LIGHT) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.background(androidx.compose.material3.MaterialTheme.colorScheme.surface).padding(24.dp)) {
+                    WaterCurve((0..140).map { weightAt(it, starts, reached) }, 185, 300.0, target = 295.0)
+                }
+            }
+        }
+        capture("curve-close-labels-light")
     }
 
     @Test fun `History rows offer Delete and Repeat to screen readers`() {

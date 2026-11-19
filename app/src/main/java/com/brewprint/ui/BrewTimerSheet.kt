@@ -255,9 +255,9 @@ private fun NextRows(view: TimerNow, compact: Boolean) {
     val pouring = view.phase == TimerPhase.POUR
     val wait = view.recipe.pulses[view.pulse].waitSeconds.takeIf { pouring && view.pulse < view.pulseCount - 1 && it > 0 }
     val upcoming = (view.pulse + 1 until view.pulseCount).toList()
-    val shown = upcoming.take((if (wait != null) 1 else 2) - if (compact) 1 else 0)
+    val shown = upcoming.take(if (compact) 1 else if (wait != null) 1 else 2)
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (wait != null) NextRow(if (view.paused) "Held" else formatDuration(((view.timer.stepAt + view.stepDuration - view.timer.startedAt + 500) / 1000).toInt()), "Wait $wait s", null)
+        if (wait != null && !compact) NextRow(if (view.paused) "Held" else formatDuration(((view.timer.stepAt + view.stepDuration - view.timer.startedAt + 500) / 1000).toInt()), "Wait $wait s", null)
         shown.forEach { index ->
             val predicted = view.startSeconds(index)
             val planned = view.schedule[index].startSeconds
@@ -356,8 +356,7 @@ internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Un
         if (skip == null) PrimaryAction("Finish brew", icon = Icons.Outlined.Flag, onClick = onFinish) else {
             // Pause and Resume, and the skip label, cross-fade in place.
             val buttons: @Composable (Modifier) -> Unit = { modifier ->
-                if (view.paused) FooterButton("Resume", Icons.Outlined.PlayArrow, modifier, filled = true, onClick = onResume)
-                else FooterButton("Pause", Icons.Outlined.Pause, modifier, onClick = onPause)
+                FooterButton(if (view.paused) "Resume" else "Pause", if (view.paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause, modifier, filled = view.paused, onClick = if (view.paused) onResume else onPause)
                 FooterButton(skip, Icons.Outlined.SkipNext, modifier, onClick = onSkip)
             }
             if (LocalDensity.current.fontScale >= 1.3f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons(Modifier.fillMaxWidth()) }
@@ -379,7 +378,8 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
     Button(onClick, modifier.heightIn(min = 56.dp).pressScale(source), shape = MaterialTheme.shapes.small, colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = ink),
         elevation = null, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), interactionSource = source) {
         AnimatedContent(text to icon, label = "label", transitionSpec = { fadeIn(tween(200, delayMillis = 60)) togetherWith fadeOut(tween(120)) using SizeTransform(clip = false) }) { (label, glyph) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+            Row(if (leaving) Modifier.clearAndSetSemantics { } else Modifier, verticalAlignment = Alignment.CenterVertically) {
                 Icon(glyph, null, Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(label, maxLines = 2)
@@ -417,7 +417,8 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
         }
         HorizontalDivider(color = colors.outlineVariant)
         TimingRows(schedule, timing, scale)
-        Text("Started shows how far each pulse was from the plan: + late, \u2212 early. " + if (scale != null) "Reached is the scale's steady reading after each pulse; \u2014 means none was recorded." else "Pours are not measured.",
+        val unstarted = schedule.indices.any { timing.pulseStarts.getOrNull(it) == null }
+        Text("Started shows how far each pulse was from the plan: + late, \u2212 early" + (if (unstarted) "; \u2014 means it did not start" else "") + ". " + if (scale != null) "Reached is the scale's steady reading after each pulse; \u2014 means none was recorded." else "Pours are not measured.",
             color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }

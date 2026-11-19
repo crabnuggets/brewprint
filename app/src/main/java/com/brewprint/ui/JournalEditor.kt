@@ -80,7 +80,10 @@ private fun Tags(options: List<String>, values: List<String>, onChange: (List<St
 
 @Composable
 fun JournalSummary(journal: Journal) {
-    if (journal.impression.isNotBlank()) Text(journal.impression, style = MaterialTheme.typography.bodyLarge)
+    if (journal.impression.isNotBlank()) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("How was this cup?", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(journal.impression, style = MaterialTheme.typography.bodyLarge)
+    }
     listOf(
         "Aroma" to journal.aroma,
         "Flavor" to (journal.flavorTags + journal.flavor).filter { it.isNotBlank() }.joinToString(", "),

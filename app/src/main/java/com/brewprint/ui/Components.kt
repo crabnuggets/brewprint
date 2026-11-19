@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
@@ -125,6 +126,20 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
     )
 }
 
+/** Whether TalkBack-style touch exploration is on, following changes while the app is open. */
+@Composable
+internal fun rememberTouchExploration(): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val manager = remember(context) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java) }
+    var on by remember(manager) { mutableStateOf(manager?.isTouchExplorationEnabled == true) }
+    DisposableEffect(manager) {
+        val listener = android.view.accessibility.AccessibilityManager.TouchExplorationStateChangeListener { on = it }
+        manager?.addTouchExplorationStateChangeListener(listener)
+        onDispose { manager?.removeTouchExplorationStateChangeListener(listener) }
+    }
+    return on
+}
+
 /** Tells the floating navigation whether the current page wants it shown, and how much room it takes. */
 internal class Chrome {
     var navShown by mutableStateOf(true)
@@ -158,10 +173,9 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             chrome.navShown = value == 0 || value >= max || travel < -SCROLL_SLOP || (chrome.navShown && travel <= SCROLL_SLOP)
         }
     }
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val exploring = remember(context) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled == true }
-    val shown = headerShown || pinHeader || exploring
+    val shown = headerShown || pinHeader || rememberTouchExploration()
     val offset by animateFloatAsState(if (shown) 0f else -headerHeight.toFloat(), tween(280), label = "header")
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     Column(Modifier.fillMaxSize().imePadding()) {
         Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             val density = LocalDensity.current
@@ -173,6 +187,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             Row(
                 Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.graphicsLayer { translationY = offset }
                     .background(MaterialTheme.colorScheme.background)
+                    .then(if (scroll.value > headerHeight) Modifier.drawBehind { drawLine(outlineVariant, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx()) } else Modifier)
                     .padding(start = if (back == null) 24.dp else 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -315,7 +330,7 @@ internal fun IconAction(icon: ImageVector, label: String, modifier: Modifier = M
 @Composable
 internal fun <T, K> BlurSwap(value: T, key: (T) -> K, modifier: Modifier = Modifier, alignment: Alignment = Alignment.TopStart, content: @Composable (T) -> Unit) {
     AnimatedContent(value, modifier, contentAlignment = alignment, contentKey = key, label = "blur-swap",
-        transitionSpec = { fadeIn(tween(240, delayMillis = 60)) togetherWith fadeOut(tween(150)) using SizeTransform(clip = false) { _, _ -> tween(300) } },
+        transitionSpec = { fadeIn(tween(240, delayMillis = 60)) togetherWith fadeOut(tween(150)) using SizeTransform(clip = false) { _, _ -> androidx.compose.animation.core.snap() } },
     ) { shown ->
         val blur by transition.animateFloat({ tween(if (targetState == EnterExitState.Visible) 340 else 150) }, label = "blur") { if (it == EnterExitState.Visible) 0f else 10f }
         Box(Modifier.graphicsLayer {
