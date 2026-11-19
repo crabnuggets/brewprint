@@ -34,6 +34,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -243,7 +244,7 @@ private fun HistoryScreen(brews: List<BrewRecord>, canRepeat: Boolean, onRecord:
         brews.sortedByDescending { it.startedAt }.groupBy { Instant.ofEpochMilli(it.startedAt).atZone(ZoneId.systemDefault()).toLocalDate() }.forEach { (day, records) ->
             Text(when (day) { LocalDate.now() -> "Today"; LocalDate.now().minusDays(1) -> "Yesterday"; else -> day.format(DateTimeFormatter.ofPattern("d MMM uuuu")) }, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
             Surface(shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
-                Column {
+                Column(Modifier.animateContentSize(tween(300))) {
                     records.forEachIndexed { index, brew ->
                         if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         key(brew.id) { HistoryRow(brew, canRepeat, { onRecord(brew.id) }, { onRepeat(brew.id) }, { onDelete(brew.id) }) }
@@ -449,10 +450,12 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
                 val timer = draft.timer
                 val data = draft.scale
-                if (timer != null) Panel {
-                    TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
-                    if (data != null) LiftOffer(timer, data) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
-                    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                if (timer != null || data != null) Panel {
+                    if (timer != null) {
+                        TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
+                        if (data != null) LiftOffer(timer, data) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
+                        HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                     MeasuredTrio(draft.recipe!!, data)
                 }
                 JournalEditor(draft.journal, draft.beans!!.expectedNotes) { change(draft.copy(journal = it)) }
@@ -547,7 +550,7 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
             Text(beans.name, style = MaterialTheme.typography.titleLarge)
             Text(recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else Text(recipe.name, style = MaterialTheme.typography.titleMedium)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (showBeans) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             val dose = formatAmount(recipe.dose)
             val ratio = formatAmount(recipe.ratio)

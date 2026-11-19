@@ -201,7 +201,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
             Text("The scale didn't tare", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.titleMedium)
             Reading("On scale", live.grams)
             Text("Tap Tare again, or press the scale's tare button.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+            PrimaryButton(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tare") }
         } else when (step) {
             ScaleStep.BREWER -> {
                 Text("Put the brewer on the scale", style = MaterialTheme.typography.titleMedium)
@@ -209,7 +209,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 if (reconnected) Text("Tare the brewer again. Take the coffee out first if you've added it.", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = colors.onSurface, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) { Reading("On scale", live.grams) }
-                    Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                    PrimaryButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tare") }
                 }
             }
             // Until the scale reads about 0 g, coffee must wait: grounds added now would be tared away or taken as the dose.
@@ -229,7 +229,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatAmount(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SoftTextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
-                    Button(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
+                    PrimaryButton(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)) {
                         Text(if (coffee != null) "Use ${formatAmount(coffee)} g" else "Use dose")
                     }
                 }
@@ -239,7 +239,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 val label = if (live.zeroed) "On scale, tared" + weighedDose?.let { " · Weighed ${formatAmount(it)} g" }.orEmpty() else "On scale"
                 Box(Modifier.weight(1f)) { Reading(label, live.grams) }
                 // Off zero with no tare pending, nothing changes until the user tares, so Tare becomes the step's action.
-                if (live.needsTare()) Button(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                if (live.needsTare()) PrimaryButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tare") }
                 else SoftButton(onClick = onTare, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
             }
         }
@@ -378,7 +378,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             val clash = shownTarget != null && abs(y(shownTarget) - y(total)) < totalLabel.size.height
             val totalTop = if (clash) (targetTop - totalLabel.size.height) else y(total) - totalLabel.size.height / 2f
             drawText(totalLabel, topLeft = Offset(size.width - totalLabel.size.width, totalTop))
-            if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.dp.toPx())
+            if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
         }
         if (shownTarget != null && targetLabel != null) {
             drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
@@ -392,6 +392,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             else { if (open) path.lineTo(x(second), y(value)) else path.moveTo(x(second), y(value)); open = true }
         }
         drawPath(path, colors.onSurface, style = Stroke((if (withAxis) 2.5 else 2.0).dp.toPx(), join = StrokeJoin.Round))
+        if (showTotal && !merged) drawLine(colors.outline, Offset(0f, y(total)), Offset(width - gap, y(total)), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx())))
         // Minute ticks thin out on long brews, so labels never touch.
         val every = listOf(1, 2, 5, 10, 15).firstOrNull { axisLabel == null || x(it * 60) >= axisLabel.size.width + 12.dp.toPx() } ?: 30
         if (axisLabel != null) for (minute in 0..span / 60 step every) {
@@ -426,7 +427,7 @@ internal fun MeasuredTrio(recipe: Recipe, data: ScaleData?) {
         }
     }
     // Large text stacks the three, so no value is cut.
-    if (LocalDensity.current.fontScale >= 1.3f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { cells.forEach { cell(it, Modifier.fillMaxWidth()) } }
+    if (LocalDensity.current.fontScale >= 1.15f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { cells.forEach { cell(it, Modifier.fillMaxWidth()) } }
     else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { cells.forEachIndexed { index, it -> cell(it, Modifier.weight(listOf(1.2f, 1f, .8f)[index])) } }
 }
 
@@ -449,7 +450,7 @@ internal fun ScaleSettings(scale: PairedScale?, live: ScaleLive, onAdd: () -> Un
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(ScaleLink.allowed(context)) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { allowed = ScaleLink.allowed(context); ScaleLink.sync(context) }
-    Text("Coffee scale", style = MaterialTheme.typography.titleMedium)
+    SectionTitle("Coffee scale")
     Panel {
         if (scale == null) {
             Text("Pair a Bluetooth scale to start the timer at your first pour and end each pour at its target.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,14 +45,14 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
     }
     BackHandler { onClose() }
     Page("Settings", onClose) {
-        Text("Appearance", style = MaterialTheme.typography.titleMedium)
-        Appearance.entries.forEach { option -> Surface(onClick = { onAppearance(option) }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        SectionTitle("Appearance")
+        Appearance.entries.forEach { option -> Surface(modifier = Modifier.fillMaxWidth().selectable(selected = option == appearance, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onAppearance(option) }), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = option == appearance, onClick = { onAppearance(option) })
+                RadioButton(selected = option == appearance, onClick = null)
                 Text(option.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.padding(start = 12.dp))
             }
         } }
-        Text("Brew timer", style = MaterialTheme.typography.titleMedium)
+        SectionTitle("Brew timer")
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Column(Modifier.padding(vertical = 4.dp)) {
                 SwitchRow("Live notification", "Shows the running brew on your lock screen", timer.liveNotification) { on ->

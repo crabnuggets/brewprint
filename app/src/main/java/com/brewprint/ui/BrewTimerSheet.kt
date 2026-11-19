@@ -360,7 +360,7 @@ internal fun TimerFooter(view: TimerNow, onPause: () -> Unit, onResume: () -> Un
                 FooterButton(skip, Icons.Outlined.SkipNext, modifier, onClick = onSkip)
             }
             if (LocalDensity.current.fontScale >= 1.6f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { buttons(Modifier.fillMaxWidth()) }
-            else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { buttons(Modifier.weight(1f)) }
+            else Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) { buttons(Modifier.weight(1f).fillMaxHeight()) }
             SoftTextButton(onClick = onFinish, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Icon(Icons.Outlined.Flag, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Finish brew")
             }
@@ -505,7 +505,7 @@ internal fun KeepScreenOn(on: Boolean) {
 @Composable
 internal fun StepCue(recipe: Recipe, timer: BrewTimer, settings: TimerSettings) {
     val context = LocalContext.current
-    val step = TimerNow(recipe, timer, rememberNow()).takeIf { it.active }?.step
+    val step = TimerNow(recipe, timer, rememberNow(100)).takeIf { it.active }?.step
     var last by remember { mutableStateOf(step) }
     LaunchedEffect(step) {
         // The timer's service cues the step when it is running; this covers the timer without it.

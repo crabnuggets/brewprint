@@ -203,7 +203,8 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
         // A hairline marks where content continues under the footer, so a cut-off line reads as scrollable.
         val density = LocalDensity.current
         val bottomPadding = with(density) { 24.dp.roundToPx() }
-        if (footer != null && scroll.maxValue - scroll.value > bottomPadding) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        val moreBelow by remember(scroll, bottomPadding) { derivedStateOf { scroll.maxValue - scroll.value > bottomPadding } }
+        if (footer != null && moreBelow) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         if (footer != null) Box(Modifier.fillMaxWidth().onSizeChanged { chrome.footerSpace = with(density) { it.height.toDp() } }.background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp, vertical = 12.dp).animateContentSize(tween(300))) { footer() }
         else LaunchedEffect(Unit) { chrome.footerSpace = 0.dp }
     }
@@ -301,6 +302,13 @@ internal fun SecondaryAction(text: String, enabled: Boolean = true, icon: ImageV
     }
 }
 
+/** A filled button sized by its caller, with the shared press feedback. */
+@Composable
+internal fun PrimaryButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = MaterialTheme.shapes.small, content: @Composable RowScope.() -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    Button(onClick, modifier.pressScale(source), enabled = enabled, shape = shape, interactionSource = source, content = content)
+}
+
 /** A secondary button: a soft fill instead of an outline. */
 @Composable
 internal fun SoftButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = MaterialTheme.shapes.small, contentPadding: PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -> Unit) {
@@ -351,7 +359,10 @@ internal fun <T, K> BlurSwap(value: T, key: (T) -> K, modifier: Modifier = Modif
 internal fun <T> Roll(value: T, modifier: Modifier = Modifier, content: @Composable (T) -> Unit) {
     AnimatedContent(value, modifier, label = "roll", transitionSpec = {
         (slideInVertically(tween(260)) { it / 2 } + fadeIn(tween(260))) togetherWith (slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(180))) using SizeTransform(clip = false)
-    }) { content(it) }
+    }) { shown ->
+        val leaving = transition.targetState == EnterExitState.PostExit
+        Box(if (leaving) Modifier.clearAndSetSemantics { } else Modifier) { content(shown) }
+    }
 }
 
 /** A section title: one style across screens, and a heading for TalkBack navigation. */
