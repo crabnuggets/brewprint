@@ -1,0 +1,12 @@
+{
+  "name": "brewprint",
+  "owner": { "name": "Brewprint" },
+  "description": "Claude plugins for Brewprint, a filter coffee brewing journal.",
+  "plugins": [
+    {
+      "name": "brewprint",
+      "source": "./plugins/brewprint",
+      "description": "Read your Brewprint brews and get help tasting and dialing in your filter coffee."
+    }
+  ]
+}
