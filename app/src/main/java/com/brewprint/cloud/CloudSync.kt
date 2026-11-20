@@ -89,8 +89,10 @@ object CloudSync {
             client.auth.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {
                     val user = status.session.user ?: return@collect
-                    // Refused while another account's changes wait; signIn then ends this session.
-                    if (repository.syncWith(user.id).isFailure) return@collect
+                    // Under the lock, a late emission (such as a token refresh) can't rebind an account that just signed out.
+                    // Binding is refused while another account's changes wait; signIn then ends this session.
+                    val bound = lock.withLock { client.auth.currentUserOrNull()?.id == user.id && repository.syncWith(user.id).isSuccess }
+                    if (!bound) return@collect
                     mutable.update { it.copy(email = user.email) }
                     sync()
                 } else if (status is SessionStatus.NotAuthenticated) {
