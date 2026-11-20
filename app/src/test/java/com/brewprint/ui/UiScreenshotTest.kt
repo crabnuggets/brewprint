@@ -98,6 +98,42 @@ class UiScreenshotTest {
         compose.onNodeWithText("Save notes").assertIsDisplayed()
     }
 
+    @Test fun `capture header actions and swipe feedback`() {
+        var appearance by mutableStateOf(Appearance.DARK)
+        val repository = seededRepository()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            BrewprintTheme(appearance) { BrewprintApp(state, repository) }
+        }
+        fun pair(name: String) {
+            compose.runOnIdle { appearance = Appearance.LIGHT }
+            capture("$name-light")
+            compose.runOnIdle { appearance = Appearance.DARK }
+            capture("$name-dark")
+        }
+        compose.onNode(hasText("History") and isSelectable()).performClick()
+        val row = compose.onAllNodesWithText("Ethiopia natural")[0]
+        // Held mid-swipe: short of the threshold, then past it, each way.
+        row.performTouchInput { down(centerRight - androidx.compose.ui.geometry.Offset(20f, 0f)); moveBy(androidx.compose.ui.geometry.Offset(-width * .25f, 0f)) }
+        pair("swipe-delete-before")
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(-width * .3f, 0f)) }
+        pair("swipe-delete-armed")
+        // Pulled back under the threshold before letting go, so nothing is deleted.
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(width * .55f, 0f)); up() }
+        row.performTouchInput { down(centerLeft + androidx.compose.ui.geometry.Offset(20f, 0f)); moveBy(androidx.compose.ui.geometry.Offset(width * .25f, 0f)) }
+        pair("swipe-repeat-before")
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(width * .3f, 0f)) }
+        pair("swipe-repeat-armed")
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(-width * .55f, 0f)); up() }
+        compose.runOnIdle { assertTrue(repository.state.value.draft == null && repository.state.value.brews.size == 3) }
+        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        tap("Three-pulse filter")
+        pair("recipe-header")
+        // The menu opens in its own window, which this capture does not draw.
+        tap("More actions")
+        compose.onNodeWithText("Archive recipe").assertExists()
+    }
+
     @Test
     @Config(qualifiers = "w320dp-h700dp-xxhdpi")
     fun `capture narrow brewing journey with large text`() {

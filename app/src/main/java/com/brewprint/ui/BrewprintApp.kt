@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.input.KeyboardType
@@ -264,28 +265,70 @@ private fun HistoryScreen(brews: List<BrewRecord>, canRepeat: Boolean, onRecord:
     }
 }
 
-/** Swipe left deletes (with Undo), swipe right repeats. Screen readers get both as actions on the row. */
+/** A haptic as a swipe crosses the point where letting go acts ([armed]), and a lighter one as it pulls back. */
+private fun android.view.View.thresholdHaptic(armed: Boolean) {
+    performHapticFeedback(when {
+        android.os.Build.VERSION.SDK_INT >= 34 -> if (armed) android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE else android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE
+        !armed -> android.view.HapticFeedbackConstants.CLOCK_TICK
+        android.os.Build.VERSION.SDK_INT >= 30 -> android.view.HapticFeedbackConstants.CONFIRM
+        else -> android.view.HapticFeedbackConstants.LONG_PRESS
+    })
+}
+
+/**
+ * Swipe left deletes (with Undo), swipe right repeats. Screen readers get both as actions on the row.
+ * Before the threshold the action shows in soft gray; past it, with a haptic, delete turns red and repeat a solid fill.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryRow(brew: BrewRecord, canRepeat: Boolean, onOpen: () -> Unit, onRepeat: () -> Unit, onDelete: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val view = androidx.compose.ui.platform.LocalView.current
+    // Repeat lets the row spring back; that return is not the user pulling back, so it has no haptic.
+    var repeated by remember { mutableStateOf(false) }
     val swipe = rememberSwipeToDismissBoxState(positionalThreshold = { it * .4f }, confirmValueChange = { value ->
         when (value) {
             SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
             // Repeat opens a new brew; the row springs back.
-            SwipeToDismissBoxValue.StartToEnd -> { onRepeat(); false }
+            SwipeToDismissBoxValue.StartToEnd -> { repeated = true; onRepeat(); false }
             SwipeToDismissBoxValue.Settled -> true
         }
     })
+    LaunchedEffect(swipe) {
+        var last = swipe.targetValue
+        snapshotFlow { swipe.targetValue }.collect { target ->
+            if (target != last) {
+                if (target != SwipeToDismissBoxValue.Settled) view.thresholdHaptic(armed = true)
+                else if (!repeated) view.thresholdHaptic(armed = false)
+                repeated = false
+                last = target
+            }
+        }
+    }
     SwipeToDismissBox(swipe, enableDismissFromStartToEnd = canRepeat, backgroundContent = {
         val deleting = swipe.dismissDirection == SwipeToDismissBoxValue.EndToStart
         val repeating = swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+        val armed = swipe.targetValue != SwipeToDismissBoxValue.Settled && swipe.targetValue == swipe.dismissDirection
+        val fade = tween<androidx.compose.ui.graphics.Color>(120)
+        val fill by androidx.compose.animation.animateColorAsState(when {
+            armed && deleting -> colors.error
+            armed && repeating -> colors.primary
+            deleting || repeating -> colors.soft
+            else -> androidx.compose.ui.graphics.Color.Transparent
+        }, fade, label = "swipe-fill")
+        val ink by androidx.compose.animation.animateColorAsState(when {
+            armed && deleting -> colors.onError
+            armed && repeating -> colors.onPrimary
+            else -> colors.onSurfaceVariant
+        }, fade, label = "swipe-ink")
+        val grow by androidx.compose.animation.core.animateFloatAsState(if (armed) 1.15f else 1f, tween(120), label = "swipe-icon")
+        val icon = Modifier.graphicsLayer { scaleX = grow; scaleY = grow }
         Row(
-            Modifier.fillMaxSize().background(if (deleting) colors.primary else if (repeating) colors.softPressed else androidx.compose.ui.graphics.Color.Transparent).padding(horizontal = 22.dp),
+            Modifier.fillMaxSize().background(fill).padding(horizontal = 22.dp),
             horizontalArrangement = if (deleting) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (deleting) { Text("Delete", color = colors.onPrimary, style = MaterialTheme.typography.labelLarge); Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.Delete, null, tint = colors.onPrimary) }
-            if (repeating) { Icon(Icons.Outlined.Repeat, null, tint = colors.onSurface); Spacer(Modifier.width(8.dp)); Text("Repeat", color = colors.onSurface, style = MaterialTheme.typography.labelLarge) }
+            if (deleting) { Text("Delete", color = ink, style = MaterialTheme.typography.labelLarge); Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.Delete, null, icon, tint = ink) }
+            if (repeating) { Icon(Icons.Outlined.Repeat, null, icon, tint = ink); Spacer(Modifier.width(8.dp)); Text("Repeat", color = ink, style = MaterialTheme.typography.labelLarge) }
         }
     }) {
         Row(
@@ -360,7 +403,8 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     fun back() {
         when (draft.stage) {
             DraftStage.REVIEW -> { validTotal = true; change(draft.copy(stage = DraftStage.SHEET, timer = draft.timer?.unfinished())) }
-            DraftStage.SHEET -> change(draft.copy(stage = DraftStage.SETUP))
+            // Back from the full plan returns to the current step, not to setup.
+            DraftStage.SHEET -> if (showPlan && timerView != null) showPlan = false else change(draft.copy(stage = DraftStage.SETUP))
             // A setup with nothing chosen, or a new one left as it opened, is not worth resuming: leaving it discards it,
             // so it neither blocks Repeat nor keeps a stale start time. Opening it again costs one tap.
             DraftStage.SETUP -> if (draft.beans == null && draft.recipe == null && draft.grinder == null || opened?.let { Json.decodeFromString<BrewDraft>(it) } == draft) repository.discardDraft().onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard brew.") }
@@ -388,9 +432,12 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     SideEffect { if (stage == draft.stage) lastSheet.value = timerView }
     val stageView = (if (stage == draft.stage) timerView else lastSheet.value).takeIf { stage == DraftStage.SHEET }
     Box(Modifier.fillMaxSize().inert(transition.targetState == androidx.compose.animation.EnterExitState.PostExit)) {
-    Page(when (stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, pinHeader = stageView != null, actions = {
+    // Opening or closing the full plan starts the sheet from the top, so the focus card is in view.
+    Page(when (stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, pinHeader = stageView != null, scrollKey = showPlan.takeIf { stage == DraftStage.SHEET }, actions = {
         val paired = state.scale
         if (stage == DraftStage.SHEET && paired != null && !draft.withoutScale) { ScaleChip(paired.name, scale.live.connected, reading = !scale.live.silent); Spacer(Modifier.width(8.dp)) }
+        val discardable = stage == DraftStage.REVIEW || stage == DraftStage.SETUP && (draft.beans != null || draft.recipe != null || draft.grinder != null)
+        if (discardable) IconAction(Icons.Outlined.Delete, "Discard brew", danger = true) { discard = true }
     }, footer = {
         when (stage) {
             DraftStage.SETUP -> PrimaryAction("Use this plan", enabled = ready(draft, state)) { change(draft.copy(stage = DraftStage.SHEET)) }
@@ -424,7 +471,6 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         when (stage) {
             DraftStage.SETUP -> {
                 SetupFields(draft, state, { picker = it }, { dial = true }, ::change)
-                if (draft.beans != null || draft.recipe != null || draft.grinder != null) SoftTextButton(onClick = { discard = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Discard brew") }
             }
             DraftStage.SHEET -> if (stageView == null) {
                 PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
@@ -479,7 +525,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
         if (grinder != null) repository.upsertGrinder(grinder.copy(finish = finish)).onFailure { onError(it.message ?: "Couldn't save finish.") }
         change(draft.copy(grinder = draft.grinder.copy(finish = finish)))
     }, { dial = false })
-    if (discard) DiscardDialog({ discard = false }, { repository.discardDraft().onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard brew.") }; discard = false })
+    if (discard) DiscardBrewDialog({ discard = false }, { repository.discardDraft().onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard brew.") }; discard = false })
 }
 
 private fun selectItem(draft: BrewDraft, state: AppState, kind: String, id: String): BrewDraft = when (kind) {
@@ -664,7 +710,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
             }
         }
         SecondaryAction("Edit brew", icon = Icons.Outlined.Edit, onClick = onEdit)
-        SoftTextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Delete brew") }
+        SoftTextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), danger = true) { Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Delete brew") }
     }
 }
 

@@ -115,7 +115,7 @@ private fun ColumnScope.CurrentStep(view: TimerNow, onShowPlan: (Boolean) -> Uni
 private data class FocusTop(val step: Any, val state: String, val who: String?, val paused: Boolean)
 
 /** The two large numbers. Within a step they update in place; a new step swaps them with a blur. */
-private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val leftCounts: Boolean, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "", val rightCounts: Boolean = false)
+private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "")
 
 @Composable
 private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
@@ -151,7 +151,7 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
                 }
                 if (pouring || view.phase == TimerPhase.WAIT) Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = Alignment.End) {
                     Text("Brew time", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    Roll(formatDuration(view.brewSeconds)) { Text(it, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)) }
+                    Text(formatDuration(view.brewSeconds), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold).tabular())
                 }
             }
             val waiting = view.phase == TimerPhase.WAIT
@@ -159,17 +159,17 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
             val onScale = scale?.grams?.takeIf { pouring && !view.paused }
             val numbers = when {
                 pouring || waiting -> FocusNumbers(
-                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null, false,
+                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null,
                     if (onScale != null) "On scale" else if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at",
-                    onScale?.let(::tenths) ?: view.leftSeconds.toString(), if (onScale != null) "g" else "s", onScale == null,
+                    onScale?.let(::tenths) ?: view.leftSeconds.toString(), if (onScale != null) "g" else "s",
                 )
-                view.phase == TimerPhase.DRAWDOWN -> FocusNumbers(step, "Brew time", formatDuration(view.brewSeconds), "", false, true)
+                view.phase == TimerPhase.DRAWDOWN -> FocusNumbers(step, "Brew time", formatDuration(view.brewSeconds), "", false)
                 else -> null
             }
             if (numbers != null) BlurSwap(numbers, { it.step }, Modifier.fillMaxWidth()) { shown ->
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft, roll = shown.leftCounts)
-                    if (shown.rightLabel != null) Numeral(shown.rightLabel, shown.right, shown.rightUnit, alignEnd = true, roll = shown.rightCounts)
+                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft)
+                    if (shown.rightLabel != null) Numeral(shown.rightLabel, shown.right, shown.rightUnit, alignEnd = true)
                 }
             }
             if (pouring || waiting) {
@@ -206,14 +206,13 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
 }
 
 @Composable
-private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false, roll: Boolean = false) {
+private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            val number: @Composable (String) -> Unit = { Text(it, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold)) }
-            // A counting number rolls to its next value; a reading such as grams on the scale updates in place.
-            if (roll) Roll(value) { number(it) } else number(value)
+            // Counting numbers and scale readings update in place; only a new step animates them.
+            Text(value, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold).tabular())
             if (unit.isNotEmpty()) Text(unit, Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium))
         }
     }

@@ -4,8 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -75,7 +79,23 @@ fun LibraryScreen(
     }
     if (detailId != null) {
         BackHandler(LocalScreenActive.current, closeDetail)
-        LibraryPage(when (kind) { "beans" -> beans?.name; "grinders" -> grinder?.name; else -> recipe?.name } ?: "Library", closeDetail) {
+        var menu by remember { mutableStateOf(false) }
+        // The item's actions sit in the header, so a long recipe never hides them at the end of the page.
+        LibraryPage(when (kind) { "beans" -> beans?.name; "grinders" -> grinder?.name; else -> recipe?.name } ?: "Library", closeDetail, actions = {
+            IconAction(Icons.Outlined.Edit, "Edit ${kindLabel(kind)}") { editing = true }
+            Spacer(Modifier.width(8.dp))
+            Box {
+                IconAction(Icons.Outlined.MoreVert, "More actions") { menu = true }
+                DropdownMenu(menu, { menu = false }, shape = MaterialTheme.shapes.small, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    if (recipe != null && kind == "recipes") DropdownMenuItem(text = { Text("Duplicate recipe") }, leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) }, onClick = {
+                        menu = false
+                        val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
+                        if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
+                    })
+                    DropdownMenuItem(text = { Text("Archive ${kindLabel(kind)}") }, leadingIcon = { Icon(Icons.Outlined.Archive, null) }, onClick = { menu = false; replacementId = null; archive = true })
+                }
+            }
+        }) {
             if (beans != null && kind == "beans") {
                 DetailLine("Roaster", beans.roaster)
                 DetailLine("Origin", beans.origin)
@@ -106,13 +126,7 @@ fun LibraryScreen(
                 val last = recipe.schedule().lastOrNull()
                 last?.let { Text("Scheduled pours end at ${formatDuration(it.startSeconds + it.pulse.pourSeconds)}. Allow for drawdown.") }
                 DetailLine("Preparation notes", recipe.notes)
-                SoftButton(shape = MaterialTheme.shapes.small, onClick = {
-                    val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
-                    if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Duplicate recipe") }
             }
-            PrimaryAction("Edit ${kindLabel(kind)}") { editing = true }
-            SoftTextButton(onClick = { replacementId = null; archive = true }, modifier = Modifier.fillMaxWidth()) { Text("Archive ${kindLabel(kind)}") }
         }
     } else {
         if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
@@ -243,8 +257,8 @@ private fun GrinderEditor(initial: Grinder?, onSave: (Grinder) -> Boolean, onBac
 }
 
 @Composable
-internal fun LibraryPage(title: String, onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
-    Page(title, back = onBack, content = content)
+internal fun LibraryPage(title: String, onBack: (() -> Unit)?, actions: @Composable RowScope.() -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
+    Page(title, back = onBack, actions = actions, content = content)
 }
 
 @OptIn(ExperimentalLayoutApi::class)

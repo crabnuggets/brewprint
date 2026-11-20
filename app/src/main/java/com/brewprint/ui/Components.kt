@@ -92,6 +92,8 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
         outline = Color(0xFF777984), outlineVariant = Color(0xFF2C2D32),
         secondaryContainer = Color(0xFF2B2C32), onSecondaryContainer = Color(0xFFF7F7F8),
         inverseSurface = Color(0xFFE9E9EC), inverseOnSurface = Color(0xFF111214), inversePrimary = Color(0xFF111214),
+        // The one accent: red, kept for deleting and discarding.
+        error = Color(0xFFF2B8B5), onError = Color(0xFF601410), errorContainer = Color(0xFF4A1C1A), onErrorContainer = Color(0xFFFFDAD6),
     ) else lightColorScheme(
         primary = Color(0xFF111214), onPrimary = Color.White,
         secondary = Color(0xFF4E505A), onSecondary = Color.White,
@@ -104,6 +106,7 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
         outline = Color(0xFF898B96), outlineVariant = Color(0xFFE4E5EA),
         secondaryContainer = Color(0xFFE7E8ED), onSecondaryContainer = Color(0xFF0E0F12),
         inverseSurface = Color(0xFF2A2B30), inverseOnSurface = Color(0xFFF2F2F4), inversePrimary = Color(0xFFF2F2F4),
+        error = Color(0xFFB3261E), onError = Color.White, errorContainer = Color(0xFFFADCD9), onErrorContainer = Color(0xFF8C1D18),
     )
     val base = Typography()
     MaterialTheme(
@@ -154,10 +157,11 @@ internal val LocalChrome = staticCompositionLocalOf { Chrome() }
 private const val SCROLL_SLOP = 24f
 
 @Composable
-fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}, footer: (@Composable () -> Unit)? = null, pinHeader: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val scroll = remember(title) { ScrollState(0) }
+fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}, footer: (@Composable () -> Unit)? = null, pinHeader: Boolean = false, scrollKey: Any? = null, content: @Composable ColumnScope.() -> Unit) {
+    // A new title or [scrollKey] starts the page from the top.
+    val scroll = remember(title, scrollKey) { ScrollState(0) }
     val chrome = LocalChrome.current
-    var headerShown by remember(title) { mutableStateOf(true) }
+    var headerShown by remember(title, scrollKey) { mutableStateOf(true) }
     var headerHeight by remember { mutableIntStateOf(0) }
     // The header and the navigation step aside while the content scrolls down and come back on any scroll up.
     // The header overlays the content instead of resizing it, so hiding it never moves the scroll position.
@@ -280,9 +284,11 @@ internal fun Modifier.pressScale(source: InteractionSource): Modifier {
     return graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
+/** A soft fill; [danger] tints it red for an action that deletes or discards. */
 @Composable
-private fun softColors() = ButtonDefaults.buttonColors(
-    containerColor = MaterialTheme.colorScheme.soft, contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+private fun softColors(danger: Boolean = false) = ButtonDefaults.buttonColors(
+    containerColor = if (danger) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.soft,
+    contentColor = if (danger) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
     disabledContainerColor = MaterialTheme.colorScheme.soft.copy(alpha = .5f), disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
 )
 
@@ -327,19 +333,23 @@ internal fun SoftButton(onClick: () -> Unit, modifier: Modifier = Modifier, enab
 
 /** A smaller action that would otherwise be bare text; the soft fill makes it read as a button. */
 @Composable
-internal fun SoftTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+internal fun SoftTextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, danger: Boolean = false, content: @Composable RowScope.() -> Unit) {
     val source = remember { MutableInteractionSource() }
-    Button(onClick, modifier.heightIn(min = 40.dp).pressScale(source), enabled = enabled, shape = MaterialTheme.shapes.small, colors = softColors(), elevation = null,
+    Button(onClick, modifier.heightIn(min = 40.dp).pressScale(source), enabled = enabled, shape = MaterialTheme.shapes.small, colors = softColors(danger), elevation = null,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), interactionSource = source, content = content)
 }
 
-/** An inline "Change …" action: a round icon button whose name is spoken and shown on long press. */
+/**
+ * An inline "Change …" action or a header action: a round icon button whose name is spoken and shown on long press.
+ * [danger] tints it red for an action that deletes or discards.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun IconAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 40.dp, onClick: () -> Unit) {
+internal fun IconAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 40.dp, danger: Boolean = false, onClick: () -> Unit) {
     TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text(label) } }, state = rememberTooltipState(), modifier = modifier) {
         val source = remember { MutableInteractionSource() }
-        FilledIconButton(onClick, Modifier.size(size).pressScale(source), colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.soft, contentColor = MaterialTheme.colorScheme.onSecondaryContainer), interactionSource = source) {
+        val colors = MaterialTheme.colorScheme
+        FilledIconButton(onClick, Modifier.size(size).pressScale(source), colors = IconButtonDefaults.filledIconButtonColors(containerColor = if (danger) colors.errorContainer else colors.soft, contentColor = if (danger) colors.onErrorContainer else colors.onSecondaryContainer), interactionSource = source) {
             Icon(icon, label, Modifier.size(if (size < 40.dp) 16.dp else 18.dp))
         }
     }
@@ -363,16 +373,8 @@ internal fun <T, K> BlurSwap(value: T, key: (T) -> K, modifier: Modifier = Modif
     }
 }
 
-/** A counting number rolls to its next value instead of jumping. */
-@Composable
-internal fun <T> Roll(value: T, modifier: Modifier = Modifier, content: @Composable (T) -> Unit) {
-    AnimatedContent(value, modifier, label = "roll", transitionSpec = {
-        (slideInVertically(tween(260)) { it / 2 } + fadeIn(tween(260))) togetherWith (slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(180))) using SizeTransform(clip = false)
-    }) { shown ->
-        val leaving = transition.targetState == EnterExitState.PostExit
-        Box(if (leaving) Modifier.clearAndSetSemantics { } else Modifier) { content(shown) }
-    }
-}
+/** Tabular figures, so a number that changes in place keeps its width. */
+internal fun androidx.compose.ui.text.TextStyle.tabular() = copy(fontFeatureSettings = "tnum")
 
 /** A section title: one style across screens, and a heading for TalkBack navigation. */
 @Composable
@@ -393,4 +395,11 @@ internal fun DisclosureRow(label: String, expanded: Boolean, onClick: () -> Unit
 @Composable
 fun DiscardDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
     AlertDialog(onDismissRequest = onKeep, title = { Text("Discard changes?") }, confirmButton = { SoftTextButton(onClick = onDiscard) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = onKeep) { Text("Keep editing") } })
+}
+
+/** Confirms throwing away a brew in progress, from setup or the Finish brew review. */
+@Composable
+internal fun DiscardBrewDialog(onKeep: () -> Unit, onDiscard: () -> Unit) {
+    AlertDialog(onDismissRequest = onKeep, title = { Text("Discard this brew?") }, text = { Text("It won't be saved to History.") },
+        confirmButton = { SoftTextButton(onClick = onDiscard, danger = true) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = onKeep) { Text("Keep brew") } })
 }
