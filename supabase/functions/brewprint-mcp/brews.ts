@@ -209,7 +209,10 @@ export function scaleAnalysis(scale: ScaleData) {
   const brewing = scale.liftSeconds != null ? scale.curve.slice(0, scale.liftSeconds) : scale.curve;
   const flows = brewing.map((grams, second) => {
     const before = brewing[second - 1];
-    return second > 0 && grams != null && before != null ? round1(Math.max(0, grams - before)) : null;
+    // As in the app's ScaleData.flows(): below 0 g the brewer was off the scale, so that second is a gap.
+    return second > 0 && grams != null && before != null && grams >= 0 && before >= 0
+      ? round1(Math.max(0, grams - before))
+      : null;
   });
   const pouring = flows.filter((flow): flow is number => flow != null && flow > 0.5);
   const lastPourEnd = flows.findLastIndex((flow) => flow != null && flow > 0.5);

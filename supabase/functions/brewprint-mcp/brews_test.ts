@@ -87,6 +87,13 @@ Deno.test("readings after the dripper comes off are not pours", () => {
   assertEquals([scale.lastPourEndedAtSeconds, scale.drawdownSeconds, scale.peakFlowGramsPerSecond], [97, 73, 6.7]);
 });
 
+Deno.test("lifting the brewer off mid-brew is a gap, not a pour", () => {
+  // Off the scale for second 150 (the reading goes below 0 g), then back on.
+  const curve = brew.scale!.curve.map((grams, second) => second === 150 ? -300 : grams);
+  const scale = brewDetail({ ...brew, scale: { ...brew.scale!, curve } }).scale!;
+  assertEquals([scale.lastPourEndedAtSeconds, scale.peakFlowGramsPerSecond], [97, 6.7]);
+});
+
 Deno.test("a brew without a scale or timer has no analysis", () => {
   const detail = brewDetail({ ...brew, scale: null, timing: null });
   assertEquals([detail.scale, detail.timing, detail.totalBrewTimeSeconds], [null, null, null]);
