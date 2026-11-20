@@ -142,17 +142,15 @@ object CloudSync {
     private suspend fun pull() {
         // A minute of overlap catches changes that committed late; merging the same item twice is harmless.
         val since = repository.state.value.sync.pulledUpTo?.let { OffsetDateTime.parse(it).minusMinutes(1).toString() }
-        val rows = mutableListOf<RecordRow>()
-        do {
-            val page = client.from("records").select {
-                if (since != null) filter { gte("updated_at", since) }
+        val rows = pullPages(since, PAGE, { it.updatedAt }) { from, limit ->
+            client.from("records").select {
+                if (from != null) filter { gte("updated_at", from) }
                 order("updated_at", Order.ASCENDING)
                 order("kind", Order.ASCENDING)
                 order("id", Order.ASCENDING)
-                range(rows.size.toLong(), rows.size + PAGE - 1)
+                limit(limit)
             }.decodeList<RecordRow>()
-            rows += page
-        } while (page.size.toLong() == PAGE)
+        }
         val newest = rows.mapNotNull { it.updatedAt?.let(OffsetDateTime::parse) }.maxOrNull()?.toString()
         repository.applyRemote(rows.map { RemoteItem(it.kind, it.id, if (it.deleted) null else it.data) }, newest).getOrThrow()
     }
@@ -203,5 +201,23 @@ object CloudSync {
         runCatching { client.auth.signOut() }.onFailure { client.auth.clearSession() }
         runCatching { CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest()) }
         mutable.update { CloudState(available = true) }
+    }
+}
+
+/**
+ * Fetches every row changed since [since], a page at a time. Each page starts from the last page's newest
+ * change rather than an offset, so a row another phone edits mid-pull can't shift an unseen row past a page.
+ * Rows repeat across pages; later copies are newer and win when merged.
+ */
+internal suspend fun <R> pullPages(since: String?, page: Long, updatedAt: (R) -> String?, fetch: suspend (from: String?, limit: Long) -> List<R>): List<R> {
+    val rows = mutableListOf<R>()
+    var from = since
+    while (true) {
+        val batch = fetch(from, page)
+        rows += batch
+        val newest = batch.lastOrNull()?.let(updatedAt)?.let { OffsetDateTime.parse(it).toString() }
+        // A full page that doesn't move forward would repeat forever; uploads come in batches of 500, so this can't skip rows.
+        if (batch.size < page || newest == null || newest == from) return rows
+        from = newest
     }
 }
