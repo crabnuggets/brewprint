@@ -26,6 +26,9 @@ Deno.test("brews filter by beans, recipe and inclusive days", () => {
   assertEquals(ids({ since: "2025-11-21", until: "2025-11-21" }), [brew.id]);
   assertEquals(ids({ until: "2025-11-20" }), []);
   assertEquals(ids({ since: "2025-11-22" }), []);
+  // 04:40 UTC is 12:40 in Singapore.
+  assertEquals(ids({ since: "2025-11-21T12:00:00+08:00" }), [brew.id]);
+  assertEquals(ids({ until: "2025-11-21T12:00:00+08:00" }), []);
 });
 
 Deno.test("a summary keeps only the tasting notes the user filled in", () => {
@@ -61,12 +64,20 @@ Deno.test("a brew's pulses set the plan beside what happened", () => {
 
 Deno.test("the scale curve becomes flow, drawdown and a coarse curve", () => {
   const scale = brewDetail(brew).scale!;
-  // The last pour started at 82 s and lasted 15 s; the dripper came off at 170 s.
+  // The weight last rose at 97 s, the end of the last pour; the dripper came off at 170 s.
+  assertEquals(scale.lastPourEndedAtSeconds, 97);
   assertEquals(scale.drawdownSeconds, 73);
   assertEquals(scale.peakFlowGramsPerSecond, 6.7);
   assertEquals(scale.secondsWithoutScale, 2);
   assertEquals(scale.weightEvery5Seconds.length, 35);
   assertEquals(scale.weightEvery5Seconds[12], null);
+});
+
+Deno.test("drawdown follows the measured end of the pour, not the plan", () => {
+  // The last pour stopped early, at 90 s: the weight holds from there.
+  const curve = brew.scale!.curve.map((grams, second) => second > 90 ? brew.scale!.curve[90] : grams);
+  const scale = brewDetail({ ...brew, scale: { ...brew.scale!, curve } }).scale!;
+  assertEquals([scale.lastPourEndedAtSeconds, scale.drawdownSeconds], [90, 80]);
 });
 
 Deno.test("a brew without a scale or timer has no analysis", () => {

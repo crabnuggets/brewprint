@@ -39,7 +39,6 @@
     button:disabled { opacity: 0.6; cursor: default; }
     .primary { background: var(--primary); color: var(--on-primary); }
     .secondary { background: var(--soft); color: var(--ink); }
-    .link { background: none; padding: 8px 0; color: var(--muted); font-weight: 500; font-size: 14px; }
     #google { min-height: 44px; margin-top: 16px; }
     [hidden] { display: none !important; }
   </style>
@@ -61,12 +60,12 @@
       <li>Your beans, grinders and recipes</li>
       <li>Your brews, with their timing, scale readings and tasting notes</li>
     </ul>
+    <p id="identity" hidden>It will also receive your <span id="identity-items"></span>.</p>
     <p>It can't add, change or delete anything.</p>
     <p class="muted">Signed in as <span id="email"></span>. You'll return to <span id="destination"></span>.</p>
     <div class="actions">
       <button id="allow" class="primary" type="button">Allow</button>
       <button id="deny" class="secondary" type="button">Don't allow</button>
-      <button id="switch" class="link" type="button">Use a different Google account</button>
     </div>
   </section>
 
@@ -134,6 +133,11 @@
     for (const name of document.querySelectorAll(".client")) name.textContent = data.client.name || "This app";
     document.getElementById("email").textContent = data.user.email;
     document.getElementById("destination").textContent = new URL(data.redirect_uri).host;
+    // Identity scopes the client asked for, beyond Brewprint's own data.
+    const identity = { email: "email address", profile: "name and profile picture", phone: "phone number" };
+    const shared = data.scope.split(" ").filter((scope) => identity[scope]).map((scope) => identity[scope]);
+    document.getElementById("identity-items").textContent = shared.join(", ");
+    document.getElementById("identity").hidden = shared.length === 0;
     show("consent");
   }
 
@@ -148,13 +152,12 @@
 
   document.getElementById("allow").onclick = () => decide(true);
   document.getElementById("deny").onclick = () => decide(false);
-  document.getElementById("switch").onclick = async () => {
-    await supabase.auth.signOut({ scope: "local" });
-    await signIn().catch((error) => problem(error.message));
-  };
-
   try {
-    if (!authorizationId) {
+    // GitHub Pages can't send frame-blocking headers, so refuse to work inside another site's frame,
+    // where a hidden overlay could trick a signed-in user into clicking Allow.
+    if (window.top !== window.self) {
+      problem("Open this page in its own window to connect to Brewprint.");
+    } else if (!authorizationId) {
       problem("This page opens when an app such as Claude asks to connect to Brewprint. Start from that app.");
     } else {
       const { data: { session } } = await supabase.auth.getSession();

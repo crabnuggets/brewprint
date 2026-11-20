@@ -25,7 +25,7 @@ const CORS = {
 const INSTRUCTIONS = `Brewprint is the user's filter coffee journal. These tools read it; nothing here can change it.
 A brew record keeps the beans, grinder, grind setting and recipe as they were on that day, plus the timing,
 scale readings and the user's tasting journal. Grind settings are ticks from each grinder's own reference
-point, so compare them only within one grinder. Measured water is the scale's reading after the last pour,
+point, so compare them only within one grinder. Times are UTC; the user's app shows their local time. Measured water is the scale's reading after the last pour,
 not the weight of the drink. The app records no water temperature, roast date or overall score; ask the user
 when they matter.`;
 
@@ -95,8 +95,11 @@ function server(client: SupabaseClient) {
     inputSchema: {
       beans: z.string().optional().describe("Part of the beans' name or roaster."),
       recipe: z.string().optional().describe("Part of the recipe's name."),
-      since: z.string().optional().describe("Earliest day, YYYY-MM-DD."),
-      until: z.string().optional().describe("Latest day, YYYY-MM-DD."),
+      since: z.string().optional().describe(
+        "Earliest time, inclusive. A date-time with the user's offset, such as 2025-11-21T00:00:00+08:00, " +
+          "or YYYY-MM-DD for a whole day in UTC.",
+      ),
+      until: z.string().optional().describe("Latest time, inclusive, in the same forms as since."),
       limit: z.number().int().min(1).max(200).optional().describe("At most this many brews. Default 20."),
     },
     annotations: read,

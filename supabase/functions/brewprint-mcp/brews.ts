@@ -128,7 +128,10 @@ export interface BrewFilter {
   limit?: number;
 }
 
-/** Newest first. Text filters match any part of the name, ignoring case; dates are inclusive days in UTC. */
+/**
+ * Newest first. Text filters match any part of the name, ignoring case. A bare YYYY-MM-DD bound is a whole UTC day;
+ * a date-time with an offset is exact.
+ */
 export function findBrews(brews: BrewRecord[], filter: BrewFilter): BrewRecord[] {
   const contains = (text: string, part?: string) => !part || text.toLowerCase().includes(part.toLowerCase());
   const from = filter.since ? Date.parse(filter.since) : -Infinity;
@@ -192,36 +195,33 @@ export function brewDetail(brew: BrewRecord) {
       totalEditedByHand: timing.totalEdited,
       pausedSeconds: timing.pausedSeconds,
     },
-    scale: scale && scaleAnalysis(scale, pulses),
+    scale: scale && scaleAnalysis(scale),
   };
 }
 
 /**
- * Flow is the change in the weight curve from one second to the next.
- * Drawdown runs from the end of the last pour to the moment the dripper came off.
+ * Flow is the change in the weight curve from one second to the next. The last pour ends at the last second the
+ * weight still rose, which the scale measured, rather than when the recipe planned it to; drawdown runs from there
+ * to the moment the dripper came off.
  */
-export function scaleAnalysis(
-  scale: ScaleData,
-  pulses: { actualStartSeconds: number | null; plannedStartSeconds: number; pourSeconds: number }[],
-) {
+export function scaleAnalysis(scale: ScaleData) {
   const flows = scale.curve.map((grams, second) => {
     const before = scale.curve[second - 1];
     return second > 0 && grams != null && before != null ? round1(Math.max(0, grams - before)) : null;
   });
   const pouring = flows.filter((flow): flow is number => flow != null && flow > 0.5);
-  const last = pulses.at(-1);
-  const lastPourEnd = last ? (last.actualStartSeconds ?? last.plannedStartSeconds) + last.pourSeconds : null;
-  const missing = scale.curve.filter((grams) => grams == null).length;
+  const lastPourEnd = flows.findLastIndex((flow) => flow != null && flow > 0.5);
   return {
     weighedDoseGrams: scale.weighedDose,
     measuredWaterGrams: scale.water,
+    lastPourEndedAtSeconds: lastPourEnd >= 0 ? lastPourEnd : null,
     dripperLiftedAtSeconds: scale.liftSeconds,
-    drawdownSeconds: scale.liftSeconds != null && lastPourEnd != null
+    drawdownSeconds: scale.liftSeconds != null && lastPourEnd >= 0
       ? Math.max(0, scale.liftSeconds - lastPourEnd)
       : null,
     peakFlowGramsPerSecond: pouring.length ? Math.max(...pouring) : null,
     averagePourFlowGramsPerSecond: pouring.length ? round1(pouring.reduce((a, b) => a + b, 0) / pouring.length) : null,
-    secondsWithoutScale: missing,
+    secondsWithoutScale: scale.curve.filter((grams) => grams == null).length,
     // Every fifth second keeps the curve's shape at a fraction of its size.
     weightEvery5Seconds: scale.curve.filter((_, second) => second % 5 === 0),
   };
