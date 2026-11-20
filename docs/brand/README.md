@@ -15,6 +15,8 @@ The mark is a **print bean**: a coffee bean drawn as three nested contour lines,
 | `logo/lockup.svg`, `logo/lockup-inverse.svg` | Mark and wordmark side by side. The wordmark is outlined, so no font is needed. |
 | `png/` | PNG exports of the above. `app-icon-512.png` fits the Play Store icon slot. |
 
+The app's launcher icon is an adaptive icon built from the same geometry: `app/src/main/res/drawable/ic_launcher.xml` with `ic_launcher_background.xml` and `ic_launcher_foreground.xml`. The foreground doubles as the monochrome layer for Android 13 themed icons. The mark fills the central 60% of the visible area, as in the square SVGs. Vector drawables have no masks, so the bean's centre line is cut with a `clip-path`.
+
 ## Rules
 
 - **Colours.** Near-black `#121316` and off-white `#FAFAFC`, the app's own monochrome pair. Construction lines use the mark's colour at low opacity, never another hue.
