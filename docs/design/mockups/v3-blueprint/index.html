@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brewprint v3 blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Kalam:wght@300;400;700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Overpass:wght@300..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+/* B plan strip with the current pulse ringed in red pencil */
+.B .strip{display:grid;grid-template-columns:1.6fr repeat(9,1fr);gap:4px;position:relative}
+.B .strip i{height:14px;border-radius:4px;background:var(--soft)}
+.B .strip i.d{background:var(--ink)}
+.B .strip i.p{background:linear-gradient(90deg,var(--ink) 55%,var(--soft) 55%)}
+.B .row3{display:grid;grid-template-columns:1fr auto;align-items:baseline;padding:10px 0;border-top:1px solid var(--hair);font-size:15px}
+.B .row3:first-child{border-top:0;padding-top:0}
+.B .row3 span{color:var(--dim)}
+.B .row3 b{font-weight:650;color:var(--ink)}
+.B .meas{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;margin-top:2px}
+.B .meas i,.C .meas i{display:block;font-style:normal;font-size:13px;color:var(--dim)}
+.B .meas b,.C .meas b{font-size:19px;font-weight:650;color:var(--ink)}
+/* B revised: title blocks and a ruled schedule.
+   Drafting line weights: a heavy graphite border, light inner rules, a double rule under headings,
+   and border lines that run a little past each corner, as hand-drafted lines do. */
+.B .th{--rule:rgba(31,34,38,.18);--heavy:rgba(31,34,38,.82)}
+.B .th.dk{--rule:rgba(238,240,241,.16);--heavy:rgba(238,240,241,.62)}
+.B .ruled{position:relative;background:var(--card);border:2px solid var(--heavy)}
+.B .ruled::before,.B .ruled::after{content:"";position:absolute;pointer-events:none;border:0 solid var(--heavy)}
+.B .ruled::before{left:-9px;right:-9px;top:-2px;bottom:-2px;border-width:1.25px 0}
+.B .ruled::after{top:-9px;bottom:-9px;left:-2px;right:-2px;border-width:0 1.25px}
+.B .tb{display:grid;grid-template-columns:1fr 1fr}
+.B .tb>div{padding:9px 14px 10px;border-top:1px solid var(--rule);border-left:1px solid var(--rule);position:relative;min-width:0}
+.B .tb>div:nth-child(odd){border-left:0}
+.B .tb>div:nth-child(-n+2){border-top:0}
+.B .tb i{display:block;font-style:normal;font-size:12.5px;color:var(--dim)}
+.B .tb b{display:block;font-size:17px;font-weight:650;color:var(--ink);margin-top:2px;white-space:nowrap}
+.B .tb b small{font-size:13px;font-weight:500;color:var(--dim);margin-left:4px}
+.B .tb .rev{grid-column:span 2;border-left:0;border-top:4px double var(--heavy);display:flex;align-items:baseline;gap:12px;padding:11px 14px 12px}
+.B .tb .rev i{flex:none}
+.B .tb.c4{grid-template-columns:1.25fr .85fr .85fr 1.15fr;border-top:4px double var(--heavy);margin:16px -20px -18px;border-radius:0 0 var(--r) var(--r)}
+.B .tb.c4>div{border-top:0;border-left:1px solid var(--rule);padding:8px 12px 10px}
+.B .tb.c4>div:first-child{border-left:0;padding-left:20px}
+.B .sched{width:100%;border-collapse:collapse;font-size:14.5px}
+.B .sched th{font-weight:500;font-size:12.5px;color:var(--dim);text-align:left;padding:8px 12px 7px;border-bottom:4px double var(--heavy)}
+.B .sched td{padding:8px 12px;border-top:1px solid var(--rule);color:var(--on)}
+.B .sched tr:nth-child(2) td{border-top:0}
+.B .sched td+td,.B .sched th+th{border-left:1px solid var(--rule)}
+.B .sched td:first-child{font-weight:650;color:var(--ink)}
+.B .sched .d{color:var(--dim)}
+.B .sched .r{text-align:right}
+.C .meas{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between}
+.C .meas b{font-weight:500;font-size:22px;font-variation-settings:"opsz" 48}
+.C .meas i{font-style:italic}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  <filter id="stainf" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="9"/><feGaussianBlur stdDeviation=".8"/></filter>
+  <symbol id="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c0 1.2 1 1.3 1 2.5M12 3.5c0 1.2 1 1.3 1 2.5"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="17.5" r="1" fill="currentColor"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5c-3.5-.5-6.5 0-8.5 1.5zM12 6.5v13"/></symbol>
+  <symbol id="pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></symbol>
+  <symbol id="skip" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5.6v12.8a.7.7 0 0 0 1.1.6l9.4-6.4a.7.7 0 0 0 0-1.2L6.1 5a.7.7 0 0 0-1.1.6z"/><rect x="17" y="5" width="2.6" height="14" rx="1.1"/></symbol>
+  <symbol id="flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4.5h11l-2 4 2 4H5"/></symbol>
+  <symbol id="rep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.6L4 15.5M4 20v-4.5h4.5"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5l6.5 6.5-6.5 6.5"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h5M13 19l.6-3 5.4-5.4a1.6 1.6 0 0 1 2.3 2.3L16 18.3 13 19z"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></symbol>
+  <symbol id="ring" viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M12 24 C4 10 58 1 88 9 C104 15 98 33 62 37 C26 41 1 33 5 21 C8 12 22 7 36 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"/></symbol>
+</defs></svg>
+<template id="st"><div class="status"><span>12:27</span><i class="cam"></i><span class="ic"><i class="w"></i><i class="s"></i><i class="b"></i></span></div></template>
+
+<!-- ======================================================================
+     A · Cyanotype
+     ====================================================================== -->
+<section class="board A" id="a">
+  <div class="bh"><span class="tagp">A</span><div><h1>Cyanotype</h1><p>The literal blueprint: chalk lines on Prussian blue, and a blueline print for light appearance. Titles are drawn wide and numbers narrow, like dimension figures. A brew's details sit in a drawing's title block.</p></div></div>
+  <div class="row">
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="top root"><h2>Brew</h2><span class="hb"><svg><use href="#gear"/></svg></span></div>
+      <div class="body">
+        <div class="btn pri"><svg><use href="#plus"/></svg>New brew</div>
+        <div class="card" style="padding:20px 20px 18px">
+          <div class="lbl">Last recorded setting</div>
+          <div class="big" style="margin:10px 0 8px">24<small>ticks</small></div>
+          <div class="lbl">Comandante C40</div>
+          <svg class="dial" data-v="24"></svg>
+        </div>
+        <div class="sec">Most recent brew</div>
+        <div class="card">
+          <div class="split" style="margin:-4px 0 8px"><span class="lbl">Today, 12:27</span><span class="chip" style="padding:0 8px 0 14px">View brew<svg><use href="#chev"/></svg></span></div>
+          <h4>Ethiopia natural</h4>
+          <div class="btn sec" style="margin-top:14px"><svg><use href="#rep"/></svg>Repeat</div>
+          <div class="tb c4"><div><i>Recipe</i><b>Ten-pulse</b></div><div><i>Dose</i><b>20<small>g</small></b></div><div><i>Ratio</i><b>1:15</b></div><div><i>Grind</i><b>24<small>ticks</small></b></div></div>
+        </div>
+      </div>
+      <svg class="photo"></svg>
+      <div class="nav"><span class="on"><svg><use href="#cup"/></svg>Brew</span><span><svg><use href="#list"/></svg></span><span><svg><use href="#book"/></svg></span></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Brew, dark</h3><p>Cards are ruled frames with registration marks, not filled panels. The dial is drawn as an elevation with centre lines. Pale beans and a cup ring are sun-printed into the paper behind.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="chip"><i class="dot"></i>Dotty</span></div>
+      <div class="body" style="gap:14px">
+        <div class="card">
+          <div class="r1"><div><div class="state">Pour</div><div class="lbl" style="margin-top:6px">Pulse 4 of 10</div></div><div class="kv"><div class="lbl">Brew time</div><b>1:02</b></div></div>
+          <div class="nums"><div><div class="lbl">Pour to</div><div class="num dim">120<small>g</small></div></div><div style="text-align:right"><div class="lbl">On scale</div><div class="num">104.6<small>g</small></div></div></div>
+          <svg class="dim" data-w="318" data-f=".872" style="margin-top:12px"></svg>
+          <div class="det" style="margin-top:6px"><span>15.4 g to go · 6.2 g/s</span><span>3 s left</span></div>
+        </div>
+        <svg class="ruler" data-w="364" data-done="3" data-part=".55"></svg>
+        <div class="card" style="padding:14px 18px">
+          <div class="lbl" style="margin-bottom:8px">Ratio <b style="color:var(--ink)">1:5.2</b> → 1:15</div>
+          <svg class="chart" data-w="324" data-t="63" data-target="120" data-look="a"></svg>
+        </div>
+        <div class="next"><span class="t">1:15</span><div><b>Pulse 5, add 30 g</b><span>To 150 g total. Pour 5 s</span></div></div>
+      </div>
+      <div class="foot">
+        <div class="pair"><div class="btn sec"><svg><use href="#pause"/></svg>Pause</div><div class="btn sec"><svg><use href="#skip"/></svg>Pour done</div></div>
+        <div class="btn fin"><svg><use href="#flag"/></svg>Finish brew</div>
+      </div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Brew sheet, dark</h3><p>The pour is a dimension line from zero to 120 g, filled to the scale reading. The plan is a ruler with one bay per pulse. Numbers are set narrow, so 104.6 g stays large on a phone.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Ethiopia natural</h2><span class="hb"><svg><use href="#more"/></svg></span></div>
+      <div class="body fade" style="gap:14px">
+        <div class="card journal">
+          <div class="lbl" style="margin-bottom:6px">How was this cup?</div>
+          <p>Bright and sweet, a little thin. Sweeter as it cooled.</p>
+          <div class="lbl" style="margin-top:12px">Next time</div>
+          <p style="font-size:16px">Try one tick finer.</p>
+        </div>
+        <div class="tb c2">
+          <div><i>Recipe</i><b>Ten-pulse</b></div><div><i>Date</i><b>Today, 12:27</b></div>
+          <div><i>Grinder</i><b>Comandante C40</b></div><div><i>Grind setting</i><b>24<small>ticks</small></b></div>
+          <div><i>Dose</i><b>20.1<small>g weighed</small></b></div><div><i>Water</i><b>304.2<small>of 300 g</small></b></div>
+          <div><i>Ratio</i><b>1:15.1<small>of 1:15</small></b></div><div><i>Total brew time</i><b>3:24</b></div>
+        </div>
+        <div class="sec">Timing and water</div>
+        <svg class="chart" data-w="364" data-mode="record" data-look="a"></svg>
+        <table class="tt">
+          <tr><th>Pulse</th><th>Planned</th><th>Start</th><th class="r">Reached</th></tr>
+          <tr><td>Bloom</td><td class="d">0:00</td><td>On time</td><td class="r">30.8 g</td></tr>
+          <tr><td>Pulse 2</td><td class="d">0:30</td><td>On time</td><td class="r">61.2 g</td></tr>
+          <tr><td>Pulse 3</td><td class="d">0:45</td><td>On time</td><td class="r">91.0 g</td></tr>
+          <tr><td>Pulse 4</td><td class="d">1:00</td><td>On time</td><td class="r">121.1 g</td></tr>
+          <tr><td>Pulse 5</td><td class="d">1:15</td><td>On time</td><td class="r">151.6 g</td></tr>
+        </table>
+      </div>
+      <div class="foot"><div class="btn pri"><svg><use href="#rep"/></svg>Repeat</div></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Brew record, light</h3><p>Light appearance prints the same drawing in Prussian ink on white. The record's setup and results form a title block, so every value keeps its label beside it.</p></div></div>
+    </div>
+
+    <div class="parts">
+      <h5>Palette</h5>
+      <div class="sw">
+        <div><i style="background:#13396A"></i><span>Prussian<small>#13396A paper, dark</small></span></div>
+        <div><i style="background:#F3F7FC"></i><span>Chalk<small>#F3F7FC lines, dark</small></span></div>
+        <div><i style="background:#A3BBDA"></i><span>Faded line<small>#A3BBDA labels, dark</small></span></div>
+        <div><i style="background:#F4F7FB"></i><span>Blueline paper<small>#F4F7FB, light</small></span></div>
+        <div><i style="background:#123A6B"></i><span>Blueline ink<small>#123A6B, light</small></span></div>
+        <div><i style="background:#56739A"></i><span>Pencil blue<small>#56739A labels, light</small></span></div>
+      </div>
+      <h5 style="margin-top:6px">Type: Archivo, one family on its width axis</h5>
+      <div class="spec th dk A" style="background-image:none;font-family:Archivo">
+        <div style="font-stretch:118%;font-weight:700;font-size:28px;color:var(--ink)">Brew sheet</div>
+        <div style="font-stretch:72%;font-weight:550;font-size:46px;line-height:1;color:var(--ink);margin-top:6px">104.6<span style="font-size:17px;color:var(--dim)">g</span> <span style="color:var(--dim)">120</span></div>
+        <div style="font-size:14px;color:var(--dim);margin-top:8px">Wide for titles, narrow for numbers, normal for reading.</div>
+      </div>
+      <h5 style="margin-top:6px">Parts</h5>
+      <div class="spec th A" style="display:flex;flex-direction:column;gap:12px;padding:20px 18px">
+        <div class="pair"><div class="btn pri">Save brew</div><div class="btn sec">Keep 15 g</div></div>
+        <div class="card" style="padding:12px 14px"><div class="lbl">A ruled frame, 2 dp corners, registration marks</div></div>
+      </div>
+      <p class="note">Cafe touch: the beans and cup ring on Brew are a cyanotype photogram, the print an object leaves when it sits on the paper in sunlight. It appears on Brew only, never behind numbers.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     B · Redline
+     ====================================================================== -->
+<section class="board B" id="b">
+  <div class="bh"><span class="tagp">B</span><div><h1>Redline</h1><p>A drawing on the drafting table: graphite on gridded vellum. A red pencil marks only what to act on now, or what to change next time. Your own notes appear in pencil; the app's words are lettered.</p></div></div>
+  <div class="row">
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <svg class="stain" viewBox="0 0 190 190"><g style="filter:url(#stainf)"><circle cx="95" cy="95" r="70" fill="none" style="stroke:var(--ring)" stroke-width="5"/><circle cx="98" cy="92" r="66" fill="none" style="stroke:var(--ring)" stroke-width="1.5" opacity=".7"/></g></svg>
+      <div class="top root"><h2>Brew</h2><span class="hb"><svg><use href="#gear"/></svg></span></div>
+      <div class="body">
+        <div class="btn pri"><svg><use href="#plus"/></svg>New brew</div>
+        <div class="card">
+          <div class="lbl">Last recorded setting</div>
+          <div class="big" style="margin:8px 0 6px">24<small>ticks</small></div>
+          <div class="lbl">Comandante C40</div>
+        </div>
+        <div class="sec">Most recent brew</div>
+        <div class="card" style="margin-top:6px">
+          <i class="tape"></i>
+          <div class="split" style="margin:-4px 0 8px"><span class="lbl">Today, 12:27</span><span class="chip" style="padding:0 8px 0 14px">View brew<svg><use href="#chev"/></svg></span></div>
+          <h4>Ethiopia natural</h4>
+          <div class="m">Ten-pulse · 20 g · 1:15 · 24 ticks</div>
+          <div class="hand" style="margin-top:12px">Bright and sweet, a little thin.</div>
+          <div class="hand red" style="font-size:18px">Next time: one tick finer</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px"><div class="btn sec"><svg><use href="#rep"/></svg>Repeat</div><div class="btn sec sm"><svg><use href="#note"/></svg>Edit tasting notes</div></div>
+        </div>
+      </div>
+      <div class="nav"><span class="on"><svg><use href="#cup"/></svg>Brew</span><span><svg><use href="#list"/></svg></span><span><svg><use href="#book"/></svg></span></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Brew, light</h3><p>The latest brew is taped to the table. What you wrote is in pencil, and your "Next time" reminder is in red, right where you decide to repeat. A faint cup ring sits on the vellum.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="chip"><i class="dot"></i>Dotty</span></div>
+      <div class="body" style="gap:14px">
+        <div class="card">
+          <div class="r1"><div><div class="state">Pour</div><div class="lbl" style="margin-top:6px">Pulse 4 of 10</div></div><div class="kv"><div class="lbl">Brew time</div><b>1:02</b></div></div>
+          <div class="nums"><div><div class="lbl">Pour to</div><div class="num tgt">120<small>g</small></div></div><div style="text-align:right"><div class="lbl">On scale</div><div class="num">104.6<small>g</small></div></div></div>
+          <div style="height:6px;border-radius:3px;background:var(--soft);margin-top:16px"><div style="width:87%;height:100%;border-radius:3px;background:var(--ink)"></div></div>
+          <div class="det"><span>15.4 g to go · 6.2 g/s</span><span>3 s left</span></div>
+        </div>
+        <div class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i class="p"></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <svg class="mark" style="left:107px;top:-10px;width:52px;height:34px;color:var(--acc)"><use href="#ring"/></svg></div>
+        <div class="card" style="padding:14px 18px">
+          <div class="lbl" style="margin-bottom:8px">Ratio <b style="color:var(--ink)">1:5.2</b> → 1:15</div>
+          <svg class="chart" data-w="324" data-t="63" data-target="120" data-look="b"></svg>
+        </div>
+        <div class="next"><span class="t">1:15</span><div><b>Pulse 5, add 30 g</b><span>To 150 g total. Pour 5 s</span></div></div>
+      </div>
+      <div class="foot">
+        <div class="pair"><div class="btn sec"><svg><use href="#pause"/></svg>Pause</div><div class="btn sec"><svg><use href="#skip"/></svg>Pour done</div></div>
+        <div class="btn fin"><svg><use href="#flag"/></svg>Finish brew</div>
+      </div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Brew sheet, dark</h3><p>Graphite board with a faint blue grid. Red appears three times, and each time it means "this one": the target, its line on the chart, and a ring around the current pulse.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Ethiopia natural</h2><span class="hb"><svg><use href="#more"/></svg></span></div>
+      <div class="body fade" style="gap:14px">
+        <div class="lbl" style="margin-top:-2px">Today, 12:27</div>
+        <div class="card" style="margin-top:6px">
+          <i class="tape" style="left:22%"></i>
+          <div class="hand" style="font-size:21px">Bright and sweet, a little thin. Sweeter as it cooled.</div>
+          <div class="lbl" style="margin-top:12px">Next time</div>
+          <div class="hand red">Try one tick finer</div>
+        </div>
+        <div class="card" style="padding:14px 20px">
+          <div class="row3"><span>Recipe</span><b>Ten-pulse, 20 g at 1:15</b></div>
+          <div class="row3"><span>Grinder</span><b>Comandante C40</b></div>
+          <div class="row3"><span>Grind setting</span><b style="position:relative">24 ticks<svg class="mark" style="left:-14px;top:-9px;width:calc(100% + 26px);height:calc(100% + 18px);color:var(--acc)"><use href="#ring"/></svg></b></div>
+        </div>
+        <div class="meas"><div><i>Dose, weighed</i><b>20.1 g</b></div><div><i>Water</i><b>304.2 g</b></div><div><i>Ratio</i><b>1:15.1</b></div><div><i>Brew time</i><b>3:24</b></div></div>
+        <div class="sec">Timing and water</div>
+        <svg class="chart" data-w="364" data-mode="record" data-look="b"></svg>
+        <table class="tt">
+          <tr><th>Pulse</th><th>Planned</th><th>Start</th><th class="r">Reached</th></tr>
+          <tr><td>Bloom</td><td class="d">0:00</td><td>On time</td><td class="r">30.8 g</td></tr>
+          <tr><td>Pulse 2</td><td class="d">0:30</td><td>On time</td><td class="r">61.2 g</td></tr>
+          <tr><td>Pulse 3</td><td class="d">0:45</td><td>On time</td><td class="r">91.0 g</td></tr>
+        </table>
+      </div>
+      <div class="foot"><div class="btn pri"><svg><use href="#rep"/></svg>Repeat</div></div>
+      <svg class="mark" style="left:190px;top:240px;width:215px;height:165px;color:var(--acc);z-index:4" viewBox="0 0 215 165"><path d="M6 12 C140 0 212 60 176 156 M176 156 l-1 -12 M176 156 l10 -8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Brew record, light</h3><p>The journal comes first, in pencil. Your "Next time" note is drawn back to the value it is about, so the record reads like a marked-up drawing.</p></div></div>
+    </div>
+
+    <div class="parts">
+      <h5>Palette</h5>
+      <div class="sw">
+        <div><i style="background:#F0F2EF"></i><span>Vellum<small>#F0F2EF paper, light</small></span></div>
+        <div><i style="background:#1F2226"></i><span>Graphite<small>#1F2226 ink, light</small></span></div>
+        <div><i style="background:#6298CE"></i><span>Non-photo blue<small>#6298CE grid, faint</small></span></div>
+        <div><i style="background:#C4372C"></i><span>Red pencil<small>#C4372C, #EE7566 dark</small></span></div>
+        <div><i style="background:#E7DEB6"></i><span>Drafting tape<small>#E7DEB6</small></span></div>
+        <div><i style="background:#1C1F22"></i><span>Board<small>#1C1F22 paper, dark</small></span></div>
+      </div>
+      <h5 style="margin-top:6px">Type: Overpass, with Kalam for your words</h5>
+      <div class="spec th B" style="background-size:40px 40px,40px 40px,8px 8px,8px 8px">
+        <div style="font-family:Overpass;font-weight:750;font-size:26px;letter-spacing:-.6px;color:var(--ink)">Grind setting 24 ticks</div>
+        <div class="hand" style="font-family:Kalam;font-size:21px;color:var(--ink);margin-top:4px">Smells like cocoa; lighter than I expected</div>
+        <div style="font-family:Overpass;font-size:14px;color:var(--dim);margin-top:6px">Overpass comes from highway sign lettering. Kalam is only for text you typed.</div>
+      </div>
+      <h5 style="margin-top:6px">Parts</h5>
+      <div class="spec th B" style="display:flex;flex-direction:column;gap:14px;padding:22px 18px;background-size:40px 40px,40px 40px,8px 8px,8px 8px">
+        <div class="pair"><div class="btn pri">Save brew</div><div class="btn sec">Keep 15 g</div></div>
+        <div class="card" style="padding:12px 14px"><i class="tape" style="width:60px;margin-left:-30px;height:18px;top:-9px"></i><div class="lbl">A sheet on the vellum, 5 dp corners</div></div>
+      </div>
+      <p class="note">Cafe touch: drafting tape on the latest brew and a cup ring on Brew. The red pencil stays rare. If everything is marked, nothing is.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     B2 · Redline, revised with A's title block
+     ====================================================================== -->
+<section class="board B" id="b2">
+  <div class="bh"><span class="tagp">B</span><div><h1>Redline, with title blocks</h1><p>Board B with the title block from A. Setup and results sit in ruled cells, each value under its own label, and the timing table is ruled to match, with drafting line weights. The red pencil keeps its one job: what to act on now, or what to change next time.</p></div></div>
+  <div class="row">
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <svg class="stain" viewBox="0 0 190 190"><g style="filter:url(#stainf)"><circle cx="95" cy="95" r="70" fill="none" style="stroke:var(--ring)" stroke-width="5"/><circle cx="98" cy="92" r="66" fill="none" style="stroke:var(--ring)" stroke-width="1.5" opacity=".7"/></g></svg>
+      <div class="top root"><h2>Brew</h2><span class="hb"><svg><use href="#gear"/></svg></span></div>
+      <div class="body">
+        <div class="btn pri"><svg><use href="#plus"/></svg>New brew</div>
+        <div class="card">
+          <div class="lbl">Last recorded setting</div>
+          <div class="big" style="margin:8px 0 6px">24<small>ticks</small></div>
+          <div class="lbl">Comandante C40</div>
+        </div>
+        <div class="sec">Most recent brew</div>
+        <div class="card" style="margin-top:6px">
+          <i class="tape"></i>
+          <div class="split" style="margin:-4px 0 8px"><span class="lbl">Today, 12:27</span><span class="chip" style="padding:0 8px 0 14px">View brew<svg><use href="#chev"/></svg></span></div>
+          <h4>Ethiopia natural</h4>
+          <div class="hand" style="margin-top:8px">Bright and sweet, a little thin.</div>
+          <div class="hand red" style="font-size:18px">Next time: one tick finer</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px"><div class="btn sec"><svg><use href="#rep"/></svg>Repeat</div><div class="btn sec sm"><svg><use href="#note"/></svg>Edit tasting notes</div></div>
+          <div class="tb c4"><div><i>Recipe</i><b>Ten-pulse</b></div><div><i>Dose</i><b>20<small>g</small></b></div><div><i>Ratio</i><b>1:15</b></div><div><i>Grind</i><b>24<small>ticks</small></b></div></div>
+        </div>
+      </div>
+      <div class="nav"><span class="on"><svg><use href="#cup"/></svg>Brew</span><span><svg><use href="#list"/></svg></span><span><svg><use href="#book"/></svg></span></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Brew, light</h3><p>The latest brew's card ends in a strip of title-block cells: recipe, dose, ratio, and grind, each under its label. Your notes stay in pencil above it.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="chip"><i class="dot"></i>Dotty</span></div>
+      <div class="body" style="gap:14px">
+        <div class="card">
+          <div class="r1"><div><div class="state">Pour</div><div class="lbl" style="margin-top:6px">Pulse 4 of 10</div></div><div class="kv"><div class="lbl">Brew time</div><b>1:02</b></div></div>
+          <div class="nums"><div><div class="lbl">Pour to</div><div class="num tgt">120<small>g</small></div></div><div style="text-align:right"><div class="lbl">On scale</div><div class="num">104.6<small>g</small></div></div></div>
+          <div style="height:6px;border-radius:3px;background:var(--soft);margin-top:16px"><div style="width:87%;height:100%;border-radius:3px;background:var(--ink)"></div></div>
+          <div class="det"><span>15.4 g to go · 6.2 g/s</span><span>3 s left</span></div>
+        </div>
+        <div class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i class="p"></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="card" style="padding:14px 18px">
+          <div class="lbl" style="margin-bottom:8px">Ratio <b style="color:var(--ink)">1:5.2</b> → 1:15</div>
+          <svg class="chart" data-w="324" data-t="63" data-target="120" data-look="b"></svg>
+        </div>
+        <div class="next"><span class="t">1:15</span><div><b>Pulse 5, add 30 g</b><span>To 150 g total. Pour 5 s</span></div></div>
+      </div>
+      <div class="foot">
+        <div class="pair"><div class="btn sec"><svg><use href="#pause"/></svg>Pause</div><div class="btn sec"><svg><use href="#skip"/></svg>Pour done</div></div>
+        <div class="btn fin"><svg><use href="#flag"/></svg>Finish brew</div>
+      </div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Brew sheet, dark</h3><p>As B, without the ring on the plan strip: the half-filled bar already shows the current pulse. Red marks only the target and its line on the chart.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Ethiopia natural</h2><span class="hb"><svg><use href="#more"/></svg></span></div>
+      <div class="body fade" style="gap:14px">
+        <div class="lbl" style="margin-top:-2px">Today, 12:27</div>
+        <div class="card" style="margin-top:6px">
+          <i class="tape" style="left:22%"></i>
+          <div class="lbl" style="margin-bottom:4px">How was this cup?</div>
+          <div class="hand" style="font-size:21px">Bright and sweet, a little thin. Sweeter as it cooled.</div>
+          <div class="btn sec sm" style="margin-top:12px"><svg><use href="#note"/></svg>Edit tasting notes</div>
+        </div>
+        <div class="tb ruled">
+          <div><i>Recipe</i><b>Ten-pulse</b></div><div><i>Grinder</i><b>Comandante C40</b></div>
+          <div><i>Dose</i><b>20.1<small>g, weighed</small></b></div><div><i>Grind setting</i><b><span style="position:relative;display:inline-block">24<small>ticks</small><svg class="mark" style="left:-9px;top:-7px;width:calc(100% + 20px);height:calc(100% + 14px);color:var(--acc)"><use href="#ring"/></svg></span></b></div>
+          <div><i>Water</i><b>304.2<small>of 300 g</small></b></div><div><i>Ratio</i><b>1:15.1<small>of 1:15</small></b></div>
+          <div><i>Total brew time</i><b>3:24</b></div><div><i>Brewed</i><b>Today, 12:27</b></div>
+          <div class="rev"><i>Next time</i><span class="hand red" style="font-size:20px;line-height:1">Try one tick finer</span></div>
+          <svg class="mark" style="left:0;top:0;width:364px;height:290px;color:var(--acc);z-index:4" viewBox="0 0 364 290"><path d="M262 256 C330 250 352 190 338 140 C330 112 314 104 300 102 M300 102 l11 -6 M300 102 l9 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="sec">Timing and water</div>
+        <svg class="chart" data-w="364" data-mode="record" data-look="b"></svg>
+      </div>
+      <div class="foot"><div class="btn pri"><svg><use href="#rep"/></svg>Repeat</div></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Brew record, light</h3><p>The journal comes first. Setup and results form a title block below it. "Next time" sits in the block's revision row, where a drawing records what changes, and points to the setting it is about.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="body" style="gap:14px;padding-top:18px">
+        <div class="sec" style="margin-top:0">Timing and water</div>
+        <div class="tb ruled" style="grid-template-columns:1fr 1fr 1fr">
+          <div style="border-left:0"><i>Dose, weighed</i><b>20.1<small>g</small></b></div><div style="border-left:1px solid var(--rule)"><i>Water</i><b>304.2<small>g</small></b></div><div style="border-left:1px solid var(--rule);border-top:0"><i>Ratio</i><b>1:15.1</b></div>
+        </div>
+        <svg class="chart" data-w="364" data-mode="record" data-look="b"></svg>
+        <div class="ruled"><table class="sched">
+          <tr><th>Pulse</th><th>Planned</th><th>Start</th><th class="r">Reached</th></tr>
+          <tr><td>Bloom</td><td class="d">0:00</td><td>On time</td><td class="r">30.8 g</td></tr>
+          <tr><td>Pulse 2</td><td class="d">0:30</td><td>On time</td><td class="r">61.2 g</td></tr>
+          <tr><td>Pulse 3</td><td class="d">0:45</td><td>On time</td><td class="r">91.0 g</td></tr>
+          <tr><td>Pulse 4</td><td class="d">1:00</td><td>On time</td><td class="r">121.1 g</td></tr>
+          <tr><td>Pulse 5</td><td class="d">1:15</td><td>On time</td><td class="r">151.6 g</td></tr>
+          <tr><td>Pulse 6</td><td class="d">1:30</td><td>+9 s</td><td class="r">182.0 g</td></tr>
+          <tr><td>Pulse 7</td><td class="d">1:45</td><td>+23 s</td><td class="r">211.7 g</td></tr>
+          <tr><td>Pulse 8</td><td class="d">2:00</td><td>+39 s</td><td class="r">242.3 g</td></tr>
+          <tr><td>Pulse 9</td><td class="d">2:15</td><td>+51 s</td><td class="r">272.9 g</td></tr>
+          <tr><td>Pulse 10</td><td class="d">2:30</td><td>+66 s</td><td class="r">304.2 g</td></tr>
+        </table></div>
+      </div>
+      <div class="foot"><div class="btn pri"><svg><use href="#rep"/></svg>Repeat</div></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>4</b><div><h3>Brew record, dark, scrolled</h3><p>Scrolling hides the header. The timing table is ruled like a schedule on a drawing. Late starts stay graphite, not red: they are a record, not a task.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     C · Patent figure
+     ====================================================================== -->
+<section class="board C" id="c">
+  <div class="bh"><span class="tagp">C</span><div><h1>Patent figure</h1><p>The closest to today's monochrome: black ink on white, with engraved line art and hatching instead of grey fills. The most recent brew is drawn as Fig. 1, with numbered callouts for its beans, recipe and grind.</p></div></div>
+  <div class="row">
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <div class="top root"><h2>Brew</h2><span class="hb"><svg><use href="#gear"/></svg></span></div>
+      <div class="body">
+        <div class="btn pri"><svg><use href="#plus"/></svg>New brew</div>
+        <div class="split" style="padding:2px 2px 0"><span class="lbl" style="font-size:15px">Last recorded setting</span><span style="font-size:24px;font-weight:500;color:var(--ink)">24 <span style="font-size:15px;color:var(--dim)">ticks, Comandante C40</span></span></div>
+        <div class="card" style="padding:14px 18px 18px">
+          <svg viewBox="0 0 330 206" style="width:100%;height:auto" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <pattern id="cd" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" style="stroke:var(--ink)" stroke-width=".9"/></pattern>
+              <pattern id="ch" width="3.4" height="3.4" patternUnits="userSpaceOnUse"><line x1="0" y1="1.7" x2="3.4" y2="1.7" style="stroke:var(--ink)" stroke-width="1"/></pattern>
+              <pattern id="cv" width="4.4" height="4.4" patternUnits="userSpaceOnUse"><line x1="2.2" y1="0" x2="2.2" y2="4.4" style="stroke:var(--ink)" stroke-width=".8"/></pattern>
+              <clipPath id="carafe"><path d="M136 137 V146 C100 154 92 196 106 200 H194 C208 196 200 154 164 146 V137 Z"/></clipPath>
+            </defs>
+            <g style="stroke:var(--ink)" stroke-width="1.3">
+              <!-- kettle spout and stream -->
+              <path d="M0 84 C34 80 56 52 74 32 C86 18 98 12 108 18 L106 26 C98 24 90 28 80 40 C62 62 40 92 0 96 Z" fill="url(#cd)"/>
+              <path d="M106 25 C112 36 128 50 142 76" stroke-width="1.1"/>
+              <path d="M108 24 C116 35 132 49 147 76" stroke-width=".8"/>
+              <!-- dripper -->
+              <path d="M90 74 H210 V80 H90 Z" fill="var(--paper)"/>
+              <path d="M94 80 L132 132 H168 L206 80"/>
+              <path d="M206 80 L168 132 H162 L197 80 Z" fill="url(#cd)" stroke="none"/>
+              <path d="M98 87 Q110 84 122 87 T146 87 T170 87 T194 87 T202 87" stroke-width="1"/>
+              <g data-stipple="101.5,91,198.5,128,129.5,170.5" stroke="none"></g>
+              <path d="M208 84 C234 86 234 114 192 117"/><path d="M204 91 C223 93 223 107 197 110" stroke-width="1"/>
+              <path d="M124 132 H176 V137 H124 Z" fill="var(--paper)"/>
+              <!-- carafe -->
+              <g clip-path="url(#carafe)"><rect x="90" y="178" width="120" height="30" fill="url(#ch)" stroke="none"/><rect x="180" y="140" width="30" height="64" fill="url(#cv)" stroke="none"/></g>
+              <path d="M136 137 V146 C100 154 92 196 106 200 H194 C208 196 200 154 164 146 V137"/>
+              <path d="M112 170 C109 180 110 190 115 196" stroke-width="1"/>
+              <path d="M62 201 H238"/>
+              <path d="M70 201 l-6 6 M84 201 l-6 6 M98 201 l-6 6 M112 201 l-6 6 M126 201 l-6 6 M140 201 l-6 6 M154 201 l-6 6 M168 201 l-6 6 M182 201 l-6 6 M196 201 l-6 6 M210 201 l-6 6 M224 201 l-6 6 M238 201 l-6 6" stroke-width=".8"/>
+              <!-- leaders -->
+              <path d="M128 50 C160 44 190 30 236 30" stroke-width=".9"/>
+              <path d="M176 108 C206 108 228 118 252 112" stroke-width=".9"/>
+              <path d="M186 190 C212 188 232 172 252 172" stroke-width=".9"/>
+            </g>
+            <g style="fill:var(--ink);font-family:Newsreader;font-size:17px;font-weight:500">
+              <text x="242" y="35">12</text><text x="258" y="117">14</text><text x="258" y="177">10</text>
+            </g>
+          </svg>
+          <ol class="legend"><li><b>10</b>Ethiopia natural, 20 g</li><li><b>12</b>Ten-pulse at 1:15, 300 g</li><li><b>14</b>Comandante C40, 24 ticks</li></ol>
+          <div class="figcap"><b>Fig. 1</b>Most recent brew, today at 12:27</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px"><div class="btn sec"><svg><use href="#rep"/></svg>Repeat</div><div class="btn sec sm"><svg><use href="#note"/></svg>Edit tasting notes</div></div>
+        </div>
+      </div>
+      <div class="nav"><span class="on"><svg><use href="#cup"/></svg>Brew</span><span><svg><use href="#list"/></svg></span><span><svg><use href="#book"/></svg></span></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>1</b><div><h3>Brew, light</h3><p>The engraving changes with what you brewed: its numbered legend is the last setup. Cards are plates with a double rule, and labels are set in italic.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th dk">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Brew sheet</h2><span class="chip"><i class="dot"></i>Dotty</span></div>
+      <div class="body" style="gap:14px">
+        <div class="card">
+          <div class="r1"><div><div class="state">Pour</div><div class="lbl" style="margin-top:6px">Pulse 4 of 10</div></div><div class="kv"><div class="lbl">Brew time</div><b style="font-weight:500;font-size:24px">1:02</b></div></div>
+          <div class="nums"><div><div class="lbl">Pour to</div><div class="num dim">120<small>g</small></div></div><div style="text-align:right"><div class="lbl">On scale</div><div class="num">104.6<small>g</small></div></div></div>
+          <div class="bar"><i class="hatch" style="width:87%"></i></div>
+          <div class="det"><span>15.4 g to go · 6.2 g/s</span><span>3 s left</span></div>
+        </div>
+        <div class="strip"><i class="d"></i><i class="d"></i><i class="d"></i><i class="hatch"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i></div>
+        <div>
+          <div class="lbl" style="margin-bottom:8px">Ratio <b style="color:var(--ink);font-style:normal">1:5.2</b> → 1:15</div>
+          <svg class="chart" data-w="364" data-t="63" data-target="120" data-look="c"></svg>
+          <div class="figcap"><b>Fig. 2</b>Water on the scale</div>
+        </div>
+        <div class="next"><span class="t">1:15</span><div><b>Pulse 5, add 30 g</b><span>To 150 g total. Pour 5 s</span></div></div>
+      </div>
+      <div class="foot">
+        <div class="pair"><div class="btn sec"><svg><use href="#pause"/></svg>Pause</div><div class="btn sec"><svg><use href="#skip"/></svg>Pour done</div></div>
+        <div class="btn fin"><svg><use href="#flag"/></svg>Finish brew</div>
+      </div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>2</b><div><h3>Brew sheet, dark</h3><p>Dark appearance is a photostat negative: white ink on black. The bar fills with hatching rather than a solid. Done pulses are solid, and the current one is hatched.</p></div></div>
+    </div>
+
+    <div class="col"><div class="phone"><div class="screen th">
+      <div class="top"><span class="hb"><svg><use href="#back"/></svg></span><h2>Ethiopia natural</h2><span class="hb"><svg><use href="#more"/></svg></span></div>
+      <div class="body fade" style="gap:14px">
+        <div class="lbl" style="margin-top:-2px">Today, 12:27</div>
+        <div class="journal" style="padding:0 2px">
+          <p>“Bright and sweet, a little thin. Sweeter as it cooled.”</p>
+          <div class="split" style="margin-top:12px"><span><span class="lbl">Next time</span> <span style="color:var(--ink)">Try one tick finer.</span></span></div>
+        </div>
+        <div class="card" style="padding:16px 20px">
+          <div class="meas"><div><i>Dose, weighed</i><b>20.1 g</b></div><div><i>Water</i><b>304.2 g</b></div><div><i>Ratio</i><b>1:15.1</b></div><div><i>Brew time</i><b>3:24</b></div></div>
+          <div style="border-top:1px solid var(--hair);margin-top:14px;padding-top:12px;font-size:15px;color:var(--on)">Ten-pulse, 20 g at 1:15 <span style="color:var(--dim)">with</span> Comandante C40 <span style="color:var(--dim)">at</span> 24 ticks</div>
+        </div>
+        <div class="sec">Timing and water</div>
+        <div>
+          <svg class="chart" data-w="364" data-mode="record" data-look="c"></svg>
+          <div class="figcap"><b>Fig. 3</b>Water over time; the hatched area is the plan</div>
+        </div>
+        <table class="tt">
+          <tr><th>Pulse</th><th>Planned</th><th>Start</th><th class="r">Reached</th></tr>
+          <tr><td>Bloom</td><td class="d">0:00</td><td>On time</td><td class="r">30.8 g</td></tr>
+          <tr><td>Pulse 2</td><td class="d">0:30</td><td>On time</td><td class="r">61.2 g</td></tr>
+          <tr><td>Pulse 3</td><td class="d">0:45</td><td>On time</td><td class="r">91.0 g</td></tr>
+        </table>
+      </div>
+      <div class="foot"><div class="btn pri"><svg><use href="#rep"/></svg>Repeat</div></div>
+      <i class="home"></i></div></div>
+      <div class="cap"><b>3</b><div><h3>Brew record, light</h3><p>Your words are quoted in italic, like a note in the margin of a filing. Charts are figures with captions, and the plan behind the curve is hatched, not grey.</p></div></div>
+    </div>
+
+    <div class="parts">
+      <h5>Palette</h5>
+      <div class="sw">
+        <div><i style="background:#FFFFFF"></i><span>Paper<small>#FFFFFF, light</small></span></div>
+        <div><i style="background:#000000"></i><span>Ink<small>#000000 lines and titles</small></span></div>
+        <div><i style="background:#5F5F5F"></i><span>Graphite<small>#5F5F5F labels</small></span></div>
+        <div><i style="background:#D9D9D9"></i><span>Rule<small>#D9D9D9 hairlines</small></span></div>
+        <div><i style="background:repeating-linear-gradient(-45deg,#000 0 1.3px,#fff 1.3px 4.6px)"></i><span>Hatch<small>45°, 1.3 on 4.6 dp</small></span></div>
+        <div><i style="background:#000000;box-shadow:inset 0 0 0 4px #000,inset 0 0 0 5px #fff"></i><span>Photostat<small>white on black, dark</small></span></div>
+      </div>
+      <h5 style="margin-top:6px">Type: Newsreader, one family</h5>
+      <div class="spec th C" style="border:1px solid #000;outline:1px solid #000;outline-offset:-5px">
+        <div style="font-family:Newsreader;font-weight:500;font-size:30px;letter-spacing:-.4px;font-variation-settings:'opsz' 72;color:#000">Pour to 120 g</div>
+        <div style="font-family:Newsreader;font-style:italic;font-size:17px;color:#5F5F5F">Last recorded setting</div>
+        <div style="font-family:Newsreader;font-size:15px;color:#1D1D1D;margin-top:6px">Upright for values, italic for labels and your own words. Optical sizes keep the large numbers crisp.</div>
+      </div>
+      <h5 style="margin-top:6px">Parts</h5>
+      <div class="spec th C" style="display:flex;flex-direction:column;gap:12px;padding:18px">
+        <div class="pair"><div class="btn pri">Save brew</div><div class="btn sec">Keep 15 g</div></div>
+        <div class="bar" style="margin:4px 0 0"><i class="hatch" style="width:62%"></i></div>
+      </div>
+      <p class="note">Cafe touch: the figure is drawn like the engraving on a coffee-bag label. Callout numbers go up in twos (10, 12, 14), as they do in patent drawings.</p>
+    </div>
+  </div>
+</section>
+
+<script src="base.js"></script>
+</body>
+</html>
