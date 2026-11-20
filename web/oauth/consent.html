@@ -60,7 +60,7 @@
       <li>Your beans, grinders and recipes</li>
       <li>Your brews, with their timing, scale readings and tasting notes</li>
     </ul>
-    <p id="identity" hidden>It will also receive your <span id="identity-items"></span>.</p>
+    <p>It will also see your Google account's name, email address and profile picture.</p>
     <p>It can't add, change or delete anything.</p>
     <p class="muted">Signed in as <span id="email"></span>. You'll return to <span id="destination"></span>.</p>
     <div class="actions">
@@ -133,11 +133,6 @@
     for (const name of document.querySelectorAll(".client")) name.textContent = data.client.name || "This app";
     document.getElementById("email").textContent = data.user.email;
     document.getElementById("destination").textContent = new URL(data.redirect_uri).host;
-    // Identity scopes the client asked for, beyond Brewprint's own data.
-    const identity = { email: "email address", profile: "name and profile picture", phone: "phone number" };
-    const shared = data.scope.split(" ").filter((scope) => identity[scope]).map((scope) => identity[scope]);
-    document.getElementById("identity-items").textContent = shared.join(", ");
-    document.getElementById("identity").hidden = shared.length === 0;
     show("consent");
   }
 

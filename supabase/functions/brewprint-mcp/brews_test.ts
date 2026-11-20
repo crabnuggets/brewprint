@@ -80,6 +80,13 @@ Deno.test("drawdown follows the measured end of the pour, not the plan", () => {
   assertEquals([scale.lastPourEndedAtSeconds, scale.drawdownSeconds], [90, 80]);
 });
 
+Deno.test("readings after the dripper comes off are not pours", () => {
+  // Lifted at 170 s, then set back down on the scale: the weight jumps again.
+  const curve = [...brew.scale!.curve, 120, 400, 400];
+  const scale = brewDetail({ ...brew, scale: { ...brew.scale!, curve } }).scale!;
+  assertEquals([scale.lastPourEndedAtSeconds, scale.drawdownSeconds, scale.peakFlowGramsPerSecond], [97, 73, 6.7]);
+});
+
 Deno.test("a brew without a scale or timer has no analysis", () => {
   const detail = brewDetail({ ...brew, scale: null, timing: null });
   assertEquals([detail.scale, detail.timing, detail.totalBrewTimeSeconds], [null, null, null]);

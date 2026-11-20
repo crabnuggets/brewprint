@@ -12,6 +12,7 @@ ADR 0001 kept each item's JSON in `records.data` partly because nothing read it 
 
 ## Consequences
 
+- The MCP server accepts any valid access token for a user of this project, from Claude or from the app, because Supabase's OAuth server doesn't yet bind a token's audience to the resource it was issued for. That holds only while this project's auth server protects nothing but Brewprint's records. Before another service trusts its tokens, bind audiences and check them here.
 - The Edge Function runs with gateway JWT checks off (`verify_jwt = false`) and checks the bearer token itself, so it can answer MCP clients with the `WWW-Authenticate` hint they use to find the OAuth server.
 - Dynamic client registration is on, so any MCP client can ask to connect. The consent page, which names the client and where it returns to, is what stops one the user didn't start.
 - The consent page lives on the Site URL (Supabase Auth → URL Configuration). The app signs in with Google ID tokens, so nothing in the app depends on that URL.

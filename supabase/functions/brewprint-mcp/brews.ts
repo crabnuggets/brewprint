@@ -205,8 +205,10 @@ export function brewDetail(brew: BrewRecord) {
  * to the moment the dripper came off.
  */
 export function scaleAnalysis(scale: ScaleData) {
-  const flows = scale.curve.map((grams, second) => {
-    const before = scale.curve[second - 1];
+  // The app keeps recording after the dripper comes off; putting it back down would read as another pour.
+  const brewing = scale.liftSeconds != null ? scale.curve.slice(0, scale.liftSeconds) : scale.curve;
+  const flows = brewing.map((grams, second) => {
+    const before = brewing[second - 1];
     return second > 0 && grams != null && before != null ? round1(Math.max(0, grams - before)) : null;
   });
   const pouring = flows.filter((flow): flow is number => flow != null && flow > 0.5);
