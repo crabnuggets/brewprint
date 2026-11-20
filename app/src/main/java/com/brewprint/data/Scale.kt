@@ -28,10 +28,10 @@ internal const val QUIET_FLOW = 0.5
 
 /**
  * Flow for each second of [ScaleData.curve], worked out from the change to the next second, so flow need not be saved.
- * Gaps stay gaps and still seconds are 0. Below 0 g the brewer is off the scale, so a second next to such a reading is a gap:
- * putting the brewer back would otherwise read as a pour.
+ * Gaps stay gaps and still seconds are 0. Putting the brewer back would read as a pour, so flow ends at [ScaleData.liftSeconds],
+ * and a second next to a reading below 0 g, where the brewer was off the scale before that, is a gap.
  */
-fun ScaleData.flows(): List<Double?> = curve.zipWithNext { grams, next ->
+fun ScaleData.flows(): List<Double?> = curve.take(liftSeconds ?: curve.size).zipWithNext { grams, next ->
     if (grams == null || next == null || grams < 0 || next < 0) null else (next - grams).takeIf { it >= QUIET_FLOW } ?: 0.0
 }
 

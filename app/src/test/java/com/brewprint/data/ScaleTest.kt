@@ -19,6 +19,8 @@ class ScaleTest {
         // then the brewer lifted at 7 s and put back at 8 s.
         val data = ScaleData(curve = listOf(0.0, 6.0, 12.0, 12.3, null, 14.0, 20.0, -350.0, 120.0, 120.0))
         assertEquals(listOf(6.0, 6.0, 0.0, null, null, 6.0, null, null, 0.0), data.flows())
+        // A light dripper lifted in drawdown leaves the reading above 0 g; putting it back is not a pour.
+        assertEquals(listOf(0.0), ScaleData(curve = listOf(240.0, 240.0, 180.0, 240.0), liftSeconds = 2).flows())
     }
 
     // Pours at 0:00, 0:45, 1:20, 1:55 and 2:30; scheduled pours end at 2:45.
