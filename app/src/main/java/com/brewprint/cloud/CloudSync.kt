@@ -89,8 +89,9 @@ object CloudSync {
             client.auth.sessionStatus.collect { status ->
                 if (status is SessionStatus.Authenticated) {
                     val user = status.session.user ?: return@collect
+                    // Refused while another account's changes wait; signIn then ends this session.
+                    if (repository.syncWith(user.id).isFailure) return@collect
                     mutable.update { it.copy(email = user.email) }
-                    repository.syncWith(user.id)
                     sync()
                 } else if (status is SessionStatus.NotAuthenticated) {
                     mutable.update { CloudState(available = true) }
@@ -98,7 +99,9 @@ object CloudSync {
             }
         }
         scope.launch {
-            repository.state.map { it.sync.pending }.distinctUntilChanged().debounce(2_000).filter { it.isNotEmpty() }.collect { sync() }
+            // Any edit to a synced item counts, even one already waiting, so an edit made during an upload is sent too.
+            repository.state.distinctUntilChanged { a, b -> a.beans === b.beans && a.grinders === b.grinders && a.recipes === b.recipes && a.brews === b.brews && a.sync.pending == b.sync.pending }
+                .debounce(2_000).filter { it.sync.pending.isNotEmpty() }.collect { sync() }
         }
     }
 
@@ -107,17 +110,17 @@ object CloudSync {
         if (::repository.isInitialized) scope.launch { sync() }
     }
 
-    private suspend fun sync() {
-        lock.withLock {
-            val user = client.auth.currentUserOrNull() ?: return
-            if (repository.state.value.sync.userId != user.id) return
-            mutable.update { it.copy(syncing = true) }
-            val result = runCatching {
-                push(user.id)
-                pull()
-            }
-            mutable.update { it.copy(syncing = false, failed = result.isFailure, syncedAt = if (result.isSuccess) System.currentTimeMillis() else it.syncedAt) }
+    private suspend fun sync() = lock.withLock { syncLocked() }
+
+    private suspend fun syncLocked() {
+        val user = client.auth.currentUserOrNull() ?: return
+        if (repository.state.value.sync.userId != user.id) return
+        mutable.update { it.copy(syncing = true) }
+        val result = runCatching {
+            push(user.id)
+            pull()
         }
+        mutable.update { it.copy(syncing = false, failed = result.isFailure, syncedAt = if (result.isSuccess) System.currentTimeMillis() else it.syncedAt) }
     }
 
     private suspend fun push(userId: String) {
@@ -165,6 +168,11 @@ object CloudSync {
                 provider = Google
                 this.nonce = nonce
             }
+            val user = client.auth.currentUserOrNull() ?: return "Couldn't sign in. Check your connection and try again."
+            repository.syncWith(user.id).exceptionOrNull()?.let { refused ->
+                endSession(activity)
+                return refused.message
+            }
             null
         } catch (_: GetCredentialCancellationException) {
             null
@@ -180,14 +188,18 @@ object CloudSync {
      * Uploads every change, then signs out and removes the account's data from this phone.
      * Returns a message for the user when changes couldn't be uploaded; nothing is removed then.
      */
-    suspend fun signOut(context: Context): String? {
-        sync()
-        if (repository.state.value.sync.pending.isNotEmpty()) return "Couldn't upload your latest changes. Connect to the internet and try again."
+    suspend fun signOut(context: Context): String? = lock.withLock {
+        syncLocked()
+        // Checking for unsent changes and removing the data is one step, so an edit can't slip in between.
+        repository.signedOut().exceptionOrNull()?.let { return it.message ?: "Couldn't sign out. Try again." }
+        endSession(context)
+        null
+    }
+
+    private suspend fun endSession(context: Context) {
         // Offline, the server can't end the session, but this phone still forgets it.
         runCatching { client.auth.signOut() }.onFailure { client.auth.clearSession() }
         runCatching { CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest()) }
-        repository.signedOut()
         mutable.update { CloudState(available = true) }
-        return null
     }
 }

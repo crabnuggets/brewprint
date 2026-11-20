@@ -66,13 +66,16 @@ private fun <T> SyncKind<T>.encode(state: AppState, id: String): JsonElement? =
     list(state).firstOrNull { this.id(it) == id }?.let { syncJson.encodeToJsonElement(serializer, it) }
 
 /**
- * Starts syncing with [userId]. Data made before the phone's first sign-in joins the account.
- * Another account's data is never merged in: it is replaced by this account's.
+ * Starts syncing with [userId]. Data made while signed out joins the account.
+ * Another account's data is never merged in: it is replaced by this account's, and only once all of it was uploaded.
  */
 fun AppState.syncingWith(userId: String): AppState = when (sync.userId) {
     userId -> this
     null -> copy(sync = SyncState(userId = userId, pending = sync.pending + syncKeys()))
-    else -> withoutAccountData().copy(sync = SyncState(userId = userId))
+    else -> {
+        check(sync.pending.isEmpty()) { "This phone has changes that haven't reached the Google account you used before. Sign in with that account first." }
+        withoutAccountData().copy(sync = SyncState(userId = userId))
+    }
 }
 
 /** Removes the account's beans, grinders, recipes and brews from this phone. Settings and the paired scale stay. */

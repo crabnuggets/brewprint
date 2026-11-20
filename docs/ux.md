@@ -223,8 +223,8 @@ Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 
 
 - **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, timer settings, and the paired scale stay on the phone.
 - **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
-- **First sign-in.** Anything made on the phone before its first sign-in joins the account; a fresh install receives everything in the account.
-- **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's.
+- **Signing in.** Anything made on the phone while signed out joins the account; a fresh install receives everything in the account.
+- **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's. If the earlier account still has changes waiting to upload, for example after its session ended while offline, sign-in is refused with "This phone has changes that haven't reached the Google account you used before. Sign in with that account first."
 - **Conflicts.** The newest change to an item wins. A change not yet uploaded from this phone wins over the server's copy.
 - **Signing out** uploads every change first, then removes the account's beans, grinders, recipes, brews, and brew draft from the phone. Settings and the paired scale stay. If changes can't be uploaded, it says "Couldn't upload your latest changes. Connect to the internet and try again." and nothing is removed.
 

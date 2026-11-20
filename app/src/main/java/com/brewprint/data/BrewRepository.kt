@@ -249,7 +249,10 @@ class BrewRepository(context: Context) {
     fun syncWith(userId: String): Result<Unit> = change(track = false) { it.syncingWith(userId) to Unit }
 
     /** Signing out leaves no account data on the phone, so the next account starts clean. */
-    fun signedOut(): Result<Unit> = change(track = false) { it.withoutAccountData() to Unit }
+    fun signedOut(): Result<Unit> = change(track = false) {
+        check(it.sync.pending.isEmpty()) { "Couldn't upload your latest changes. Connect to the internet and try again." }
+        it.withoutAccountData() to Unit
+    }
 
     fun markPushed(pushed: Map<String, JsonElement?>): Result<Unit> = change(track = false) { it.afterPush(pushed) to Unit }
 

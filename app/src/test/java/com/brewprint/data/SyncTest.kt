@@ -48,7 +48,7 @@ class SyncTest {
 
     @Test fun `another account's data replaces this phone's instead of merging`() {
         val state = AppState(beans = listOf(beans), grinders = listOf(grinder), defaultGrinderId = grinder.id, lastBeansId = beans.id, appearance = Appearance.DARK)
-            .syncingWith("user-1")
+            .syncingWith("user-1").let { it.afterPush(it.sync.pending.associateWith(it::syncData)) }
         val switched = state.syncingWith("user-2")
         assertTrue(switched.syncKeys().isEmpty())
         assertNull(switched.defaultGrinderId)
@@ -64,6 +64,7 @@ class SyncTest {
         repository.setAppearance(Appearance.DARK).getOrThrow()
         repository.syncWith("user-1").getOrThrow()
         repository.startDraft().getOrThrow()
+        repository.markPushed(repository.state.value.let { state -> state.sync.pending.associateWith(state::syncData) }).getOrThrow()
         repository.signedOut().getOrThrow()
         val state = repository.state.value
         assertTrue(state.beans.isEmpty() && state.grinders.isEmpty() && state.draft == null)
@@ -72,6 +73,18 @@ class SyncTest {
         // The next account starts from its own data alone.
         repository.syncWith("user-2").getOrThrow()
         assertTrue(repository.state.value.sync.pending.isEmpty())
+    }
+
+    @Test fun `another account can't take over while this one's changes wait`() {
+        val repository = BrewRepository(context)
+        repository.syncWith("user-1").getOrThrow()
+        repository.upsertBeans(beans).getOrThrow()
+        assertTrue(repository.syncWith("user-2").isFailure)
+        assertTrue(repository.signedOut().isFailure)
+        val state = repository.state.value
+        assertEquals(listOf(beans), state.beans)
+        assertEquals("user-1", state.sync.userId)
+        assertEquals(setOf("beans/${beans.id}"), state.sync.pending)
     }
 
     @Test fun `an item edited while uploading stays queued`() {
