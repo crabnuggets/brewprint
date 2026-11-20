@@ -110,6 +110,8 @@ The brew sheet offers "Start timer" and "Finish without timing". The timer is op
 
 Settings holds the appearance choice and four brew timer switches: "Live notification" (off by default), "Vibrate at each step", "Sound at each step", and "Keep screen on while brewing" (all three on by default). The sound is a short tone at each step change, for a phone propped on the counter where a vibration goes unfelt.
 
+An "Experimental" section at the end of Settings holds features still being tried out. Its first is "Theme": "Monochrome" (the default) or "Blueprint". The choice is saved with the app's data and applies at once. Both themes offer the same screens, actions, and accessibility; only the look differs. See [the blueprint theme](ui-design.md#experimental-blueprint-theme).
+
 Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
 
 With the switch on, a running timer shows one ongoing notification, requested as an Android 16 Live Update with the standard progress template. Each part has one job:

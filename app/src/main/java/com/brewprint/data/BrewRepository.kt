@@ -121,6 +121,10 @@ class BrewRepository(context: Context) {
         current.copy(appearance = appearance) to Unit
     }
 
+    fun setExperiments(experiments: Experiments): Result<Unit> = change { current ->
+        current.copy(experiments = experiments) to Unit
+    }
+
     fun setTimerSettings(settings: TimerSettings): Result<Unit> = change { current ->
         current.copy(timerSettings = settings) to Unit
     }

@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                 brew.tare(System.currentTimeMillis())
                 handler.postDelayed({ brew.expireTare(System.currentTimeMillis()) }, TARE_MILLIS + 50)
             }) {
-                BrewprintTheme(state.appearance) { BrewprintApp(state, repository, openDraft) }
+                BrewprintTheme(state.appearance, state.experiments.theme) { BrewprintApp(state, repository, openDraft) }
             }
         }
     }

@@ -115,7 +115,7 @@ private fun ColumnScope.CurrentStep(view: TimerNow, onShowPlan: (Boolean) -> Uni
 private data class FocusTop(val step: Any, val state: String, val who: String?, val paused: Boolean)
 
 /** The two large numbers. Within a step they update in place; a new step swaps them with a blur. */
-private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "")
+private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val leftTarget: Boolean = false, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "")
 
 @Composable
 private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
@@ -159,7 +159,7 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
             val onScale = scale?.grams?.takeIf { pouring && !view.paused }
             val numbers = when {
                 pouring || waiting -> FocusNumbers(
-                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null,
+                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null, pouring,
                     if (onScale != null) "On scale" else if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at",
                     onScale?.let(::tenths) ?: view.leftSeconds.toString(), if (onScale != null) "g" else "s",
                 )
@@ -168,7 +168,7 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
             }
             if (numbers != null) BlurSwap(numbers, { it.step }, Modifier.fillMaxWidth()) { shown ->
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft)
+                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft, target = shown.leftTarget)
                     if (shown.rightLabel != null) Numeral(shown.rightLabel, shown.right, shown.rightUnit, alignEnd = true)
                 }
             }
@@ -206,13 +206,15 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
 }
 
 @Composable
-private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false) {
+private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false, target: Boolean = false) {
     val colors = MaterialTheme.colorScheme
+    // The blueprint marks the grams to pour to now in red pencil.
+    val ink = if (target && LocalLook.current.blueprint) targetColor() else if (soft) colors.onSurfaceVariant else colors.onSurface
     Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             // Counting numbers and scale readings update in place; only a new step animates them.
-            Text(value, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold).tabular())
+            Text(value, color = ink, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold).tabular())
             if (unit.isNotEmpty()) Text(unit, Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium))
         }
     }
@@ -392,7 +394,7 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
 internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? = null) {
     val colors = MaterialTheme.colorScheme
     SectionTitle(if (scale != null) "Timing and water" else "Timing")
-    Panel {
+    Panel(ruled = true) {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Total brew time", Modifier.align(Alignment.CenterVertically))
             Text(timing.totalSeconds?.let(::formatDuration) ?: "Not recorded", style = MaterialTheme.typography.titleLarge)
@@ -469,9 +471,12 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
             Text(started, Modifier.width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
             if (reached != null) Text(reached, Modifier.width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1)
         }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // The blueprint rules the table like a schedule on a drawing: a double rule under the headings, light rules between rows.
+    val ruled = LocalLook.current.blueprint
+    Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 8.dp else 10.dp)) {
         line("Pulse", "Plan", "Started", if (scale != null) "Reached" else null, small, header = true, modifier = Modifier.clearAndSetSemantics { })
-        rows.forEach { row -> line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
+        if (ruled) DoubleRule()
+        rows.forEachIndexed { index, row -> if (ruled && index > 0) CellRule(); line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
     }
 }
 

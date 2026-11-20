@@ -70,6 +70,18 @@ The following details interpret the confirmed direction and remain open for revi
 
 Exact palette values, any limited accent colors, typefaces, corner radii, and the specific placement of selective glass effects are undecided. Offer System, Light, and Dark appearance choices, with System as the default.
 
+## Experimental: blueprint theme
+
+Settings → Experimental → Theme offers "Blueprint" beside the default "Monochrome". It follows the [revised Redline board](design/mockups/v3-blueprint/b2.png), and is an opt-in experiment: the confirmed direction above, including "Avoid a coffee or cafe theme" and the monochrome palette, still describes the default theme. Both themes keep the same behavior, content, and accessibility; a theme may change color, type, shape, decoration, and motion.
+
+- **Paper and type.** Graphite on vellum with an 8 dp grid, heavier every 40 dp. App text is set in Overpass. The user's own words (tasting notes, "Next time") are set in Kalam, like pencil. Cards have 6 dp corners and buttons 10 dp.
+- **Red pencil.** One accent, used only for what to act on now or what to change next time: the grams to pour to, the target line on the live curve, and "Next time". Late starts in the timing table stay graphite; they are a record, not a task.
+- **Title blocks.** The brew record shows its setup as a title block: ruled cells, each value under its label, with "Next time" in a revision row beneath a double rule. The timing table is ruled to match. The latest brew on Brew ends in a four-cell strip: recipe, dose, ratio, and grind. Cells halve, then stack, on narrow screens or with large text.
+- **Drafting lines.** A heavy border whose lines run a few dp past each corner, light rules between cells, and a double rule under headings and before the revision row.
+- **Cafe touch.** A strip of drafting tape on the latest brew and on the record's tasting notes. Decorative only.
+
+The board's ring and arrow from "Next time" to a setting are not drawn: the app cannot tell which setting a note is about.
+
 ## Grinder setting dial
 
 ### Confirmed concept
