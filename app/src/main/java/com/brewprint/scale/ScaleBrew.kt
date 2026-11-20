@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 // The thresholds of "Brewing with a scale" in docs/ux.md. Grams, grams a second, and milliseconds.
-private const val QUIET_FLOW = 0.5
 private const val STEADY_MILLIS = 1_000L
 private const val STEADY_SPREAD = 1.0
 private const val RISE_GRAMS = 2.0

@@ -14,6 +14,14 @@ class ScaleTest {
         }
     }
 
+    @Test fun `the record's flow comes from the saved curve, keeps gaps and ends when the dripper came off`() {
+        // A 6 g/s pour, a still second with a 0.3 g wobble, a lost second, then the dripper lifted at 7 s and put back at 8 s.
+        val data = ScaleData(curve = listOf(0.0, 6.0, 12.0, 12.3, null, 14.0, 20.0, -350.0, 240.0), liftSeconds = 7)
+        assertEquals(listOf(null, 6.0, 6.0, 0.0, null, null, 6.0), data.flows())
+        // Without a lift, readings below 0 g count as 0 g, so taking the brewer off is no flow.
+        assertEquals(listOf(null, 5.0, 0.0), ScaleData(curve = listOf(-1.0, 5.0, -350.0)).flows())
+    }
+
     // Pours at 0:00, 0:45, 1:20, 1:55 and 2:30; scheduled pours end at 2:45.
     private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
         Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),

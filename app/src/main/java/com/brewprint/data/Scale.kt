@@ -23,6 +23,20 @@ data class ScaleData(
     val liftSeconds: Int? = null,
 )
 
+/** Flow in grams a second below which the scale counts as still. */
+internal const val QUIET_FLOW = 0.5
+
+/**
+ * Flow for each second of [ScaleData.curve], worked out from the change since the second before, so flow need not be saved.
+ * Gaps stay gaps, readings below 0 g count as 0 g, and still seconds are 0. It ends at [ScaleData.liftSeconds]:
+ * putting the dripper back on would read as a pour.
+ */
+fun ScaleData.flows(): List<Double?> = curve.take(liftSeconds ?: curve.size).mapIndexed { second, grams ->
+    val before = curve.getOrNull(second - 1)
+    if (grams == null || before == null) null
+    else (grams.coerceAtLeast(0.0) - before.coerceAtLeast(0.0)).takeIf { it >= QUIET_FLOW } ?: 0.0
+}
+
 /** The scale as the screens see it. Not saved. */
 data class ScaleLive(
     val connected: Boolean = false,
