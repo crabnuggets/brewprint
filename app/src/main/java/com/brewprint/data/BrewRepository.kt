@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 class BrewRepository(context: Context) {
     companion object {
@@ -40,10 +41,14 @@ class BrewRepository(context: Context) {
         state = mutableState.asStateFlow()
     }
 
+    /** Saves a change. Changed beans, grinders, recipes and brews are queued for upload unless [track] is off. */
     @Synchronized
-    private fun <T> change(transform: (AppState) -> Pair<AppState, T>): Result<T> = runCatching {
+    private fun <T> change(track: Boolean = true, transform: (AppState) -> Pair<AppState, T>): Result<T> = runCatching {
         check(loadError == null) { loadError.orEmpty() }
-        val (next, result) = transform(mutableState.value)
+        val current = mutableState.value
+        val (changed, result) = transform(current)
+        val keys = if (track) changedKeys(current, changed) else emptySet()
+        val next = if (keys.isEmpty()) changed else changed.copy(sync = changed.sync.copy(pending = changed.sync.pending + keys))
         val bytes = json.encodeToString(next).toByteArray(Charsets.UTF_8)
         val output = file.startWrite()
         try {
@@ -239,4 +244,17 @@ class BrewRepository(context: Context) {
             noteEdits = current.noteEdits.filterNot { it.brewId == brewId },
         ) to Unit
     }
+
+    /** Starts syncing with a signed-in account. */
+    fun syncWith(userId: String): Result<Unit> = change(track = false) { it.syncingWith(userId) to Unit }
+
+    /** Signing out leaves no account data on the phone, so the next account starts clean. */
+    fun signedOut(): Result<Unit> = change(track = false) {
+        check(it.sync.pending.isEmpty()) { "Couldn't upload your latest changes. Connect to the internet and try again." }
+        it.withoutAccountData() to Unit
+    }
+
+    fun markPushed(pushed: Map<String, JsonElement?>): Result<Unit> = change(track = false) { it.afterPush(pushed) to Unit }
+
+    fun applyRemote(items: List<RemoteItem>, pulledUpTo: String?): Result<Unit> = change(track = false) { it.withRemote(items, pulledUpTo) to Unit }
 }

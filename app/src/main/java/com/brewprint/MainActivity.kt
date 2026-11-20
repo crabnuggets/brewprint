@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.brewprint.cloud.CloudSync
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.Appearance
 import com.brewprint.timer.BrewTimerService
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val repository = BrewRepository.get(applicationContext)
+        CloudSync.start(applicationContext)
         if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_OPEN_DRAFT, false)) openDraft++
         setContent {
             val state by repository.state.collectAsStateWithLifecycle()
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
         BrewTimerService.clearFinished(this)
         BrewTimerService.sync(this)
         ScaleLink.sync(this)
+        CloudSync.requestSync()
     }
 
     override fun onStop() {
