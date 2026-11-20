@@ -111,6 +111,28 @@ class BlueprintThemeTest {
         assertEquals(1, compose.onAllNodesWithText("Try one tick finer").fetchSemanticsNodes().size)
     }
 
+    @Test fun `a scale brew without a final reading says so in the title block`() {
+        val repository = seeded(Theme.BLUEPRINT)
+        val brew = repository.state.value.brews.single()
+        repository.updateBrew(brew.copy(scale = brew.scale!!.copy(water = null))).getOrThrow()
+        open(repository)
+        tap("View brew")
+        // The title block words it as the timing section does.
+        compose.onAllNodesWithContentDescription("Water not recorded, planned 301.5 grams").assertCountEquals(2)
+        compose.onNodeWithContentDescription("Brew ratio not recorded, planned 1 to 15").assertExists()
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h700dp-xxhdpi")
+    fun `on a narrow screen the ruled pulse table stacks rather than cut the names`() {
+        val repository = seeded(Theme.BLUEPRINT)
+        open(repository)
+        tap("View brew")
+        compose.onNodeWithText("Pulse 10", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Plan 2:30 · Started +1:06 · Reached 304.2 g", useUnmergedTree = true).performScrollTo()
+        capture("record-timing-narrow")
+    }
+
     @Test fun `capture the blueprint theme`() {
         val repository = seeded(Theme.BLUEPRINT)
         open(repository)

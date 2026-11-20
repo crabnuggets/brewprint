@@ -714,14 +714,18 @@ private fun recordCells(brew: BrewRecord): List<Cell> {
     val weighed = brew.scale?.weighedDose != null
     val water = brew.scale?.water
     val measuredRatio = water?.let { "1:" + "%.1f".format(it / recipe.dose) }
+    // A scale brew whose final water was not seen says so, as the timing section does.
+    val unmeasured = brew.scale != null && water == null
     return listOfNotNull(
         Cell("Recipe", recipe.name),
         Cell("Grinder", brew.grinder.name),
         Cell("Dose", dose, if (weighed) "g, weighed" else "g", "Coffee dose $dose grams" + if (weighed) ", weighed" else ""),
         Cell("Grind setting", "${brew.setting}", "ticks", "Grind setting, ${brew.setting} ticks"),
         if (water != null) Cell("Water", tenths(water), "of $planned g", "Water ${tenths(water)} grams, planned $planned grams")
+        else if (unmeasured) Cell("Water", "\u2014", "planned $planned g", "Water not recorded, planned $planned grams")
         else Cell("Water", planned, "g", "Total brew water $planned grams"),
         if (measuredRatio != null) Cell("Ratio", measuredRatio, "of 1:$ratio", "Brew ratio ${measuredRatio.replace("1:", "1 to ")}, planned 1 to $ratio")
+        else if (unmeasured) Cell("Ratio", "\u2014", "planned 1:$ratio", "Brew ratio not recorded, planned 1 to $ratio")
         else Cell("Ratio", "1:$ratio", spoken = "Brew ratio 1 to $ratio"),
         brew.timing?.let { Cell("Total brew time", it.totalSeconds?.let(::formatDuration) ?: "Not recorded") },
         Cell("Brewed", dateTime(brew.startedAt)),

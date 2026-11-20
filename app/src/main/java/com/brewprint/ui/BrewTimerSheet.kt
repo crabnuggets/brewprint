@@ -455,8 +455,8 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
     // The blueprint rules the table: light rules between rows and columns, and a double rule under the headings.
     val ruled = LocalLook.current.blueprint
     val cell = if (ruled) Modifier.padding(horizontal = 10.dp, vertical = 9.dp) else Modifier
-    if (LocalDensity.current.fontScale >= 1.3f) {
-        // Large text: the name on its own line, then the three values with their labels.
+    // Large text: the name on its own line, then the three values with their labels.
+    val stacked: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 12.dp)) {
             rows.forEachIndexed { index, row ->
                 if (ruled && index > 0) CellRule()
@@ -466,8 +466,8 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
                 }
             }
         }
-        return
     }
+    if (LocalDensity.current.fontScale >= 1.3f) return stacked()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val strong = body.copy(fontWeight = FontWeight.SemiBold)
@@ -486,11 +486,19 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
             Text(started, cell.width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
             if (reached != null) { divide(); Text(reached, cell.width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1) }
         }
-    Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 10.dp)) {
-        line("Pulse", "Plan", "Started", if (scale != null) "Reached" else null, small, header = true, modifier = Modifier.clearAndSetSemantics { })
-        if (ruled) DoubleRule()
-        rows.forEachIndexed { index, row -> if (ruled && index > 0) CellRule(); line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
+    val table: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 10.dp)) {
+            line("Pulse", "Plan", "Started", if (scale != null) "Reached" else null, small, header = true, modifier = Modifier.clearAndSetSemantics { })
+            if (ruled) DoubleRule()
+            rows.forEachIndexed { index, row -> if (ruled && index > 0) CellRule(); line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
+        }
     }
+    if (!ruled) return table()
+    // Ruled cells are padded, so a narrow screen can leave too little room for the pulse names; then the rows stack.
+    val columns = if (scale != null) 3 else 2
+    val fixed = planWidth + startedWidth + reachedWidth + 20.dp * (columns + 1) + 1.dp * columns
+    val nameWidth = widest(rows.map { it.name }, "Pulse")
+    BoxWithConstraints { if (maxWidth - fixed < nameWidth) stacked() else table() }
 }
 
 /** "9 seconds late", "1 minute 6 seconds early". */
