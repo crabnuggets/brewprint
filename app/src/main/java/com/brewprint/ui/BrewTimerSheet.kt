@@ -418,7 +418,7 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
             val latest = schedule.indices.mapNotNull { index -> timing.pulseStarts.getOrNull(index)?.let { it - schedule[index].startSeconds } }.maxOrNull() ?: 0
             val summary = "Water over brew time against the plan. " + (scale.water?.let { "Ended at ${tenths(it)} grams" } ?: "Final water not recorded") +
                 ", planned ${formatAmount(recipe.totalWater)} grams." + if (latest > 0) " Pulses started up to ${spokenDifference(latest)}." else ""
-            WaterCurve(scale.curve, maxOf(timing.totalSeconds ?: 0, scale.curve.size), recipe.totalWater, plan = planLine(recipe), description = summary)
+            WaterCurve(scale.curve, maxOf(timing.totalSeconds ?: 0, scale.curve.size), recipe.totalWater, plan = planLine(recipe), flows = scale.flows(), description = summary)
         }
         if (!ruled) {
             HorizontalDivider(color = colors.outlineVariant)

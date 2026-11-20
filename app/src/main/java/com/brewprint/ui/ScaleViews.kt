@@ -310,7 +310,7 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
     }
 }
 
-/** What the record's chart lines mean: the actual curve, the plan, and the total. */
+/** What the record's chart lines mean: the actual curve, the plan, the total, and the flow band. */
 @Composable
 internal fun CurveLegend() {
     val colors = MaterialTheme.colorScheme
@@ -318,10 +318,11 @@ internal fun CurveLegend() {
         Canvas(Modifier.size(width = 16.dp, height = 8.dp)) { draw() }
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
-    Row(Modifier.clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    FlowRow(Modifier.clearAndSetSemantics { }, horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item("Actual") { drawLine(colors.onSurface, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
         item("Plan") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 2.5.dp.toPx()) }
         item("Total") { drawLine(colors.outline, Offset(0f, center.y), Offset(size.width, center.y), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 4.dp.toPx()))) }
+        item("Flow") { drawRect(colors.outline.copy(alpha = .5f)) }
     }
 }
 
