@@ -62,6 +62,17 @@ The [v2 polish boards](v2-polish/index.html) are **proposed, awaiting the owner'
 | [Brew sheet](v2-polish/b2.png) | Pour and wait with the labelled chart, dark pour, motion frames |
 | [Finish brew and the record](v2-polish/b3.png) | Finish brew results card, brew record, timing and water at 412 dp and 360 dp |
 
+## v3 blueprint (proposed)
+
+The [v3 blueprint boards](v3-blueprint/index.html) are **three alternative directions**. B, revised with title blocks, is built as the experimental Blueprint theme in Settings; see [the blueprint theme](../../ui-design.md#experimental-blueprint-theme). Monochrome stays the default. They explore a "blueprint" identity that plays on the app's name, with small cafe touches. This departs from two confirmed points in the [UI design direction](../../ui-design.md): "Avoid a coffee or cafe theme", and a mostly monochrome palette for A and B. The brief keeps those points for the default theme. Each board shows the same content: Brew, the brew sheet during a pour with a scale, and the brew record, in light and dark. A parts panel shows the palette, type, and controls.
+
+| Reference | Direction |
+| --- | --- |
+| [A, Cyanotype](v3-blueprint/a.png) | Chalk lines on Prussian blue, with a blueline print for light appearance. Archivo is set wide for titles and narrow for numbers. Cards are ruled frames, and the record is a title block. Cafe touch: a photogram of beans and a cup ring. |
+| [B, Redline](v3-blueprint/b.png) | Graphite on gridded vellum. A red pencil marks only the current target and "Next time". The user's own notes are set in Kalam, and the app's text in Overpass. Cafe touch: drafting tape and a cup-ring stain. |
+| [B, revised with title blocks](v3-blueprint/b2.png) | **Built as the experimental Blueprint theme.** B with A's title block: setup and results in ruled, labelled cells; "Next time" in the block's revision row, ringed to the setting it is about; a ruled timing schedule; a four-cell strip on the latest brew. Tables use drafting line weights: a heavy border that overshoots its corners, light inner rules, and a double rule under headings and before the revision row. The brew sheet drops B's ring on the plan strip, so red marks only the pour target. |
+| [C, Patent figure](v3-blueprint/c.png) | Black ink on white, with a photostat negative for dark appearance. Engraved line art and hatching replace grey fills. The latest brew is drawn as Fig. 1, with numbered callouts. Set in Newsreader. Cafe touch: engraving like a coffee-bag label. |
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.

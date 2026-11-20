@@ -22,10 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.brewprint.data.Appearance
+import com.brewprint.data.Experiments
+import com.brewprint.data.Theme
 import com.brewprint.data.TimerSettings
 import com.brewprint.timer.BrewTimerService
 
@@ -33,7 +37,7 @@ internal fun notificationsAllowed(context: Context): Boolean =
     context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
 
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, scale: @Composable () -> Unit = {}) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
@@ -47,12 +51,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
     Page("Settings", onClose) {
         account()
         SectionTitle("Appearance")
-        Appearance.entries.forEach { option -> Surface(modifier = Modifier.fillMaxWidth().selectable(selected = option == appearance, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onAppearance(option) }), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = option == appearance, onClick = null)
-                Text(option.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.padding(start = 12.dp))
-            }
-        } }
+        Appearance.entries.forEach { option -> Choice(option.name.lowercase().replaceFirstChar { it.uppercase() }, null, option == appearance) { onAppearance(option) } }
         SectionTitle("Brew timer")
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Column(Modifier.padding(vertical = 4.dp)) {
@@ -82,6 +81,24 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
             }
         }
         scale()
+        SectionTitle("Experimental")
+        Text("Features still being tried out. They may change or go away.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text("Theme", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
+        Choice("Monochrome", null, experiments.theme == Theme.MONOCHROME) { onExperiments(experiments.copy(theme = Theme.MONOCHROME)) }
+        Choice("Blueprint", "Graphite on gridded paper, with a red pencil for targets", experiments.theme == Theme.BLUEPRINT) { onExperiments(experiments.copy(theme = Theme.BLUEPRINT)) }
+    }
+}
+
+@Composable
+private fun Choice(label: String, detail: String?, selected: Boolean, onSelect: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = selected, onClick = null)
+            Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(label)
+                if (detail != null) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 

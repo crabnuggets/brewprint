@@ -28,6 +28,12 @@ data class Beans(
 
 @Serializable enum class DialFinish { METAL, MATTE, GLASS }
 @Serializable enum class Appearance { SYSTEM, LIGHT, DARK }
+/** The app's look. Monochrome is the default; Blueprint is an experiment. Both offer the same features. */
+@Serializable enum class Theme { MONOCHROME, BLUEPRINT }
+
+/** Opt-in features that may change or be removed. */
+@Serializable
+data class Experiments(val theme: Theme = Theme.MONOCHROME)
 @Serializable enum class DraftStage { SETUP, SHEET, REVIEW }
 
 @Serializable
@@ -190,6 +196,7 @@ data class AppState(
     val lastBeansId: String? = null,
     val lastRecipeId: String? = null,
     val appearance: Appearance = Appearance.SYSTEM,
+    val experiments: Experiments = Experiments(),
     val timerSettings: TimerSettings = TimerSettings(),
     val scale: PairedScale? = null,
     /** "Not now" on the pairing card hides it for good. */

@@ -148,7 +148,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
-                "settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, onClose = { route = null }, account = { AccountSettings(onError) }) {
+                "settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, onClose = { route = null }, account = { AccountSettings(onError) },
+                    experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }) {
                     ScaleSettings(state.scale, LocalScale.current.live, pairScale) {
                         state.scale?.let { forgetScale(context, it) }
                         repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
@@ -223,7 +224,8 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
             }
         } else {
             SectionTitle("Most recent brew")
-            Panel {
+            val look = LocalLook.current
+            Taped { Panel {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
                         Text(dateTime(recent.startedAt), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -231,12 +233,23 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
                     SoftTextButton(onClick = { onRecord(recent.id) }) { Text("View brew"); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp)) }
                 }
                 Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
-                Text(recent.recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("${formatAmount(recent.recipe.dose)} g · 1:${formatAmount(recent.recipe.ratio)} · ${recent.setting} ticks", Modifier.clearAndSetSemantics { contentDescription = "Coffee dose ${formatAmount(recent.recipe.dose)} grams, brew ratio 1 to ${formatAmount(recent.recipe.ratio)}, ${recent.setting} ticks" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                if (look.blueprint) {
+                    // The user's own notes stay in pencil above the setup; the setup moves to the strip below.
+                    if (recent.journal.impression.isNotBlank()) Text(recent.journal.impression, maxLines = 3, overflow = TextOverflow.Ellipsis, style = look.hand(MaterialTheme.typography.bodyLarge))
+                    if (recent.journal.nextTime.isNotBlank()) Text("Next time: ${recent.journal.nextTime}", maxLines = 2, overflow = TextOverflow.Ellipsis, color = look.accent, style = look.hand(MaterialTheme.typography.bodyLarge))
+                    Spacer(Modifier.height(4.dp))
+                } else {
+                    Text(recent.recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${formatAmount(recent.recipe.dose)} g · 1:${formatAmount(recent.recipe.ratio)} · ${recent.setting} ticks", Modifier.clearAndSetSemantics { contentDescription = "Coffee dose ${formatAmount(recent.recipe.dose)} grams, brew ratio 1 to ${formatAmount(recent.recipe.ratio)}, ${recent.setting} ticks" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                }
                 SecondaryAction("Repeat", enabled = state.draft == null, icon = Icons.Outlined.Repeat) { onRepeat(recent.id) }
                 SoftButton(onClick = { onNotes(recent.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Icon(Icons.Outlined.EditNote, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(if (state.noteEdits.any { it.brewId == recent.id }) "Resume tasting notes" else if (recent.journal.isEmpty) "Add tasting notes" else "Edit tasting notes") }
-            }
+                if (look.blueprint) Column(Modifier.padding(top = 6.dp).bleed(20.dp)) {
+                    DoubleRule()
+                    CellGrid(stripCells(recent.recipe, recent.setting), columns = 4, weights = listOf(1.35f, .9f, .8f, 1f))
+                }
+            } }
         }
         state.noteEdits.filter { it.brewId != recent?.id }.forEach { edit ->
             state.brews.find { it.id == edit.brewId }?.let { brew -> SoftButton(onClick = { onNotes(brew.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Resume tasting notes · ${brew.beans.name}") } }
@@ -341,7 +354,7 @@ private fun HistoryRow(brew: BrewRecord, canRepeat: Boolean, onOpen: () -> Unit,
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(brew.beans.name, style = MaterialTheme.typography.titleMedium)
                 Text("${brew.recipe.name} · ${brew.setting} ticks", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                Text(brew.journal.impression.ifBlank { if (brew.journal.isEmpty) "Add tasting notes" else "View tasting notes" }, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = if (brew.journal.impression.isBlank()) colors.onSurfaceVariant else colors.onSurface)
+                Text(brew.journal.impression.ifBlank { if (brew.journal.isEmpty) "Add tasting notes" else "View tasting notes" }, maxLines = 2, overflow = TextOverflow.Ellipsis, style = if (brew.journal.impression.isBlank()) MaterialTheme.typography.bodyMedium else LocalLook.current.hand(MaterialTheme.typography.bodyMedium), color = if (brew.journal.impression.isBlank()) colors.onSurfaceVariant else colors.onSurface)
             }
             Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp).align(Alignment.CenterVertically), tint = colors.onSurfaceVariant)
         }
@@ -684,6 +697,41 @@ private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: 
     }
 }
 
+/** The four-cell strip on Brew: recipe, dose, ratio, and grind. */
+private fun stripCells(recipe: Recipe, setting: Int): List<Cell> = listOf(
+    Cell("Recipe", recipe.name),
+    Cell("Dose", formatAmount(recipe.dose), "g", "Coffee dose ${formatAmount(recipe.dose)} grams"),
+    Cell("Ratio", "1:${formatAmount(recipe.ratio)}", spoken = "Brew ratio 1 to ${formatAmount(recipe.ratio)}"),
+    Cell("Grind", "$setting", "ticks", "Grind setting, $setting ticks"),
+)
+
+/** A record's title block: its setup, then its results beside the plan where the scale measured them. */
+private fun recordCells(brew: BrewRecord): List<Cell> {
+    val recipe = brew.recipe
+    val dose = formatAmount(recipe.dose)
+    val planned = formatAmount(recipe.totalWater)
+    val ratio = formatAmount(recipe.ratio)
+    val weighed = brew.scale?.weighedDose != null
+    val water = brew.scale?.water
+    val measuredRatio = water?.let { "1:" + "%.1f".format(it / recipe.dose) }
+    // A scale brew whose final water was not seen says so, as the timing section does.
+    val unmeasured = brew.scale != null && water == null
+    return listOfNotNull(
+        Cell("Recipe", recipe.name),
+        Cell("Grinder", brew.grinder.name),
+        Cell("Dose", dose, if (weighed) "g, weighed" else "g", "Coffee dose $dose grams" + if (weighed) ", weighed" else ""),
+        Cell("Grind setting", "${brew.setting}", "ticks", "Grind setting, ${brew.setting} ticks"),
+        if (water != null) Cell("Water", tenths(water), "of $planned g", "Water ${tenths(water)} grams, planned $planned grams")
+        else if (unmeasured) Cell("Water", "\u2014", "planned $planned g", "Water not recorded, planned $planned grams")
+        else Cell("Water", planned, "g", "Total brew water $planned grams"),
+        if (measuredRatio != null) Cell("Ratio", measuredRatio, "of 1:$ratio", "Brew ratio ${measuredRatio.replace("1:", "1 to ")}, planned 1 to $ratio")
+        else if (unmeasured) Cell("Ratio", "\u2014", "planned 1:$ratio", "Brew ratio not recorded, planned 1 to $ratio")
+        else Cell("Ratio", "1:$ratio", spoken = "Brew ratio 1 to $ratio"),
+        brew.timing?.let { Cell("Total brew time", it.totalSeconds?.let(::formatDuration) ?: "Not recorded") },
+        Cell("Brewed", dateTime(brew.startedAt)),
+    )
+}
+
 @Composable
 private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> Unit, onRepeat: () -> Unit, onNotes: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     BackHandler(LocalScreenActive.current) { onClose() }
@@ -692,11 +740,19 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
             Text(brew.beans.name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
             Text(dateTime(brew.startedAt), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
-        if (!brew.journal.isEmpty) Panel { JournalSummary(brew.journal) }
+        val look = LocalLook.current
+        // The blueprint moves "Next time" into the title block's revision row.
+        val journal = if (look.blueprint) brew.journal.copy(nextTime = "") else brew.journal
+        if (!journal.isEmpty) Taped { Panel { JournalSummary(journal) } }
         PrimaryAction(if (hasNoteEdit) "Resume tasting notes" else if (brew.journal.isEmpty) "Add tasting notes" else "Edit tasting notes", icon = Icons.Outlined.EditNote, onClick = onNotes)
         SecondaryAction("Repeat", icon = Icons.Outlined.Repeat, onClick = onRepeat)
         SectionTitle("Preparation")
-        PlanSummary(brew.beans, brew.grinder, brew.setting, brew.recipe, showBeans = false)
+        if (look.blueprint) TitleBlock(recordCells(brew),
+            revision = brew.journal.nextTime.takeIf { it.isNotBlank() }?.let { next -> {
+                Text("Next time", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text(next, Modifier.weight(1f), color = look.accent, style = look.hand(MaterialTheme.typography.bodyLarge))
+            } })
+        else PlanSummary(brew.beans, brew.grinder, brew.setting, brew.recipe, showBeans = false)
         brew.timing?.let { TimingPanel(brew.recipe, it, brew.scale) }
         PlanSchedule(brew.recipe)
         Panel {

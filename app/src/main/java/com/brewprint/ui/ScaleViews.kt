@@ -336,6 +336,9 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium
     val withAxis = plan.isNotEmpty()
+    // The target is what to act on now: red pencil in the blueprint.
+    val targetInk = targetColor()
+    val targetLine = if (LocalLook.current.blueprint) targetInk else colors.onSurface.copy(alpha = .8f)
     // The last pour's target is the total, so it is drawn once, as the target.
     val shownTarget = target
     val showTotal = target == null || abs(target - total) > .05
@@ -345,7 +348,7 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
     Canvas(Modifier.fillMaxWidth().height(if (withAxis) 128.dp else 104.dp).clearAndSetSemantics { if (description.isNotEmpty()) contentDescription = description }) {
         val totalLabel = measurer.measure("${formatAmount(total)} g", labelStyle.copy(color = colors.onSurfaceVariant))
         // When this pour's target is the total, its label says so.
-        val targetLabel = shownTarget?.let { measurer.measure("${formatAmount(it)} g" + if (!showTotal) " total" else "", labelStyle.copy(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) }
+        val targetLabel = shownTarget?.let { measurer.measure("${formatAmount(it)} g" + if (!showTotal) " total" else "", labelStyle.copy(color = targetInk, fontWeight = FontWeight.SemiBold)) }
         val labelWidth = maxOf(totalLabel.size.width, targetLabel?.size?.width ?: 0) + 6.dp.toPx()
         val axisLabel = if (withAxis) measurer.measure("0:00", labelStyle) else null
         val plotTop = totalLabel.size.height / 2f
@@ -380,9 +383,9 @@ internal fun WaterCurve(curve: List<Double?>, seconds: Int, total: Double, targe
             if (clash) drawLine(colors.outline, Offset(width - gap, y(total)), Offset(size.width - totalLabel.size.width - 2.dp.toPx(), totalTop + labelHeight / 2f), 1.5.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(.1f, 3.dp.toPx())))
         }
         if (shownTarget != null && targetLabel != null) {
-            drawLine(colors.onSurface.copy(alpha = .8f), Offset(0f, y(shownTarget)), Offset(width - gap - if (merged && showTotal) 32.dp.toPx() else 0f, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
+            drawLine(targetLine, Offset(0f, y(shownTarget)), Offset(width - gap - if (merged && showTotal) 32.dp.toPx() else 0f, y(shownTarget)), 1.4.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
             drawText(targetLabel, topLeft = Offset(size.width - targetLabel.size.width, targetTop))
-            if (showTotal && abs(y(shownTarget) - y(total)) < labelHeight) drawLine(colors.onSurface.copy(alpha = .8f), Offset(width - gap, y(shownTarget)), Offset(size.width - targetLabel.size.width - 2.dp.toPx(), targetTop + labelHeight / 2f), 1.dp.toPx())
+            if (showTotal && abs(y(shownTarget) - y(total)) < labelHeight) drawLine(targetLine, Offset(width - gap, y(shownTarget)), Offset(size.width - targetLabel.size.width - 2.dp.toPx(), targetTop + labelHeight / 2f), 1.dp.toPx())
         }
         val path = Path()
         var open = false

@@ -115,7 +115,7 @@ private fun ColumnScope.CurrentStep(view: TimerNow, onShowPlan: (Boolean) -> Uni
 private data class FocusTop(val step: Any, val state: String, val who: String?, val paused: Boolean)
 
 /** The two large numbers. Within a step they update in place; a new step swaps them with a blur. */
-private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "")
+private data class FocusNumbers(val step: Any, val leftLabel: String, val left: String, val leftUnit: String, val leftSoft: Boolean, val leftTarget: Boolean = false, val rightLabel: String? = null, val right: String = "", val rightUnit: String = "")
 
 @Composable
 private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
@@ -159,7 +159,7 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
             val onScale = scale?.grams?.takeIf { pouring && !view.paused }
             val numbers = when {
                 pouring || waiting -> FocusNumbers(
-                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null,
+                    step, if (pouring) "Pour to" else "Then pour to", formatAmount(target), "g", !pouring || onScale != null, pouring,
                     if (onScale != null) "On scale" else if (!view.paused) "Time left" else if (pouring) "Pour held at" else "Wait held at",
                     onScale?.let(::tenths) ?: view.leftSeconds.toString(), if (onScale != null) "g" else "s",
                 )
@@ -168,7 +168,7 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
             }
             if (numbers != null) BlurSwap(numbers, { it.step }, Modifier.fillMaxWidth()) { shown ->
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft)
+                    Numeral(shown.leftLabel, shown.left, shown.leftUnit, soft = shown.leftSoft, target = shown.leftTarget)
                     if (shown.rightLabel != null) Numeral(shown.rightLabel, shown.right, shown.rightUnit, alignEnd = true)
                 }
             }
@@ -206,13 +206,15 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
 }
 
 @Composable
-private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false) {
+private fun Numeral(label: String, value: String, unit: String, soft: Boolean = false, alignEnd: Boolean = false, target: Boolean = false) {
     val colors = MaterialTheme.colorScheme
+    // The blueprint marks the grams to pour to now in red pencil.
+    val ink = if (target && LocalLook.current.blueprint) targetColor() else if (soft) colors.onSurfaceVariant else colors.onSurface
     Column(Modifier.semantics(mergeDescendants = true) { }, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             // Counting numbers and scale readings update in place; only a new step animates them.
-            Text(value, color = if (soft) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold).tabular())
+            Text(value, color = ink, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 46.sp, lineHeight = 50.sp, fontWeight = if (soft) FontWeight.Medium else FontWeight.SemiBold).tabular())
             if (unit.isNotEmpty()) Text(unit, Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium))
         }
     }
@@ -392,6 +394,11 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
 internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? = null) {
     val colors = MaterialTheme.colorScheme
     SectionTitle(if (scale != null) "Timing and water" else "Timing")
+    // The blueprint draws the pulse table on its own, ruled like a schedule on a drawing.
+    val ruled = LocalLook.current.blueprint
+    val schedule = recipe.schedule()
+    val unstarted = schedule.indices.any { timing.pulseStarts.getOrNull(it) == null }
+    val key = "Started shows how far each pulse was from the plan: + late, \u2212 early" + (if (unstarted) "; \u2014 means it did not start" else "") + ". " + if (scale != null) "Reached is the scale's steady reading after each pulse; \u2014 means none was recorded." else "Pours are not measured."
     Panel {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Total brew time", Modifier.align(Alignment.CenterVertically))
@@ -403,7 +410,6 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
             timing.totalEdited -> "Edited.$paused"
             else -> "First pour to Finish brew.$paused"
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        val schedule = recipe.schedule()
         if (scale != null) {
             HorizontalDivider(color = colors.outlineVariant)
             MeasuredTrio(recipe, scale)
@@ -414,11 +420,15 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
                 ", planned ${formatAmount(recipe.totalWater)} grams." + if (latest > 0) " Pulses started up to ${spokenDifference(latest)}." else ""
             WaterCurve(scale.curve, maxOf(timing.totalSeconds ?: 0, scale.curve.size), recipe.totalWater, plan = planLine(recipe), description = summary)
         }
-        HorizontalDivider(color = colors.outlineVariant)
-        TimingRows(schedule, timing, scale)
-        val unstarted = schedule.indices.any { timing.pulseStarts.getOrNull(it) == null }
-        Text("Started shows how far each pulse was from the plan: + late, \u2212 early" + (if (unstarted) "; \u2014 means it did not start" else "") + ". " + if (scale != null) "Reached is the scale's steady reading after each pulse; \u2014 means none was recorded." else "Pours are not measured.",
-            color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        if (!ruled) {
+            HorizontalDivider(color = colors.outlineVariant)
+            TimingRows(schedule, timing, scale)
+            Text(key, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    if (ruled) {
+        Column(Modifier.fillMaxWidth().ruled()) { TimingRows(schedule, timing, scale) }
+        Text(key, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -442,18 +452,22 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
     }
     val body = MaterialTheme.typography.bodyLarge
     val small = MaterialTheme.typography.bodySmall
-    if (LocalDensity.current.fontScale >= 1.3f) {
-        // Large text: the name on its own line, then the three values with their labels.
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            rows.forEach { row ->
-                Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = row.spoken }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // The blueprint rules the table: light rules between rows and columns, and a double rule under the headings.
+    val ruled = LocalLook.current.blueprint
+    val cell = if (ruled) Modifier.padding(horizontal = 10.dp, vertical = 9.dp) else Modifier
+    // Large text: the name on its own line, then the three values with their labels.
+    val stacked: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 12.dp)) {
+            rows.forEachIndexed { index, row ->
+                if (ruled && index > 0) CellRule()
+                Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = row.spoken }.then(cell), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(row.name, style = body)
                     Text(listOfNotNull("Plan ${row.plan}", "Started ${row.started}", row.reached?.let { "Reached $it" }).joinToString(" \u00B7 "), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
-        return
     }
+    if (LocalDensity.current.fontScale >= 1.3f) return stacked()
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val strong = body.copy(fontWeight = FontWeight.SemiBold)
@@ -462,17 +476,29 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
     val startedWidth = widest(rows.map { it.started }, "Started")
     val reachedWidth = if (scale != null) widest(rows.map { it.reached.orEmpty() }, "Reached") else 0.dp
     @Composable fun line(name: String, plan: String, started: String, reached: String?, style: androidx.compose.ui.text.TextStyle, header: Boolean, late: Boolean = false, modifier: Modifier) =
-        Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier.fillMaxWidth().then(if (ruled) Modifier.height(IntrinsicSize.Min) else Modifier), horizontalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 12.dp)) {
             val dim = colors.onSurfaceVariant
-            Text(name, Modifier.weight(1f), color = if (header) dim else colors.onSurface, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(plan, Modifier.width(planWidth), color = dim, style = style, textAlign = TextAlign.End, maxLines = 1)
-            Text(started, Modifier.width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
-            if (reached != null) Text(reached, Modifier.width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1)
+            val divide: @Composable () -> Unit = { if (ruled) CellRule(vertical = true) }
+            Text(name, Modifier.weight(1f).then(cell), color = if (header) dim else colors.onSurface, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            divide()
+            Text(plan, cell.width(planWidth), color = dim, style = style, textAlign = TextAlign.End, maxLines = 1)
+            divide()
+            Text(started, cell.width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
+            if (reached != null) { divide(); Text(reached, cell.width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1) }
         }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        line("Pulse", "Plan", "Started", if (scale != null) "Reached" else null, small, header = true, modifier = Modifier.clearAndSetSemantics { })
-        rows.forEach { row -> line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
+    val table: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 10.dp)) {
+            line("Pulse", "Plan", "Started", if (scale != null) "Reached" else null, small, header = true, modifier = Modifier.clearAndSetSemantics { })
+            if (ruled) DoubleRule()
+            rows.forEachIndexed { index, row -> if (ruled && index > 0) CellRule(); line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
+        }
     }
+    if (!ruled) return table()
+    // Ruled cells are padded, so a narrow screen can leave too little room for the pulse names; then the rows stack.
+    val columns = if (scale != null) 3 else 2
+    val fixed = planWidth + startedWidth + reachedWidth + 20.dp * (columns + 1) + 1.dp * columns
+    val nameWidth = widest(rows.map { it.name }, "Pulse")
+    BoxWithConstraints { if (maxWidth - fixed < nameWidth) stacked() else table() }
 }
 
 /** "9 seconds late", "1 minute 6 seconds early". */

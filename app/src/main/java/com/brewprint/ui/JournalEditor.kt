@@ -82,7 +82,7 @@ private fun Tags(options: List<String>, values: List<String>, onChange: (List<St
 fun JournalSummary(journal: Journal) {
     if (journal.impression.isNotBlank()) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("How was this cup?", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(journal.impression, style = MaterialTheme.typography.bodyLarge)
+        Text(journal.impression, style = LocalLook.current.hand(MaterialTheme.typography.bodyLarge))
     }
     listOf(
         "Aroma" to journal.aroma,
@@ -98,7 +98,9 @@ fun JournalSummary(journal: Journal) {
     ).filter { it.second.isNotBlank() }.forEach { (label, value) ->
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value)
+            // The user's own words, in pencil in the blueprint; what to change next time in red.
+            val look = LocalLook.current
+            Text(value, color = if (label == "Next time" && look.blueprint) look.accent else androidx.compose.ui.graphics.Color.Unspecified, style = look.hand(LocalTextStyle.current))
         }
     }
 }

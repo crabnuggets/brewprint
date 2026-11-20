@@ -67,20 +67,25 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brewprint.data.Appearance
+import com.brewprint.data.Theme
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 
 /** The soft fill behind secondary buttons and icon actions; no outlines on buttons. */
 internal val ColorScheme.soft: Color get() = secondaryContainer
 internal val ColorScheme.softPressed: Color get() = surfaceContainerHighest
 
 @Composable
-fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
+fun BrewprintTheme(appearance: Appearance, theme: Theme = Theme.MONOCHROME, content: @Composable () -> Unit) {
     val dark = when (appearance) {
         Appearance.SYSTEM -> isSystemInDarkTheme()
         Appearance.LIGHT -> false
         Appearance.DARK -> true
     }
+    val blueprint = theme == Theme.BLUEPRINT
     // Monochrome levels: titles are the darkest tone, labels a clearly lighter one (still 4.5:1 on cards).
-    val colors = if (dark) darkColorScheme(
+    val colors = if (blueprint) blueprintColors(dark) else if (dark) darkColorScheme(
         primary = Color(0xFFF2F2F4), onPrimary = Color(0xFF111214),
         secondary = Color(0xFFCECED5), onSecondary = Color(0xFF161719),
         background = Color(0xFF0C0D0F), onBackground = Color(0xFFF7F7F8),
@@ -109,27 +114,63 @@ fun BrewprintTheme(appearance: Appearance, content: @Composable () -> Unit) {
         error = Color(0xFFB3261E), onError = Color.White, errorContainer = Color(0xFFFADCD9), onErrorContainer = Color(0xFF8C1D18),
     )
     val base = Typography()
+    // The blueprint sets every style in Overpass, with headings a step heavier.
+    val face: TextStyle.() -> TextStyle = { if (blueprint) copy(fontFamily = Overpass) else this }
+    val heading = if (blueprint) FontWeight.Bold else FontWeight.SemiBold
+    CompositionLocalProvider(LocalLook provides Look(blueprint, dark)) {
     MaterialTheme(
         colorScheme = colors,
         typography = Typography(
-            headlineLarge = base.headlineLarge.copy(fontFamily = FontFamily.SansSerif, fontSize = 34.sp, letterSpacing = (-1).sp, fontWeight = FontWeight.SemiBold),
-            headlineMedium = base.headlineMedium.copy(fontSize = 28.sp, letterSpacing = (-.6).sp, fontWeight = FontWeight.SemiBold),
-            headlineSmall = base.headlineSmall.copy(fontSize = 24.sp, letterSpacing = (-.4).sp, fontWeight = FontWeight.SemiBold),
+            headlineLarge = base.headlineLarge.copy(fontFamily = FontFamily.SansSerif, fontSize = 34.sp, letterSpacing = (-1).sp, fontWeight = heading).face(),
+            headlineMedium = base.headlineMedium.copy(fontSize = 28.sp, letterSpacing = (-.6).sp, fontWeight = FontWeight.SemiBold).face(),
+            headlineSmall = base.headlineSmall.copy(fontSize = 24.sp, letterSpacing = (-.4).sp, fontWeight = heading).face(),
             // Section titles are a step heavier than body text, so a title never reads as a label.
-            titleLarge = base.titleLarge.copy(fontSize = 21.sp, letterSpacing = (-.4).sp, fontWeight = FontWeight.Bold),
-            titleMedium = base.titleMedium.copy(fontSize = 17.sp, letterSpacing = (-.1).sp, fontWeight = FontWeight.Bold),
-            bodyLarge = base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.sp),
-            bodyMedium = base.bodyMedium.copy(letterSpacing = 0.sp, lineHeight = 21.sp),
-            bodySmall = base.bodySmall.copy(letterSpacing = 0.sp),
-            labelLarge = base.labelLarge.copy(fontSize = 15.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold),
-            labelMedium = base.labelMedium.copy(fontSize = 12.sp, letterSpacing = 0.sp),
-            labelSmall = base.labelSmall.copy(letterSpacing = 0.sp),
+            titleLarge = base.titleLarge.copy(fontSize = 21.sp, letterSpacing = (-.4).sp, fontWeight = FontWeight.Bold).face(),
+            titleMedium = base.titleMedium.copy(fontSize = 17.sp, letterSpacing = (-.1).sp, fontWeight = FontWeight.Bold).face(),
+            bodyLarge = base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.sp).face(),
+            bodyMedium = base.bodyMedium.copy(letterSpacing = 0.sp, lineHeight = 21.sp).face(),
+            bodySmall = base.bodySmall.copy(letterSpacing = 0.sp).face(),
+            labelLarge = base.labelLarge.copy(fontSize = 15.sp, letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold).face(),
+            labelMedium = base.labelMedium.copy(fontSize = 12.sp, letterSpacing = 0.sp).face(),
+            labelSmall = base.labelSmall.copy(letterSpacing = 0.sp).face(),
         ),
-        // Buttons use the small shape: softly rounded rectangles, not pills.
-        shapes = Shapes(small = RoundedCornerShape(16.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(24.dp)),
+        // Buttons use the small shape: softly rounded rectangles, not pills. The blueprint's corners are tighter, like cut card.
+        shapes = if (blueprint) Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(6.dp), large = RoundedCornerShape(8.dp))
+            else Shapes(small = RoundedCornerShape(16.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(24.dp)),
         content = content,
     )
+    }
 }
+
+/** Graphite on vellum. Labels stay at least 4.5:1 on cards; the red pencil lives in [Look.accent]. */
+private fun blueprintColors(dark: Boolean) = if (dark) darkColorScheme(
+    primary = Color(0xFFECEEEF), onPrimary = Color(0xFF1C1F22),
+    secondary = Color(0xFFC9CDD1), onSecondary = Color(0xFF1C1F22),
+    background = Color(0xFF1C1F22), onBackground = Color(0xFFEEF0F1),
+    surface = Color(0xFF24282C), onSurface = Color(0xFFEEF0F1),
+    surfaceContainerLowest = Color(0xFF1C1F22), surfaceContainerLow = Color(0xFF24282C),
+    surfaceContainer = Color(0xFF2A2E33), surfaceContainerHigh = Color(0xFF30353A), surfaceContainerHighest = Color(0xFF3D4248),
+    surfaceTint = Color(0xFFECEEEF),
+    surfaceVariant = Color(0xFF30353A), onSurfaceVariant = Color(0xFF99A0A7),
+    outline = Color(0xFF7A8188), outlineVariant = Color(0xFF363B40),
+    secondaryContainer = Color(0xFF30353A), onSecondaryContainer = Color(0xFFEEF0F1),
+    inverseSurface = Color(0xFFE6E8E9), inverseOnSurface = Color(0xFF1C1F22), inversePrimary = Color(0xFF1C1F22),
+    // Deleting and discarding share the red pencil, so the theme has one red.
+    error = Color(0xFFEE7566), onError = Color(0xFF3A0E0A), errorContainer = Color(0xFF4A2220), onErrorContainer = Color(0xFFFFDAD5),
+) else lightColorScheme(
+    primary = Color(0xFF26292E), onPrimary = Color(0xFFF6F7F5),
+    secondary = Color(0xFF4E535A), onSecondary = Color.White,
+    background = Color(0xFFF0F2EF), onBackground = Color(0xFF1F2226),
+    surface = Color.White, onSurface = Color(0xFF1F2226),
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFFAFBFA),
+    surfaceContainer = Color(0xFFECEEEC), surfaceContainerHigh = Color(0xFFE7EAE9), surfaceContainerHighest = Color(0xFFD5DADA),
+    surfaceTint = Color(0xFF26292E),
+    surfaceVariant = Color(0xFFECEFEE), onSurfaceVariant = Color(0xFF666C74),
+    outline = Color(0xFF868D94), outlineVariant = Color(0xFFD2D7DA),
+    secondaryContainer = Color(0xFFE2E6E6), onSecondaryContainer = Color(0xFF1F2226),
+    inverseSurface = Color(0xFF2D3136), inverseOnSurface = Color(0xFFF0F2EF), inversePrimary = Color(0xFFF0F2EF),
+    error = Color(0xFFC4372C), onError = Color.White, errorContainer = Color(0xFFF7DEDA), onErrorContainer = Color(0xFF8A2219),
+)
 
 /** Whether TalkBack-style touch exploration is on, following changes while the app is open. */
 @Composable
@@ -185,7 +226,8 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
     val offset by animateFloatAsState(if (shown) 0f else -headerHeight.toFloat(), tween(280), label = "header")
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val scrolledUnder by remember(scroll) { derivedStateOf { scroll.value > headerHeight } }
-    Column(Modifier.fillMaxSize().imePadding()) {
+    var footerTop by remember { mutableFloatStateOf(0f) }
+    Column(Modifier.fillMaxSize().paper().imePadding()) {
         Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             val density = LocalDensity.current
             Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
@@ -195,7 +237,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
             }
             Row(
                 Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.graphicsLayer { translationY = offset }
-                    .background(MaterialTheme.colorScheme.background)
+                    .paper { offset }
                     .then(if (scrolledUnder) Modifier.drawBehind { drawLine(outlineVariant, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx()) } else Modifier)
                     .padding(start = if (back == null) 24.dp else 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -210,7 +252,7 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
         val bottomPadding = with(density) { 24.dp.roundToPx() }
         val moreBelow by remember(scroll, bottomPadding) { derivedStateOf { scroll.maxValue - scroll.value > bottomPadding } }
         if (footer != null && moreBelow) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        if (footer != null) Box(Modifier.fillMaxWidth().onSizeChanged { chrome.footerSpace = with(density) { it.height.toDp() } }.background(MaterialTheme.colorScheme.background).padding(horizontal = 24.dp, vertical = 12.dp).animateContentSize(tween(300))) { footer() }
+        if (footer != null) Box(Modifier.fillMaxWidth().onSizeChanged { chrome.footerSpace = with(density) { it.height.toDp() } }.onPlaced { footerTop = it.positionInParent().y }.paper { footerTop }.padding(horizontal = 24.dp, vertical = 12.dp).animateContentSize(tween(300))) { footer() }
         else LaunchedEffect(Unit) { chrome.footerSpace = 0.dp }
     }
 }
@@ -220,7 +262,7 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
     AnimatedVisibility(shown, modifier, enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)), exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))) {
         Surface(
             modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).testTag("bottom-navigation"),
-            shape = RoundedCornerShape(29.dp),
+            shape = RoundedCornerShape(LocalLook.current.navRadius),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 6.dp,
@@ -230,7 +272,7 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
                     val selected = destination == selectedTab
                     // The selected destination shows its name beside its icon; the others keep their names for screen readers.
                     Row(
-                        Modifier.clip(RoundedCornerShape(22.dp))
+                        Modifier.clip(RoundedCornerShape(LocalLook.current.pillRadius))
                             .background(if (selected) MaterialTheme.colorScheme.soft else Color.Transparent)
                             .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(destination) })
                             .semantics { if (!selected) text = AnnotatedString(destination) }
@@ -270,7 +312,9 @@ internal fun softFieldColors(): TextFieldColors {
 }
 
 @Composable
-fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun Panel(modifier: Modifier = Modifier, ruled: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+    // A [ruled] panel holds a table; the blueprint draws it in drafting lines instead of a soft card.
+    if (ruled && LocalLook.current.blueprint) return Column(modifier.fillMaxWidth().ruled().animateContentSize(tween(300)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.animateContentSize(tween(300)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
