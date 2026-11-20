@@ -1,0 +1,19 @@
+# Local development only. The hosted project is configured in the Supabase dashboard;
+# `supabase functions deploy` reads the [functions] section below.
+project_id = "brewprint"
+
+[auth]
+# Where `web/` is served locally, for example `python -m http.server 8000 --directory web`.
+site_url = "http://127.0.0.1:8000"
+additional_redirect_urls = ["http://127.0.0.1:8000"]
+
+[auth.oauth_server]
+enabled = true
+# The consent page in web/oauth/consent.html, appended to site_url.
+authorization_url_path = "/oauth/consent.html"
+# MCP clients such as Claude register themselves; the consent page is where you approve them.
+allow_dynamic_registration = true
+
+[functions.brewprint-mcp]
+# The function checks the bearer token itself, so it can answer MCP clients with OAuth discovery hints.
+verify_jwt = false

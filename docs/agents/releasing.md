@@ -49,3 +49,21 @@ The workflow rejects a tag that isn't in the format above, isn't on `main`, or i
 ## After a release
 
 Install the APK from the GitHub Release over the previous release on a phone. Check that it updates without uninstalling, and that "Sign in with Google" still works. Release builds are signed with a different key from debug builds, so a debug build must be uninstalled before a release can be installed, which deletes its local data. Sign in on the debug build and let it sync first.
+
+## The Claude plugin and its server
+
+The Claude plugin is not part of an app release and has no tag. Three parts ship when their PR merges to `main`:
+
+- **MCP server** (`supabase/functions/brewprint-mcp`): `.github/workflows/deploy-mcp.yml` deploys it to the Supabase project. It needs the `SUPABASE_ACCESS_TOKEN` Actions secret, a Supabase personal access token.
+- **Consent page** (`web/`): `.github/workflows/consent-page.yml` publishes it to GitHub Pages at `https://crabnuggets.github.io/brewprint/oauth/consent.html`. Pages must use "GitHub Actions" as its source.
+- **Plugin** (`plugins/brewprint`, listed in `.claude-plugin/marketplace.json`): Claude Code reads it from `main`. Bump `version` in `plugins/brewprint/.claude-plugin/plugin.json` whenever the plugin's files change, using the version rules above; installed copies only update when it changes.
+
+Database migrations in `supabase/migrations/` are not applied by any workflow. The owner applies them, with `supabase link --project-ref ftwdmparhchrafsbmplv` and then `supabase db push`, before merging a PR whose code depends on them.
+
+Label these PRs like any other: `release: feature` for something people will notice, such as a new tool, and `release: fix` otherwise.
+
+### One-time setup, in the Supabase dashboard
+
+1. Authentication → URL Configuration: Site URL `https://crabnuggets.github.io/brewprint`.
+2. Authentication → OAuth Server: turn it on, set the authorization path to `/oauth/consent.html`, and allow dynamic client registration.
+3. In Google Cloud, add `https://crabnuggets.github.io` to the Web OAuth client's authorized JavaScript origins, so the consent page can sign in with Google.
