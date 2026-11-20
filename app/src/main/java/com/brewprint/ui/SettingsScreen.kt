@@ -33,7 +33,7 @@ internal fun notificationsAllowed(context: Context): Boolean =
     context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
 
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, scale: @Composable () -> Unit = {}) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
@@ -45,6 +45,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
     }
     BackHandler(LocalScreenActive.current) { onClose() }
     Page("Settings", onClose) {
+        account()
         SectionTitle("Appearance")
         Appearance.entries.forEach { option -> Surface(modifier = Modifier.fillMaxWidth().selectable(selected = option == appearance, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { onAppearance(option) }), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, colors.outlineVariant)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

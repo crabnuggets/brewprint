@@ -194,4 +194,5 @@ data class AppState(
     val scale: PairedScale? = null,
     /** "Not now" on the pairing card hides it for good. */
     val scaleOfferDismissed: Boolean = false,
+    val sync: SyncState = SyncState(),
 )

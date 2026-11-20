@@ -13,11 +13,32 @@ android {
         applicationId = "com.brewprint"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // The release workflow sets these from the run number and the tag, so each release installs over the last.
+        versionCode = System.getenv("BREWPRINT_VERSION_CODE")?.toInt() ?: 1
+        versionName = System.getenv("BREWPRINT_VERSION") ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Public by design: Supabase row-level security protects the data, not these values.
+        buildConfigField("String", "SUPABASE_URL", "\"https://ftwdmparhchrafsbmplv.supabase.co\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_GfVfBdnCKM-z6p7joMfvEw_KfOgUUTj\"")
+        // The Web OAuth client from Google Cloud; Supabase checks Google's tokens against it.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"728373646004-3f5dv4dfkg5v3goivnufkcp1k5kvoqks.apps.googleusercontent.com\"")
     }
-    buildFeatures { compose = true }
+    // Release builds are signed in CI with the keystore from the repository's Actions secrets.
+    val releaseKeystore = System.getenv("BREWPRINT_KEYSTORE")
+    signingConfigs {
+        if (releaseKeystore != null) create("release") {
+            storeFile = file(releaseKeystore)
+            storePassword = System.getenv("BREWPRINT_KEYSTORE_PASSWORD")
+            keyAlias = "brewprint"
+            keyPassword = System.getenv("BREWPRINT_KEYSTORE_PASSWORD")
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -35,6 +56,14 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    // supabase-kt 3.1 is the newest line built with Kotlin 2.1, which this project uses.
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.ktor:ktor-client-okhttp:3.1.2")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")

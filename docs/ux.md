@@ -8,7 +8,7 @@ See [the UI design direction](ui-design.md) for the owner's visual preferences a
 
 ## Scope and defaults
 
-The first version stores beans, grinders, recipes, and brew records on the device. It works offline, with no account or sign-in. An optional Bluetooth coffee scale can guide a brew (see [Brewing with a scale](#brewing-with-a-scale)); other equipment integrations, cloud sync, sharing, inventory quantities, and analytics are outside this draft's scope. Local storage means uninstalling the app or losing the device can lose the records; export and backup remain a later product decision.
+The app stores beans, grinders, recipes, and brew records on the device and works offline without an account. Signing in with Google is optional and keeps them in the user's account, so they return after a reinstall or on a new phone (see [Account and sync](#account-and-sync)). An optional Bluetooth coffee scale can guide a brew (see [Brewing with a scale](#brewing-with-a-scale)); other equipment integrations, sharing, inventory quantities, and analytics are outside this draft's scope.
 
 The app remembers the default grinder, each grinder's last recorded tick setting, and the most recently used beans and recipe. It shows these choices before each brew so the user can correct them. The app cannot know the physical grinder's current setting; the UI calls it "Last recorded setting".
 
@@ -215,6 +215,19 @@ On the saved record, show the user's written impression first, followed by only 
 
 For example, the user saves a brew before tasting, returns from the Brew screen, writes "Smells like cocoa; lighter than I expected", selects Light body and silky mouthfeel, and adds "Sweeter as it cooled" later. On their next visit to that record, those observations sit beside the exact recipe and tick setting that produced the cup. The app makes no automatic diagnosis or grinder adjustment from tasting notes.
 
+## Account and sync
+
+Settings opens with "Account". Signed out, it explains what signing in keeps and offers "Sign in with Google", which shows Android's Google account picker. Cancelling the picker says nothing; a failure says "Couldn't sign in. Check your connection and try again."
+
+Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
+
+- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, timer settings, and the paired scale stay on the phone.
+- **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
+- **First sign-in.** Anything made on the phone before its first sign-in joins the account; a fresh install receives everything in the account.
+- **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's.
+- **Conflicts.** The newest change to an item wins. A change not yet uploaded from this phone wins over the server's copy.
+- **Signing out** uploads every change first, then removes the account's beans, grinders, recipes, brews, and brew draft from the phone. Settings and the paired scale stay. If changes can't be uploaded, it says "Couldn't upload your latest changes. Connect to the internet and try again." and nothing is removed.
+
 ## Android interaction details
 
 Use numeric keyboards for quantities and durations, readable unit labels, and inline errors next to the relevant fields. Show neutral required indicators before interaction. Show field errors after meaningful editing or after the user leaves the field, and keep untouched blank fields neutral. Required validation still gates saving. Use softly filled rounded fields with subtle borders consistently in library forms, dates, and the tasting journal. Keep primary actions reachable above the keyboard. Support large text and screen readers; read cumulative water with its meaning rather than as an unlabeled number. Use text as well as color for errors and selected defaults. Pulse reordering supports dragging and labeled move actions, so dragging is never required.
@@ -250,6 +263,9 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - Switching the scale off mid-brew follows the clock and keeps a gap in the saved curve.
 - A ten-pulse record at the default text size shows each pulse's timing on one line on a 360 dp wide phone.
 - Swiping a brew away in History and tapping Undo restores it unchanged.
+- After signing in, uninstalling, reinstalling, and signing in again, the library and History come back.
+- A brew deleted on one phone disappears from another signed in to the same account.
+- Signing out and in to a second account shows only the second account's library and History.
 
 ## Assumptions to revisit
 
