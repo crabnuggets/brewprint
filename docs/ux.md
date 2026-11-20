@@ -110,7 +110,7 @@ The brew sheet offers "Start timer" and "Finish without timing". The timer is op
 
 Settings holds the appearance choice and four brew timer switches: "Live notification" (off by default), "Vibrate at each step", "Sound at each step", and "Keep screen on while brewing" (all three on by default). The sound is a short tone at each step change, for a phone propped on the counter where a vibration goes unfelt.
 
-An "Experimental" section at the end of Settings holds features still being tried out. Its first is "Theme": "Monochrome" (the default) or "Blueprint". The choice is saved with the app's data and applies at once. Both themes offer the same screens, actions, and accessibility; only the look differs. See [the blueprint theme](ui-design.md#experimental-blueprint-theme).
+An "Experimental" section at the end of Settings holds features still being tried out. Its first is "Theme": "Monochrome" (the default) or "Blueprint". The choice is saved on the phone, like appearance, and applies at once. Both themes offer the same screens, actions, and accessibility; only the look differs. See [the blueprint theme](ui-design.md#experimental-blueprint-theme).
 
 Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
 
@@ -223,7 +223,7 @@ Settings opens with "Account". Signed out, it explains what signing in keeps and
 
 Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
 
-- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, timer settings, and the paired scale stay on the phone.
+- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, and the paired scale stay on the phone.
 - **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
 - **Signing in.** Anything made on the phone while signed out joins the account; a fresh install receives everything in the account.
 - **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's. If the earlier account still has changes waiting to upload, for example after its session ended while offline, sign-in is refused with "This phone has changes that haven't reached the Google account you used before. Sign in with that account first."
