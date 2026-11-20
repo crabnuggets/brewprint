@@ -21,6 +21,8 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - Use the understated typography of option A from the generated comparison.
 - Reduce unnecessary subtext. Every line should help the user understand information or take an action.
 - Stay monochrome, and separate levels by contrast and weight rather than color. Section titles are darker and heavier than body text; secondary labels are lighter. A title, a label, and an action should never share one tone.
+- The one accent is red, kept for actions that delete or discard: "Discard brew", "Delete brew", and a History row swiped past its delete threshold. A destructive button has a soft red fill with darker red text; a swiped row turns solid red. Archiving stays neutral, since brew records keep the archived item's details.
+- Header actions on a screen are 40 dp round icon buttons with no text, beside the title on the right: a red trash icon for "Discard brew" on setup and Finish brew, and on a Library item a pencil for "Edit" with a ⋮ "More actions" menu for duplicating and archiving. Each keeps its name for screen readers and as a long-press tooltip.
 - Do not outline buttons. A primary action is filled near-black (near-white in dark appearance). A secondary action has a soft gray fill. Text-only actions also get a soft fill so they read as buttons, not prose. Buttons are softly rounded rectangles (16 dp), not pills, and shrink slightly while pressed. Use an icon on an action only where it adds meaning, such as Pause, skip, and Save.
 - Show an inline "Change …" action as a 40 dp round icon button with a soft fill, beside the value it changes: a pencil for a value edited in place (date, total brew time), and a sliders icon for "Change setup", which leaves the screen. Each keeps its name for screen readers and as a long-press tooltip, and has a 48 dp touch target. Full-width actions such as "Repeat" and "Edit brew" keep their text labels.
 
@@ -34,12 +36,14 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 
 Swiping a History row left deletes that brew, with "Undo" for 5 seconds. Swiping it right repeats it. The same actions stay on the brew record, and screen readers offer them as actions on the row, so swiping is never required. Library rows do not swipe; archiving can need a choice of replacement grinder.
 
+While a row is swiped, the action behind it shows on soft gray. Once the swipe passes the point where letting go acts (40% of the row), the phone gives one firm haptic, the fill changes over about 120 ms (to red for Delete, to the solid primary fill for Repeat), and the icon grows slightly. Pulling back under that point gives a lighter haptic and returns to gray. Haptics follow the phone's own settings.
+
 ## Motion
 
 Motion should feel calm and continuous rather than snappy: about 250–400 ms with a gentle ease-out, and nothing that bounces.
 
 - **Screens.** Opening a screen slides it in a short distance while it fades in; Back reverses it. Switching destinations cross-fades.
-- **Focus card.** On each step change, the state word, labels, and large numbers swap with a short blur cross-fade, for example "On scale" to "Time left" when a pour ends. It starts on the same step change as the vibration and sound, so they land together. Numbers that count within a step roll to their next value instead of jumping; the blur is kept for step changes.
+- **Focus card.** On each step change, the state word, labels, and large numbers swap with a short blur cross-fade, for example "On scale" to "Time left" when a pour ends. It starts on the same step change as the vibration and sound, so they land together. Numbers that count within a step, brew time and time left, change in place with fixed-width digits; only the bars move continuously, so the card has one moving thing between steps.
 - **Cards.** Cards grow and shrink smoothly when their content changes, such as the full plan, the scale steps, and the Undo bar.
 - **Chrome.** The header and bottom navigation slide in and out with the scroll. Button labels that change in place, such as Pause and Resume or the skip label, cross-fade.
 - **Reduced motion.** When Android's "Remove animations" is on, every change happens immediately. Where blur is unavailable (before Android 12), the swap is a plain cross-fade.

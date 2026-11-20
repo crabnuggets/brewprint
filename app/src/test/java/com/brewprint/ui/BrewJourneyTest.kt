@@ -115,6 +115,22 @@ class BrewJourneyTest {
         compose.runOnIdle { assertEquals(240.0, repository.state.value.recipes.single().plannedWater, 0.0) }
     }
 
+    @Test fun `recipe actions sit in the header`() {
+        compose.runOnIdle {
+            repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
+                pulses = List(10) { Pulse(water = 24.0, pourSeconds = 5, waitSeconds = if (it < 9) 10 else 0) })).getOrThrow()
+        }
+        tap("Library")
+        tap("Filter")
+        // Reachable without scrolling past ten pulses.
+        compose.onNodeWithContentDescription("Edit recipe").assertIsDisplayed()
+        compose.onNodeWithContentDescription("More actions").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Duplicate recipe").assertExists()
+        compose.onNodeWithText("Archive recipe").performClick()
+        compose.onNodeWithText("Archive").performClick()
+        compose.runOnIdle { assertTrue(repository.state.value.recipes.single().archived) }
+    }
+
     @Test fun `partial date correction requires discard confirmation`() {
         seedBrew()
         tap("View brew")

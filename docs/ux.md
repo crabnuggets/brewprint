@@ -84,7 +84,7 @@ Allow removing pulses and dragging them by a clearly labeled handle to rearrange
 
 Below the list, show "Planned pours: 240 g / Target: 240 g". If the rounded pulse sum differs from the target, show the difference, such as "Add 20 g across your pulses to reach 240 g". Keep the edits on screen but block saving until they match. Changing dose or ratio recalculates the target without silently scaling the pulses; explain the resulting mismatch beside the total.
 
-Allow editing, duplicating, and archiving recipes. A brew-specific recipe adjustment is outside the first version: duplicate or edit the recipe before using it. Existing brew records retain the recipe as it was at the time.
+Allow editing, duplicating, and archiving recipes. On a Library item's screen these sit in the header, as "Edit" and a "More actions" menu, so a long recipe never hides them. A brew-specific recipe adjustment is outside the first version: duplicate or edit the recipe before using it. Existing brew records retain the recipe as it was at the time.
 
 ## Brew sheet and timing
 
@@ -99,7 +99,7 @@ These numbers demonstrate the UI and calculations; they are not a recommended re
 The brew sheet offers "Start timer" and "Finish without timing". The timer is optional; an untimed brew works as before. See the [brew timer mockups](design/mockups/brew-timer/index.html) for appearance.
 
 - **Steps.** A step is a pour or a wait. The timer moves through the recipe's steps on schedule. A zero wait starts the next pour immediately. After the last pour the sheet shows "Drawdown" and brew time keeps counting until "Finish brew".
-- **Focus card.** It leads with the state word, "Pour", "Wait", "Paused" or "Drawdown", then the cumulative scale reading to pour to and the seconds left. A plan strip shows the whole recipe, and "Next" lists up to two upcoming rows (one while a scale guides the brew, to make room for its curve). "N done, show plan" opens the full plan, which stays open until "Back to current step".
+- **Focus card.** It leads with the state word, "Pour", "Wait", "Paused" or "Drawdown", then the cumulative scale reading to pour to and the seconds left. A plan strip shows the whole recipe, and "Next" lists up to two upcoming rows (one while a scale guides the brew, to make room for its curve). "N done, show plan" opens the full plan, which stays open until "Back to current step", the Back arrow, or Android Back, each of which returns to the current step.
 - **Skip.** The skip button is labelled by its effect, in two or three words so it fits a phone: "Pour done" during a pour, "Start pulse N" during a wait. Skipping moves every later step earlier and keeps their durations. The button ignores taps for 1 second after a step changes. "Undo" is offered for 5 seconds and restores the schedule as it was, even if a step has changed on its own in that time.
 - **Pause.** "Pause" holds the schedule while brew time keeps counting. "Resume" continues the held step; "Start pulse N" ends the pause and starts the next pour. Pause is not offered during drawdown.
 - **Finish.** "Finish brew" stops the clock and opens the review with "Total brew time", which can be corrected. Back from the review restores the timer as it was, including a pause.
@@ -167,6 +167,8 @@ The live notification is unchanged during a scale brew: its chip still shows the
 4. "How was this cup?"
 
 The three "Change …" actions are icon buttons with those names.
+
+"Discard brew", a red trash icon in the header of setup and of the review, asks "Discard this brew?" with "Keep brew" and "Discard". Discarding removes the draft and saves nothing. The running sheet has no discard: "Finish brew", then "Discard brew".
 
 A completed record stores the recipe plan, beans' details, grinder name, and tick setting as they were used, along with date/time and observations. Later library edits do not rewrite history. Planned amounts and durations remain labeled as planned. A timed brew also stores its total brew time, the time spent paused, and each pulse's actual start, shown in a "Timing" section beside the planned starts. Each pulse takes one line: its name, planned start, and how its actual start differed, as "On time", "+9 s" (late), or "−12 s" (early). Screen readers hear "9 seconds late" and "12 seconds early". An untimed brew has no Timing section. Without a scale, the app does not measure water amounts or pour durations.
 

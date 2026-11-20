@@ -176,6 +176,28 @@ class PolishJourneyTest {
         compose.runOnIdle { assertEquals(record.recipe, repository.state.value.draft?.recipe) }
     }
 
+    @Test fun `a swipe gives a haptic as it crosses the delete threshold and as it pulls back`() {
+        open { saveScaleRecord() }
+        compose.onNodeWithText("History").performClick()
+        // The view the app's Compose content draws into, which performs the haptics.
+        val host = compose.runOnIdle { generateSequence(listOf(compose.activity.window.decorView)) { views -> views.flatMap { (it as? android.view.ViewGroup)?.let { group -> (0 until group.childCount).map(group::getChildAt) } ?: emptyList() }.takeIf { it.isNotEmpty() } }.flatten().first { it.javaClass.simpleName == "AndroidComposeView" } }
+        fun last() = compose.runOnIdle { org.robolectric.Shadows.shadowOf(host).lastHapticFeedbackPerformed() }
+        val row = compose.onNodeWithText("Ethiopia natural")
+        row.performTouchInput { down(centerRight - androidx.compose.ui.geometry.Offset(20f, 0f)); moveBy(androidx.compose.ui.geometry.Offset(-width * .25f, 0f)) }
+        assertEquals(-1, last())
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(-width * .3f, 0f)) }
+        // API 28 here: the threshold uses a long-press haptic, pulling back a clock tick.
+        assertEquals(android.view.HapticFeedbackConstants.LONG_PRESS, last())
+        row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(width * .5f, 0f)) }
+        assertEquals(android.view.HapticFeedbackConstants.CLOCK_TICK, last())
+        row.performTouchInput { up() }
+        compose.runOnIdle { assertEquals(1, repository.state.value.brews.size) }
+        // Repeat springs the row back without the pull-back haptic.
+        row.performTouchInput { swipeRight() }
+        compose.runOnIdle { assertTrue(repository.state.value.draft != null) }
+        assertEquals(android.view.HapticFeedbackConstants.LONG_PRESS, last())
+    }
+
     @Test fun `two deletes in a row share one Undo that restores both`() {
         lateinit var first: BrewRecord
         lateinit var second: BrewRecord

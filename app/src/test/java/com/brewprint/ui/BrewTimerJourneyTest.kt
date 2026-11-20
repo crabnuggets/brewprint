@@ -102,7 +102,11 @@ class BrewTimerJourneyTest {
         tap("2 done, show plan")
         compose.onNodeWithText("Started 8 s early. Planned for 0:40", substring = true).assertExists()
         compose.onNodeWithText("Started 7 s late. Planned for 1:20", substring = true).assertExists()
-        tap("Back to current step")
+        // Back from the full plan returns to the current step, not to setup.
+        compose.onNodeWithContentDescription("Back").performClick()
+        shows("Pulse 3 of 3")
+        compose.onNodeWithText("Planned pours").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(DraftStage.SHEET, repository.state.value.draft?.stage) }
         tap("Finish brew")
         compose.onNodeWithContentDescription("Back").performClick()
         shows("Pulse 3 of 3")
@@ -114,6 +118,32 @@ class BrewTimerJourneyTest {
             assertEquals(15, timing.pausedSeconds)
             assertEquals(92, timing.totalSeconds)
         }
+    }
+
+    @Test fun `a finished brew can be discarded from the review`() {
+        tap("Start timer")
+        pass(30)
+        tap("Finish brew")
+        tap("Discard brew")
+        shows("Discard this brew?")
+        tap("Keep brew")
+        compose.runOnIdle { assertEquals(DraftStage.REVIEW, repository.state.value.draft?.stage) }
+        tap("Discard brew")
+        tap("Discard")
+        compose.runOnIdle {
+            assertNull(repository.state.value.draft)
+            assertTrue(repository.state.value.brews.isEmpty())
+        }
+        shows("New brew")
+    }
+
+    @Test fun `setup offers Discard brew in its header`() {
+        compose.onNodeWithContentDescription("Back").performClick()
+        shows("Use this plan")
+        compose.onNodeWithText("Discard brew").assertDoesNotExist()
+        tap("Discard brew")
+        tap("Discard")
+        compose.runOnIdle { assertNull(repository.state.value.draft) }
     }
 
     @Test fun `a forgotten brew opens the review with no total until one is entered`() {
