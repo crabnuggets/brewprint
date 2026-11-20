@@ -247,7 +247,7 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
                 SoftButton(onClick = { onNotes(recent.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Icon(Icons.Outlined.EditNote, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(if (state.noteEdits.any { it.brewId == recent.id }) "Resume tasting notes" else if (recent.journal.isEmpty) "Add tasting notes" else "Edit tasting notes") }
                 if (look.blueprint) Column(Modifier.padding(top = 6.dp).bleed(20.dp)) {
                     DoubleRule()
-                    CellGrid(setupCells(recent.recipe, recent.setting, short = true), columns = 4, weights = listOf(1.35f, .9f, .8f, 1f))
+                    CellGrid(stripCells(recent.recipe, recent.setting), columns = 4, weights = listOf(1.35f, .9f, .8f, 1f))
                 }
             } }
         }
@@ -697,14 +697,35 @@ private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: 
     }
 }
 
-/** Dose, grind, water and ratio as title-block cells. [short] is the four-cell strip on Brew: recipe, dose, ratio, grind. */
-private fun setupCells(recipe: Recipe, setting: Int, short: Boolean = false, weighed: Boolean = false): List<Cell> {
+/** The four-cell strip on Brew: recipe, dose, ratio, and grind. */
+private fun stripCells(recipe: Recipe, setting: Int): List<Cell> = listOf(
+    Cell("Recipe", recipe.name),
+    Cell("Dose", formatAmount(recipe.dose), "g", "Coffee dose ${formatAmount(recipe.dose)} grams"),
+    Cell("Ratio", "1:${formatAmount(recipe.ratio)}", spoken = "Brew ratio 1 to ${formatAmount(recipe.ratio)}"),
+    Cell("Grind", "$setting", "ticks", "Grind setting, $setting ticks"),
+)
+
+/** A record's title block: its setup, then its results beside the plan where the scale measured them. */
+private fun recordCells(brew: BrewRecord): List<Cell> {
+    val recipe = brew.recipe
     val dose = formatAmount(recipe.dose)
+    val planned = formatAmount(recipe.totalWater)
     val ratio = formatAmount(recipe.ratio)
-    val doseCell = Cell("Dose", dose, if (weighed) "g, weighed" else "g", "Coffee dose $dose grams" + if (weighed) ", weighed" else "")
-    val ratioCell = Cell("Ratio", "1:$ratio", spoken = "Brew ratio 1 to $ratio")
-    return if (short) listOf(Cell("Recipe", recipe.name), doseCell, ratioCell, Cell("Grind", "$setting", "ticks", "Grind setting, $setting ticks"))
-    else listOf(doseCell, Cell("Grind setting", "$setting", "ticks", "Grind setting, $setting ticks"), Cell("Water", formatAmount(recipe.totalWater), "g", "Total brew water ${formatAmount(recipe.totalWater)} grams"), ratioCell)
+    val weighed = brew.scale?.weighedDose != null
+    val water = brew.scale?.water
+    val measuredRatio = water?.let { "1:" + "%.1f".format(it / recipe.dose) }
+    return listOfNotNull(
+        Cell("Recipe", recipe.name),
+        Cell("Grinder", brew.grinder.name),
+        Cell("Dose", dose, if (weighed) "g, weighed" else "g", "Coffee dose $dose grams" + if (weighed) ", weighed" else ""),
+        Cell("Grind setting", "${brew.setting}", "ticks", "Grind setting, ${brew.setting} ticks"),
+        if (water != null) Cell("Water", tenths(water), "of $planned g", "Water ${tenths(water)} grams, planned $planned grams")
+        else Cell("Water", planned, "g", "Total brew water $planned grams"),
+        if (measuredRatio != null) Cell("Ratio", measuredRatio, "of 1:$ratio", "Brew ratio ${measuredRatio.replace("1:", "1 to ")}, planned 1 to $ratio")
+        else Cell("Ratio", "1:$ratio", spoken = "Brew ratio 1 to $ratio"),
+        brew.timing?.let { Cell("Total brew time", it.totalSeconds?.let(::formatDuration) ?: "Not recorded") },
+        Cell("Brewed", dateTime(brew.startedAt)),
+    )
 }
 
 @Composable
@@ -722,7 +743,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         PrimaryAction(if (hasNoteEdit) "Resume tasting notes" else if (brew.journal.isEmpty) "Add tasting notes" else "Edit tasting notes", icon = Icons.Outlined.EditNote, onClick = onNotes)
         SecondaryAction("Repeat", icon = Icons.Outlined.Repeat, onClick = onRepeat)
         SectionTitle("Preparation")
-        if (look.blueprint) TitleBlock(listOf(Cell("Recipe", brew.recipe.name), Cell("Grinder", brew.grinder.name)) + setupCells(brew.recipe, brew.setting, weighed = brew.scale?.weighedDose != null),
+        if (look.blueprint) TitleBlock(recordCells(brew),
             revision = brew.journal.nextTime.takeIf { it.isNotBlank() }?.let { next -> {
                 Text("Next time", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 Text(next, Modifier.weight(1f), color = look.accent, style = look.hand(MaterialTheme.typography.bodyLarge))
