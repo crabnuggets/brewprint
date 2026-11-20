@@ -311,7 +311,6 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
 }
 
 /** What the record's chart lines mean: the actual curve, the plan, the total, and the flow band. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun CurveLegend() {
     val colors = MaterialTheme.colorScheme
