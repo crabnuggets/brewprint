@@ -1,0 +1,22 @@
+name: Release label
+
+# Every PR says what kind of change it is, so the next release's version can be read off the merged PRs.
+# See docs/agents/releasing.md.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  release-label:
+    name: Release label
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for exactly one release label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          count=$(echo "$LABELS" | jq '[.[] | select(. == "release: fix" or . == "release: feature" or . == "release: breaking")] | length')
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Add exactly one of the labels release: fix, release: feature or release: breaking. See docs/agents/releasing.md."
+            exit 1
+          fi

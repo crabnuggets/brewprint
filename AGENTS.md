@@ -14,7 +14,7 @@ Use a single-context layout. Before exploring the codebase, read `docs/agents/do
 
 ### Releases
 
-A release is a tag on `main`, and only the owner decides to release. Before tagging, choosing a version number, or changing the release workflow, read `docs/agents/releasing.md`.
+Every PR needs exactly one label: `release: fix`, `release: feature` or `release: breaking`. Add it when filing the PR. A release is a tag on `main`, and only the owner decides to release. Before labeling a PR, tagging, choosing a version number, or changing the release workflows, read `docs/agents/releasing.md`.
 
 ### UI work
 

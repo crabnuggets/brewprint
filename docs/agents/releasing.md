@@ -16,6 +16,26 @@ A build for testing before a release adds `-beta.N`: `v0.3.0-beta.1`, then `v0.3
 
 The tag sets both numbers in the APK. `versionName` is the tag without its `v`. `versionCode` is the release workflow's run number, which only goes up, so each release installs over the previous one. Local builds are `0.1.0` with code 1.
 
+## Labeling every PR
+
+Every PR carries exactly one release label, set by whoever opens it, because that is when the kind of change is clearest:
+
+- `release: fix`: fixes, and changes that don't reach users, such as docs, CI, tests and refactors.
+- `release: feature`: a new feature or a change people will notice.
+- `release: breaking`: breaks existing data, or sync between app versions.
+
+Add it when filing the PR (`gh pr create --label "release: fix"`) or right after. The "Release label" check fails until the PR has exactly one. If the PR's scope changes during review, change the label too.
+
+## Choosing the next version
+
+1. Find the newest tag: `git fetch origin --tags && git tag -l 'v*' --sort=-v:refname | head -1`.
+2. List the PRs merged since then: `git log <tag>..origin/main --format=%s`. Each squash commit ends in its PR number.
+3. Read their labels: `gh pr list --state merged --base main --limit 200 --search "merged:>=<tag's date, YYYY-MM-DD>" --json number,title,labels`. Keep only the PRs from step 2.
+4. The highest label wins: any `release: breaking` bumps MAJOR, otherwise any `release: feature` bumps MINOR, otherwise PATCH. Before any tag exists, the first release is `v0.2.0`.
+5. A PR without a label: read it, judge it, and say so in the proposal.
+6. Propose the version to the owner with the evidence, and wait for the go-ahead:
+   > v0.3.0: #21 Add CSV export (feature); #22, #23 (fix)
+
 ## Rules
 
 - **Only the owner decides to release.** Never push a tag unless the owner asked for that exact release. When a release seems due, propose the version and give the reason in one line, for example "v0.3.0: adds CSV export".
