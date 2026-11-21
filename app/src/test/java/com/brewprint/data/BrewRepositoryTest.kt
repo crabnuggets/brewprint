@@ -101,6 +101,24 @@ class BrewRepositoryTest {
         assertTrue(repository.saveBrew(withoutGrinder.id).isFailure)
     }
 
+    @Test fun `deleted beans leave records intact and a draft using them must choose other beans`() {
+        val record = savedBrew()
+        assertEquals(beans.id, repository.state.value.lastBeansId)
+        repository.deleteBeans(beans.id).getOrThrow()
+        assertTrue(repository.state.value.beans.isEmpty())
+        assertNull(repository.state.value.lastBeansId)
+        assertEquals(record, repository.state.value.brews.single())
+        assertTrue(repository.deleteBeans(beans.id).isFailure)
+
+        val repeated = repository.repeatBrew(record.id).getOrThrow()
+        repository.updateDraft(repeated.copy(stage = DraftStage.REVIEW, allowArchivedBeans = true)).getOrThrow()
+        assertTrue(repository.saveBrew(repeated.id).isFailure)
+        val other = Beans(name = "Kenya", roaster = "Sample")
+        repository.upsertBeans(other).getOrThrow()
+        repository.updateDraft(repository.state.value.draft!!.copy(beans = other)).getOrThrow()
+        assertEquals(other, repository.saveBrew(repeated.id).getOrThrow().beans)
+    }
+
     @Test fun `note edits survive restart and discard preserves saved journal`() {
         val record = savedBrew(Journal(impression = "Original"))
         val edited = Journal(impression = "As it cools", body = "Light", mouthfeelTags = listOf("silky"))

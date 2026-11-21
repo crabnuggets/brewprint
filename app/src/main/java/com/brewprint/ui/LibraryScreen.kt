@@ -3,6 +3,9 @@ package com.brewprint.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Check
@@ -11,15 +14,25 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
@@ -33,6 +46,8 @@ fun LibraryScreen(
     onPicked: ((String, String) -> Unit)? = null,
     onClose: (() -> Unit)? = null,
     onEditingChanged: (Boolean) -> Unit = {},
+    /** Shows Undo for an action a swipe has just taken. */
+    onUndoable: (BeansUndo) -> Unit = {},
 ) {
     var kind by rememberSaveable(requestedKind) { mutableStateOf(requestedKind ?: "") }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -48,6 +63,8 @@ fun LibraryScreen(
     var editing by rememberSaveable { mutableStateOf(pickingFromEmpty) }
     val leaveEditor = { editing = false; draftId = null; if (pickingFromEmpty) onClose?.invoke(); Unit }
     var archive by rememberSaveable { mutableStateOf(false) }
+    var delete by rememberSaveable { mutableStateOf(false) }
+    var archivedList by rememberSaveable { mutableStateOf(false) }
     var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var settingDialog by rememberSaveable { mutableStateOf(false) }
     var settingText by rememberSaveable { mutableStateOf("") }
@@ -57,7 +74,9 @@ fun LibraryScreen(
     val libraryDraft = state.libraryDrafts.find { it.id == draftId }
     // Added on another phone or discarded by Claude while under review: there is nothing left to add.
     if (draftId != null && libraryDraft == null) LaunchedEffect(Unit) { leaveEditor() }
-    val closeDetail = { detailId = null; editing = false; Unit }
+    val closeDetail = { detailId = null; editing = false; archive = false; delete = false; Unit }
+    // Beans deleted on another phone while open here: there is nothing left to show or edit.
+    if (kind == "beans" && detailId != null && beans == null) LaunchedEffect(Unit) { closeDetail() }
     fun save(result: Result<Unit>): Boolean {
         result.exceptionOrNull()?.let { onError(it.message ?: "Couldn't save changes. Try again.") }
         return result.isSuccess
@@ -66,6 +85,13 @@ fun LibraryScreen(
         editing = false
         draftId = null
         if (onPicked != null) onPicked(kind, id) else detailId = id
+    }
+    // A swipe acts at once and offers Undo.
+    fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
+    fun swipeUnarchive(item: Beans) { if (save(repository.unarchiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.UNARCHIVED, item)) }
+    fun swipeDelete(item: Beans) {
+        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId)
+        if (save(repository.deleteBeans(item.id))) onUndoable(undo)
     }
     LaunchedEffect(editing) { onEditingChanged(editing) }
     DisposableEffect(Unit) { onDispose { onEditingChanged(false) } }
@@ -99,11 +125,15 @@ fun LibraryScreen(
                         val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
                         if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
                     })
-                    DropdownMenuItem(text = { Text("Archive ${kindLabel(kind)}") }, leadingIcon = { Icon(Icons.Outlined.Archive, null) }, onClick = { menu = false; replacementId = null; archive = true })
+                    if (beans != null && beans.archived) DropdownMenuItem(text = { Text("Unarchive beans") }, leadingIcon = { Icon(Icons.Outlined.Unarchive, null) }, onClick = { menu = false; save(repository.unarchiveBeans(beans.id)) })
+                    else DropdownMenuItem(text = { Text("Archive ${kindLabel(kind)}") }, leadingIcon = { Icon(Icons.Outlined.Archive, null) }, onClick = { menu = false; replacementId = null; archive = true })
+                    if (beans != null && kind == "beans") DropdownMenuItem(text = { Text("Delete beans") }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { menu = false; delete = true },
+                        colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.error, leadingIconColor = MaterialTheme.colorScheme.error))
                 }
             }
         }) {
             if (beans != null && kind == "beans") {
+                if (beans.archived) Text("Archived", style = MaterialTheme.typography.labelLarge)
                 DetailLine("Roaster", beans.roaster)
                 DetailLine("Origin", beans.origin)
                 DetailLine("Variety / cultivar", beans.variety)
@@ -135,6 +165,14 @@ fun LibraryScreen(
                 DetailLine("Preparation notes", recipe.notes)
             }
         }
+    } else if (archivedList) {
+        val back = { archivedList = false }
+        BackHandler(LocalScreenActive.current, back)
+        LibraryPage("Archived beans", back) {
+            val archived = state.beans.filter { it.archived }
+            if (archived.isEmpty()) Text("No archived beans.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            archived.forEach { item -> key(item.id) { SwipeRow(item.name, item.roaster, { kind = "beans"; detailId = item.id }, SwipeAction("Unarchive", Icons.Outlined.Unarchive) { swipeUnarchive(item) }, onDelete = { swipeDelete(item) }) } }
+        }
     } else {
         if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
         LibraryPage(if (requestedKind == null) "Library" else "Choose ${kindLabel(requestedKind)}", onClose) {
@@ -163,12 +201,17 @@ fun LibraryScreen(
                 }
                 if (items.isEmpty()) Text("No $currentKind yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 items.forEach { (id, content) ->
-                    LibraryRow(content.first, content.second) {
+                    val open: () -> Unit = {
                         kind = currentKind
                         if (onPicked != null) onPicked(currentKind, id) else detailId = id
                     }
+                    // Beans swipe to archive or delete in the Library, not while picking for a brew.
+                    val swipeable = state.beans.find { it.id == id }?.takeIf { currentKind == "beans" && onPicked == null }
+                    if (swipeable != null) key(id) { SwipeRow(content.first, content.second, open, SwipeAction("Archive", Icons.Outlined.Archive) { swipeArchive(swipeable) }, onDelete = { swipeDelete(swipeable) }) }
+                    else LibraryRow(content.first, content.second, onClick = open)
                     if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) SoftTextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
                 }
+                if (currentKind == "beans" && onPicked == null && state.beans.any { it.archived }) SoftTextButton(onClick = { archivedList = true }) { Text("Archived beans") }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -199,6 +242,10 @@ fun LibraryScreen(
             }) { Text("Archive") }
         }, dismissButton = { SoftTextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
     }
+    if (delete && beans != null) AlertDialog(onDismissRequest = { delete = false }, title = { Text("Delete these beans?") },
+        text = { Text("Existing brew records keep their saved details. You can't undo this.") },
+        confirmButton = { SoftTextButton(onClick = { if (save(repository.deleteBeans(beans.id))) { delete = false; detailId = null } }, danger = true) { Text("Delete") } },
+        dismissButton = { SoftTextButton(onClick = { delete = false }) { Text("Keep beans") } })
     if (settingDialog && grinder != null) AlertDialog(onDismissRequest = { settingDialog = false }, title = { Text("Update last recorded setting") }, text = {
         LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
     }, confirmButton = { SoftTextButton(enabled = parseGrindSetting(settingText) != null, onClick = {
@@ -207,8 +254,8 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryRow(title: String, detail: String, onClick: () -> Unit) {
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+private fun LibraryRow(title: String, detail: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
@@ -216,6 +263,87 @@ private fun LibraryRow(title: String, detail: String, onClick: () -> Unit) {
             }
             Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+private const val ARCHIVE_REACH = .3f
+private const val DELETE_REACH = .65f
+
+/**
+ * What a Library swipe did, kept as data so its Undo is offered again if the screen is recreated.
+ * [shownUntil] is when the Undo window ends, once its bar has shown.
+ */
+@kotlinx.serialization.Serializable
+data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boolean = false, val account: String? = null, val shownUntil: Long? = null) {
+    enum class Action(val message: String) { ARCHIVED("Beans archived"), UNARCHIVED("Beans unarchived"), DELETED("Beans deleted") }
+
+    /** Reverses only what the swipe did: the archive flag on beans still in the Library, or deleted beans while the phone is in the same account. */
+    fun undo(repository: BrewRepository): Result<Unit> {
+        val present = repository.state.value.beans.any { it.id == beans.id }
+        return when (action) {
+            Action.ARCHIVED -> if (present) repository.unarchiveBeans(beans.id) else Result.success(Unit)
+            Action.UNARCHIVED -> if (present) repository.archiveBeans(beans.id) else Result.success(Unit)
+            Action.DELETED -> repository.restoreBeans(beans, remembered, account)
+        }
+    }
+}
+
+/** What a short swipe does: archive, or for archived beans, unarchive. */
+private class SwipeAction(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val act: () -> Unit)
+
+/**
+ * A Library row that swipes left: a short swipe, past 30% of the row, takes [short] in amber; a long one, past 65%, deletes it in red.
+ * Crossing each point gives a haptic, and screen readers get both actions on the row.
+ */
+@Composable
+private fun SwipeRow(title: String, detail: String, onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val view = LocalView.current
+    var width by remember { mutableIntStateOf(0) }
+    var offset by remember { mutableFloatStateOf(0f) }
+    // 0 springs back, 1 archives, 2 deletes.
+    fun stageAt(at: Float): Int {
+        val reach = if (width == 0) 0f else -at / width
+        return if (reach >= DELETE_REACH) 2 else if (reach >= ARCHIVE_REACH) 1 else 0
+    }
+    val stage = stageAt(offset)
+    var felt by remember { mutableIntStateOf(0) }
+    LaunchedEffect(stage) { if (stage != felt) { view.thresholdHaptic(armed = stage > felt); felt = stage } }
+    val fade = androidx.compose.animation.core.tween<androidx.compose.ui.graphics.Color>(120)
+    val fill by androidx.compose.animation.animateColorAsState(when {
+        stage == 2 -> colors.error
+        stage == 1 -> colors.archive
+        offset < 0f -> colors.soft
+        else -> androidx.compose.ui.graphics.Color.Transparent
+    }, fade, label = "swipe-fill")
+    val ink by androidx.compose.animation.animateColorAsState(when (stage) { 2 -> colors.onError; 1 -> colors.onArchive; else -> colors.onSurfaceVariant }, fade, label = "swipe-ink")
+    val deleting = stage == 2
+    val scope = rememberCoroutineScope()
+    val shortAction by rememberUpdatedState(short)
+    val deleteAction by rememberUpdatedState(onDelete)
+    // Every action comes from one whole gesture: a new drag stops any spring back and starts from rest.
+    var settling by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun settle() { settling = scope.launch { animate(offset, 0f, animationSpec = androidx.compose.animation.core.tween(250)) { value, _ -> offset = value } } }
+    Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).onSizeChanged { width = it.width }) {
+        Row(Modifier.matchParentSize().background(fill).padding(horizontal = 22.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (offset < 0f) {
+                Text(if (deleting) "Delete" else short.label, color = ink, style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.width(8.dp))
+                Icon(if (deleting) Icons.Outlined.Delete else short.icon, null, tint = ink)
+            }
+        }
+        LibraryRow(title, detail, Modifier
+            .offset { IntOffset(offset.roundToInt(), 0) }
+            // Only letting go acts; a cancelled drag, such as one the system's back gesture takes over, springs back.
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { when (stageAt(offset)) { 2 -> deleteAction(); 1 -> shortAction.act() }; settle() },
+                    onDragStart = { settling?.cancel(); offset = 0f },
+                    onDragCancel = ::settle,
+                ) { change, delta -> change.consume(); offset = (offset + delta).coerceIn(-width.toFloat(), 0f) }
+            }
+            .semantics { customActions = listOf(CustomAccessibilityAction(short.label) { short.act(); true }, CustomAccessibilityAction("Delete") { onDelete(); true }) },
+            onClick = onOpen)
     }
 }
 

@@ -132,6 +132,7 @@ fun AppState.withRemote(items: List<RemoteItem>, pulledUpTo: String?): AppState 
         brews = next.brews.sortedByDescending { it.startedAt },
         noteEdits = next.noteEdits.filter { edit -> next.brews.any { it.id == edit.brewId } },
         defaultGrinderId = next.defaultGrinderId?.takeIf { id -> activeGrinders.any { it.id == id } } ?: activeGrinders.firstOrNull()?.id,
+        lastBeansId = next.lastBeansId?.takeIf { id -> next.beans.any { it.id == id } },
         sync = next.sync.copy(pulledUpTo = pulledUpTo ?: sync.pulledUpTo),
     )
 }
