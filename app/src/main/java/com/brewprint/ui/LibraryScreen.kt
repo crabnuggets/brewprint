@@ -47,7 +47,7 @@ fun LibraryScreen(
     onClose: (() -> Unit)? = null,
     onEditingChanged: (Boolean) -> Unit = {},
     /** Shows Undo for an action a swipe has just taken. */
-    onUndoable: (String, () -> Unit) -> Unit = { _, _ -> },
+    onUndoable: (BeansUndo) -> Unit = {},
 ) {
     var kind by rememberSaveable(requestedKind) { mutableStateOf(requestedKind ?: "") }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -86,15 +86,12 @@ fun LibraryScreen(
         draftId = null
         if (onPicked != null) onPicked(kind, id) else detailId = id
     }
-    // A swipe acts at once. Undo reverses only that change, and only on beans still in the Library.
-    fun present(item: Beans) = repository.state.value.beans.any { it.id == item.id }
-    fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable("Beans archived") { if (present(item)) save(repository.unarchiveBeans(item.id)) } }
-    fun swipeUnarchive(item: Beans) { if (save(repository.unarchiveBeans(item.id))) onUndoable("Beans unarchived") { if (present(item)) save(repository.archiveBeans(item.id)) } }
+    // A swipe acts at once and offers Undo.
+    fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
+    fun swipeUnarchive(item: Beans) { if (save(repository.unarchiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.UNARCHIVED, item)) }
     fun swipeDelete(item: Beans) {
-        val remembered = state.lastBeansId == item.id
-        // After signing out or switching accounts, the beans belong to an account no longer on this phone.
-        val account = state.sync.userId
-        if (save(repository.deleteBeans(item.id))) onUndoable("Beans deleted") { save(repository.restoreBeans(item, remembered, account)) }
+        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId)
+        if (save(repository.deleteBeans(item.id))) onUndoable(undo)
     }
     LaunchedEffect(editing) { onEditingChanged(editing) }
     DisposableEffect(Unit) { onDispose { onEditingChanged(false) } }
@@ -271,6 +268,25 @@ private fun LibraryRow(title: String, detail: String, modifier: Modifier = Modif
 
 private const val ARCHIVE_REACH = .3f
 private const val DELETE_REACH = .65f
+
+/**
+ * What a Library swipe did, kept as data so its Undo is offered again if the screen is recreated.
+ * [shownUntil] is when the Undo window ends, once its bar has shown.
+ */
+@kotlinx.serialization.Serializable
+data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boolean = false, val account: String? = null, val shownUntil: Long? = null) {
+    enum class Action(val message: String) { ARCHIVED("Beans archived"), UNARCHIVED("Beans unarchived"), DELETED("Beans deleted") }
+
+    /** Reverses only what the swipe did: the archive flag on beans still in the Library, or deleted beans while the phone is in the same account. */
+    fun undo(repository: BrewRepository): Result<Unit> {
+        val present = repository.state.value.beans.any { it.id == beans.id }
+        return when (action) {
+            Action.ARCHIVED -> if (present) repository.unarchiveBeans(beans.id) else Result.success(Unit)
+            Action.UNARCHIVED -> if (present) repository.archiveBeans(beans.id) else Result.success(Unit)
+            Action.DELETED -> repository.restoreBeans(beans, remembered, account)
+        }
+    }
+}
 
 /** What a short swipe does: archive, or for archived beans, unarchive. */
 private class SwipeAction(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val act: () -> Unit)

@@ -103,11 +103,14 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     var undoDeadline by rememberSaveable { mutableStateOf(0L) }
     var undoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var libraryUndoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // The Library swipe whose Undo is on offer, saved so a recreated screen offers it again for the time left.
+    var libraryUndo by rememberSaveable { mutableStateOf<String?>(null) }
     val accessibility = androidx.compose.ui.platform.LocalAccessibilityManager.current
     fun offerUndo() {
         undoJob?.cancel()
         // One Undo bar at a time, the newest: a Library swipe's ends, so this one isn't kept waiting behind it.
         libraryUndoJob?.cancel()
+        libraryUndo = null
         undoJob = scope.launch {
             val wait = undoDeadline - clock()
             val message = if (pendingDeletes.size == 1) "Brew deleted" else "${pendingDeletes.size} brews deleted"
@@ -124,29 +127,36 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     }
     // A Library swipe acts at once, and a newer one ends the previous one's Undo. Behind a History Undo it waits its turn:
     // its time starts once its own bar shows.
-    fun offerLibraryUndo(message: String, undo: () -> Unit) {
+    fun offerLibraryUndo(offer: BeansUndo) {
         libraryUndoJob?.cancel()
+        libraryUndo = Json.encodeToString(offer)
         libraryUndoJob = scope.launch {
-            val wait = accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
-            val text = message
+            val wait = offer.shownUntil?.let { it - clock() }
+                ?: accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
+            if (wait <= 0) { libraryUndo = null; return@launch }
             val visuals = object : SnackbarVisuals {
-                override val message = text
+                override val message = offer.action.message
                 override val actionLabel = "Undo"
                 override val withDismissAction = false
                 override val duration = SnackbarDuration.Indefinite
             }
             val timer = launch {
                 val shown = snapshotFlow { snackbar.currentSnackbarData }.first { it?.visuals === visuals }
+                libraryUndo = Json.encodeToString(offer.copy(shownUntil = clock() + wait))
                 kotlinx.coroutines.delay(wait)
                 shown?.dismiss()
             }
             val result = snackbar.showSnackbar(visuals)
             timer.cancel()
-            if (result == SnackbarResult.ActionPerformed) undo()
+            libraryUndo = null
+            if (result == SnackbarResult.ActionPerformed) offer.undo(repository).onFailure { onError(it.message ?: "Couldn't undo. Try again.") }
         }
     }
     // After recreation, a window still open is offered again for the time left; one that has ended is written.
-    LaunchedEffect(Unit) { if (pendingDeletes.isNotEmpty()) offerUndo() }
+    LaunchedEffect(Unit) {
+        if (pendingDeletes.isNotEmpty()) offerUndo()
+        libraryUndo?.let { offerLibraryUndo(Json.decodeFromString<BeansUndo>(it)) }
+    }
     val shown = if (pendingDeletes.isEmpty()) state else state.copy(brews = state.brews.filterNot { it.id in pendingDeletes })
     val navVisible = route == null && !libraryEditing
     chrome.navSpace = if (navVisible) 78.dp else 0.dp

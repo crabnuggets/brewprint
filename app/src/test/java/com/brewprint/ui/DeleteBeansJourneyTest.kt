@@ -161,6 +161,28 @@ class DeleteBeansJourneyTest {
         compose.runOnIdle { assertTrue(repository.state.value.beans.none { it.archived }) }
     }
 
+    @Test fun `a swipe's Undo survives the screen being recreated, until its time is up`() {
+        val repository = repository(kii, gesha)
+        val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        restoration.setContent {
+            val state by repository.state.collectAsState()
+            BrewprintTheme(Appearance.LIGHT) { BrewprintApp(state, repository) }
+        }
+        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = left) }
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("Beans deleted").assertExists()
+        compose.onNodeWithText("Undo").performClick()
+        compose.runOnIdle { assertTrue(repository.state.value.beans.any { it.id == kii.id }) }
+
+        compose.onNodeWithText("Gesha").performTouchInput { swipeLeft(startX = right - 1f, endX = left) }
+        compose.mainClock.advanceTimeBy(UNDO_MILLIS + 1_000)
+        compose.waitForIdle()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("Beans deleted").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(repository.state.value.beans.none { it.id == gesha.id }) }
+    }
+
     @Test fun `Undo of a delete does nothing once the account has changed`() {
         val repository = repository(kii, gesha)
         show(repository)
