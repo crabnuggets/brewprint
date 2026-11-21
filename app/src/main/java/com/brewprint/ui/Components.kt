@@ -75,6 +75,9 @@ import androidx.compose.ui.layout.positionInParent
 /** The soft fill behind secondary buttons and icon actions; no outlines on buttons. */
 internal val ColorScheme.soft: Color get() = secondaryContainer
 internal val ColorScheme.softPressed: Color get() = surfaceContainerHighest
+/** Amber, kept for a Library row swiped past its archive point. */
+internal val ColorScheme.archive: Color get() = tertiary
+internal val ColorScheme.onArchive: Color get() = onTertiary
 
 @Composable
 fun BrewprintTheme(appearance: Appearance, theme: Theme = Theme.MONOCHROME, content: @Composable () -> Unit) {
@@ -99,6 +102,7 @@ fun BrewprintTheme(appearance: Appearance, theme: Theme = Theme.MONOCHROME, cont
         inverseSurface = Color(0xFFE9E9EC), inverseOnSurface = Color(0xFF111214), inversePrimary = Color(0xFF111214),
         // The one accent: red, kept for deleting and discarding.
         error = Color(0xFFF2B8B5), onError = Color(0xFF601410), errorContainer = Color(0xFF4A1C1A), onErrorContainer = Color(0xFFFFDAD6),
+        tertiary = Color(0xFFF0B45A), onTertiary = Color(0xFF2E1D00),
     ) else lightColorScheme(
         primary = Color(0xFF111214), onPrimary = Color.White,
         secondary = Color(0xFF4E505A), onSecondary = Color.White,
@@ -112,6 +116,7 @@ fun BrewprintTheme(appearance: Appearance, theme: Theme = Theme.MONOCHROME, cont
         secondaryContainer = Color(0xFFE7E8ED), onSecondaryContainer = Color(0xFF0E0F12),
         inverseSurface = Color(0xFF2A2B30), inverseOnSurface = Color(0xFFF2F2F4), inversePrimary = Color(0xFFF2F2F4),
         error = Color(0xFFB3261E), onError = Color.White, errorContainer = Color(0xFFFADCD9), onErrorContainer = Color(0xFF8C1D18),
+        tertiary = Color(0xFFE8A33D), onTertiary = Color(0xFF2E1D00),
     )
     val base = Typography()
     // The blueprint sets every style in Overpass, with headings a step heavier.
@@ -157,6 +162,7 @@ private fun blueprintColors(dark: Boolean) = if (dark) darkColorScheme(
     inverseSurface = Color(0xFFE6E8E9), inverseOnSurface = Color(0xFF1C1F22), inversePrimary = Color(0xFF1C1F22),
     // Deleting and discarding share the red pencil, so the theme has one red.
     error = Color(0xFFEE7566), onError = Color(0xFF3A0E0A), errorContainer = Color(0xFF4A2220), onErrorContainer = Color(0xFFFFDAD5),
+    tertiary = Color(0xFFF0B45A), onTertiary = Color(0xFF2E1D00),
 ) else lightColorScheme(
     primary = Color(0xFF26292E), onPrimary = Color(0xFFF6F7F5),
     secondary = Color(0xFF4E535A), onSecondary = Color.White,
@@ -170,6 +176,7 @@ private fun blueprintColors(dark: Boolean) = if (dark) darkColorScheme(
     secondaryContainer = Color(0xFFE2E6E6), onSecondaryContainer = Color(0xFF1F2226),
     inverseSurface = Color(0xFF2D3136), inverseOnSurface = Color(0xFFF0F2EF), inversePrimary = Color(0xFFF0F2EF),
     error = Color(0xFFC4372C), onError = Color.White, errorContainer = Color(0xFFF7DEDA), onErrorContainer = Color(0xFF8A2219),
+    tertiary = Color(0xFFE8A33D), onTertiary = Color(0xFF2E1D00),
 )
 
 /** Whether TalkBack-style touch exploration is on, following changes while the app is open. */

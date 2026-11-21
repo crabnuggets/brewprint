@@ -38,6 +38,15 @@ class SyncTest {
         assertNull(deleted.syncData("beans/${beans.id}"))
     }
 
+    @Test fun `deleting beans uploads a tombstone`() {
+        val repository = BrewRepository(context)
+        repository.upsertBeans(beans).getOrThrow()
+        repository.markPushed(repository.state.value.sync.pending.associateWith { repository.state.value.syncData(it) }).getOrThrow()
+        repository.deleteBeans(beans.id).getOrThrow()
+        assertEquals(setOf("beans/${beans.id}"), repository.state.value.sync.pending)
+        assertNull(repository.state.value.syncData("beans/${beans.id}"))
+    }
+
     @Test fun `first sign-in uploads everything already on the phone`() {
         val state = AppState(beans = listOf(beans), grinders = listOf(grinder)).syncingWith("user-1")
         assertEquals(setOf("beans/${beans.id}", "grinders/${grinder.id}"), state.sync.pending)
@@ -122,6 +131,8 @@ class SyncTest {
         ), null)
         assertEquals(listOf(beans), merged.beans)
         assertTrue(merged.brews.isEmpty())
+        // Beans deleted on another phone stop being remembered for the next brew.
+        assertNull(state.copy(beans = listOf(other), lastBeansId = other.id).withRemote(listOf(RemoteItem("beans", other.id, null)), null).lastBeansId)
         assertTrue(merged.noteEdits.isEmpty())
     }
 

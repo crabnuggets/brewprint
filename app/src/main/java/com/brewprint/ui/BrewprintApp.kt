@@ -30,6 +30,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
@@ -101,9 +102,12 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     val pendingDeletes = rememberSaveable(saver = androidx.compose.runtime.saveable.listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<String>, String>({ it.toList() }, { it.toMutableStateList() })) { mutableStateListOf() }
     var undoDeadline by rememberSaveable { mutableStateOf(0L) }
     var undoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var libraryUndoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val accessibility = androidx.compose.ui.platform.LocalAccessibilityManager.current
     fun offerUndo() {
         undoJob?.cancel()
+        // One Undo bar at a time, the newest: a Library swipe's ends, so this one isn't kept waiting behind it.
+        libraryUndoJob?.cancel()
         undoJob = scope.launch {
             val wait = undoDeadline - clock()
             val message = if (pendingDeletes.size == 1) "Brew deleted" else "${pendingDeletes.size} brews deleted"
@@ -117,6 +121,29 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
         pendingDeletes += id
         undoDeadline = clock() + (accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS)
         offerUndo()
+    }
+    // A Library swipe acts at once, and a newer one ends the previous one's Undo. Behind a History Undo it waits its turn:
+    // its time starts once its own bar shows.
+    fun offerLibraryUndo(message: String, undo: () -> Unit) {
+        libraryUndoJob?.cancel()
+        libraryUndoJob = scope.launch {
+            val wait = accessibility?.calculateRecommendedTimeoutMillis(UNDO_MILLIS, containsIcons = false, containsText = true, containsControls = true) ?: UNDO_MILLIS
+            val text = message
+            val visuals = object : SnackbarVisuals {
+                override val message = text
+                override val actionLabel = "Undo"
+                override val withDismissAction = false
+                override val duration = SnackbarDuration.Indefinite
+            }
+            val timer = launch {
+                val shown = snapshotFlow { snackbar.currentSnackbarData }.first { it?.visuals === visuals }
+                kotlinx.coroutines.delay(wait)
+                shown?.dismiss()
+            }
+            val result = snackbar.showSnackbar(visuals)
+            timer.cancel()
+            if (result == SnackbarResult.ActionPerformed) undo()
+        }
     }
     // After recreation, a window still open is offered again for the time left; one that has ended is written.
     LaunchedEffect(Unit) { if (pendingDeletes.isNotEmpty()) offerUndo() }
@@ -156,7 +183,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                     }
                 }
                 else -> when (screen.removePrefix("tab:")) {
-                    "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
+                    "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo)
                     "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
                     else -> BrewHome(shown, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" }, { tab = "Library" })
                 }
@@ -283,7 +310,7 @@ private fun HistoryScreen(brews: List<BrewRecord>, canRepeat: Boolean, onRecord:
 }
 
 /** A haptic as a swipe crosses the point where letting go acts ([armed]), and a lighter one as it pulls back. */
-private fun android.view.View.thresholdHaptic(armed: Boolean) {
+internal fun android.view.View.thresholdHaptic(armed: Boolean) {
     performHapticFeedback(when {
         android.os.Build.VERSION.SDK_INT >= 34 -> if (armed) android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE else android.view.HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE
         !armed -> android.view.HapticFeedbackConstants.CLOCK_TICK
@@ -477,7 +504,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 TimerFooter(stageView, { timer { recipe, now -> pause(recipe, now) } }, { timer { recipe, now -> resume(recipe, now) } }, { timer { recipe, now -> skip(recipe, now) } }, { timer { _, now -> undone(now) } }, ::finish,
                     onUndoStart = if (justStarted) ({ change(draft.copy(timer = null)) }) else null)
             }
-            DraftStage.REVIEW -> PrimaryAction("Save brew", enabled = validDate && validTotal, icon = Icons.Outlined.Check) {
+            DraftStage.REVIEW -> PrimaryAction("Save brew", enabled = validDate && validTotal && !beansDeleted(draft, state), icon = Icons.Outlined.Check) {
                 repository.updateDraft(merged(draft)).fold(
                     onSuccess = { repository.saveBrew(draft.id).onSuccess { onSaved(it.id) }.onFailure { onError("Couldn't save brew. Try again.") } },
                     onFailure = { onError("Couldn't save brew. Try again.") },
@@ -487,7 +514,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     }) {
         when (stage) {
             DraftStage.SETUP -> {
-                SetupFields(draft, state, { picker = it }, { dial = true }, ::change)
+                SetupFields(draft, state, { picker = it }, { dial = true }, { discard = true }, ::change)
             }
             DraftStage.SHEET -> if (stageView == null) {
                 PlanSummary(draft.beans!!, draft.grinder!!, draft.setting!!, draft.recipe!!, onCorrect = { change(draft.copy(stage = DraftStage.SETUP)) })
@@ -520,6 +547,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                     }
                     IconAction(Icons.Outlined.Tune, "Change setup") { change(draft.copy(stage = DraftStage.SETUP)) }
                 }
+                if (beansDeleted(draft, state)) DeletedBeansPanel(state, { picker = "beans" }) { discard = true }
                 DateEntry(dateText, { dateText = it }, { validDate = it }) { change(draft.copy(startedAt = it)) }
                 val timer = draft.timer
                 val data = draft.scale
@@ -560,11 +588,15 @@ private fun selectItem(draft: BrewDraft, state: AppState, kind: String, id: Stri
     }
 }
 
-internal fun ready(draft: BrewDraft, state: AppState): Boolean = draft.beans != null && draft.recipe != null && draft.grinder != null && draft.setting?.let { parseGrindSetting(it.toString()) } != null && draft.recipe.validationErrors().isEmpty() && state.grinders.any { it.id == draft.grinder.id && !it.archived } && (state.beans.none { it.id == draft.beans.id && it.archived } || draft.allowArchivedBeans)
+/** Beans the draft uses that are no longer in the Library: the brew needs other beans or is discarded. */
+internal fun beansDeleted(draft: BrewDraft, state: AppState): Boolean = draft.beans != null && state.beans.none { it.id == draft.beans.id }
+
+internal fun ready(draft: BrewDraft, state: AppState): Boolean = draft.beans != null && !beansDeleted(draft, state) && draft.recipe != null && draft.grinder != null && draft.setting?.let { parseGrindSetting(it.toString()) } != null && draft.recipe.validationErrors().isEmpty() && state.grinders.any { it.id == draft.grinder.id && !it.archived } && (state.beans.none { it.id == draft.beans.id && it.archived } || draft.allowArchivedBeans)
 
 @Composable
-private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> Unit, onDial: () -> Unit, onChange: (BrewDraft) -> Unit) {
+private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> Unit, onDial: () -> Unit, onDiscard: () -> Unit, onChange: (BrewDraft) -> Unit) {
     SelectionCard("Beans", draft.beans?.name ?: if (state.beans.none { !it.archived }) "Add beans" else "Choose beans", draft.beans?.roaster, { onPick("beans") })
+    if (beansDeleted(draft, state)) DeletedBeansPanel(state, { onPick("beans") }, onDiscard)
     val archivedBeans = draft.beans != null && state.beans.any { it.id == draft.beans.id && it.archived }
     if (archivedBeans && !draft.allowArchivedBeans) Panel {
         Text("These beans are archived.")
@@ -590,6 +622,16 @@ private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> U
         } else Text("Last recorded setting: ${recorded?.let { "$it ticks" } ?: "Not recorded"}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
     draft.recipe?.let { recipe -> RecipeNumbers(recipe) }
+}
+
+/** Choose other beans, or add some when none are left, or discard the brew. */
+@Composable
+private fun DeletedBeansPanel(state: AppState, onChoose: () -> Unit, onDiscard: () -> Unit) {
+    Panel {
+        Text("These beans were deleted.")
+        SoftButton(onClick = onChoose) { Text(if (state.beans.none { !it.archived }) "Add beans" else "Choose other beans") }
+        SoftTextButton(onClick = onDiscard, danger = true) { Text("Discard brew") }
+    }
 }
 
 @Composable

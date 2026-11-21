@@ -90,6 +90,29 @@ class BrewRepository(context: Context) {
         current.copy(beans = current.beans.map { if (it.id == id) it.copy(archived = true) else it }) to Unit
     }
 
+    fun unarchiveBeans(id: String): Result<Unit> = change { current ->
+        require(current.beans.any { it.id == id }) { "Beans not found." }
+        current.copy(beans = current.beans.map { if (it.id == id) it.copy(archived = false) else it }) to Unit
+    }
+
+    /** Removes beans from the Library. Brew records keep their own copy; a brew draft using them must choose other beans. */
+    fun deleteBeans(id: String): Result<Unit> = change { current ->
+        require(current.beans.any { it.id == id }) { "Beans not found." }
+        current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id }) to Unit
+    }
+
+    /**
+     * Undoes [deleteBeans]: the beans return, and are remembered for the next brew again if they were and nothing has been since.
+     * Nothing changes once the phone has left [account], whose beans these are.
+     */
+    fun restoreBeans(beans: Beans, remembered: Boolean, account: String?): Result<Unit> = change { current ->
+        if (current.sync.userId != account) return@change current to Unit
+        current.copy(
+            beans = current.beans.filterNot { it.id == beans.id } + beans,
+            lastBeansId = if (remembered && current.lastBeansId == null) beans.id else current.lastBeansId,
+        ) to Unit
+    }
+
     fun archiveRecipe(id: String): Result<Unit> = change { current ->
         require(current.recipes.any { it.id == id }) { "Recipe not found." }
         current.copy(recipes = current.recipes.map { if (it.id == id) it.copy(archived = true) else it }) to Unit
@@ -200,8 +223,8 @@ class BrewRepository(context: Context) {
         val recipe = requireNotNull(draft.recipe) { "Choose a recipe." }
         require(recipe.validationErrors().isEmpty()) { "Check the recipe plan." }
         require(current.grinders.any { it.id == grinder.id && !it.archived }) { "Choose an active grinder." }
-        val beansArchived = current.beans.firstOrNull { it.id == beans.id }?.archived ?: beans.archived
-        require(!beansArchived || draft.allowArchivedBeans) { "Confirm archived beans or choose other beans." }
+        val library = requireNotNull(current.beans.firstOrNull { it.id == beans.id }) { "These beans were deleted. Choose other beans." }
+        require(!library.archived || draft.allowArchivedBeans) { "Confirm archived beans or choose other beans." }
         val record = BrewRecord(
             id = draft.id,
             startedAt = draft.startedAt,
