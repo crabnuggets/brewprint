@@ -2,6 +2,7 @@ package com.brewprint.ui
 
 import android.Manifest
 import android.app.NotificationManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -36,12 +37,25 @@ import com.brewprint.timer.BrewTimerService
 internal fun notificationsAllowed(context: Context): Boolean =
     context.getSystemService(NotificationManager::class.java)?.areNotificationsEnabled() != false
 
+/** Android 16 lets the user turn off Live Updates for one app; the brew then shows as a plain notification. */
+internal fun liveUpdatesAllowed(context: Context): Boolean =
+    Build.VERSION.SDK_INT < 36 || context.getSystemService(NotificationManager::class.java)?.canPostPromotedNotifications() != false
+
+private fun openNotificationSettings(context: Context, action: String = Settings.ACTION_APP_NOTIFICATION_SETTINGS) {
+    val intent = Intent(action).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try { context.startActivity(intent) } catch (_: ActivityNotFoundException) {
+        // Some phones have no page for one setting; the app's notification page holds it too.
+        if (action != Settings.ACTION_APP_NOTIFICATION_SETTINGS) openNotificationSettings(context)
+    }
+}
+
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, scale: @Composable () -> Unit = {}) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, liveUpdatesCheck: (Context) -> Boolean = ::liveUpdatesAllowed, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { allowed = notificationsAllowed(context) }
+    var liveUpdates by remember { mutableStateOf(liveUpdatesCheck(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { allowed = notificationsAllowed(context); liveUpdates = liveUpdatesCheck(context) }
     val prompt = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         allowed = notificationsAllowed(context)
         // A timer may already be running; show it now that Android allows it.
@@ -62,15 +76,12 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
                         prompt.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                 }
-                if (timer.liveNotification && !allowed) Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Outlined.NotificationsOff, null, Modifier.size(20.dp))
-                        Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
+                if (timer.liveNotification && !allowed) {
+                    AndroidNotice("Blocked by Android", "Notifications for Brewprint are turned off. The timer still runs in the app.") { openNotificationSettings(context) }
+                } else if (timer.liveNotification && !liveUpdates) {
+                    AndroidNotice("Live Updates are off", "The brew shows as a normal notification, without the timer in the status bar. Turn on Live Updates for Brewprint to see it there.") {
+                        openNotificationSettings(context, Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
                     }
-                    Text("Notifications for Brewprint are turned off. The timer still runs in the app.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                    SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
-                        context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }) { Text("Open Android settings") }
                 }
                 HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
                 SwitchRow("Vibrate at each step", null, timer.vibrate) { onTimer(timer.copy(vibrate = it)) }
@@ -110,5 +121,18 @@ private fun SwitchRow(label: String, detail: String?, checked: Boolean, onChange
             if (detail != null) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** A setting Android holds for the app, with a way to change it. */
+@Composable
+private fun AndroidNotice(title: String, text: String, onOpen: () -> Unit) {
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Outlined.NotificationsOff, null, Modifier.size(20.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium)
+        }
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = onOpen) { Text("Open Android settings") }
     }
 }

@@ -122,6 +122,8 @@ An "Experimental" section at the end of Settings holds features still being trie
 
 Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
 
+On Android 16, the user can also turn off Live Updates for Brewprint alone. ColorOS calls this "Show Live Updates on Live Alerts". If notifications are allowed but Live Updates are off, a "Live Updates are off" notice appears under the switch instead. Its "Open Android settings" opens Brewprint's Live Updates setting, or its notification settings on phones without that page. The brew still shows as a normal notification.
+
 With the switch on, a running timer shows one ongoing notification, requested as an Android 16 Live Update with the standard progress template. Each part has one job:
 
 - **Icon.** It shows the state: a drop for a pour, an hourglass for a wait, a pause mark, or a stopwatch during drawdown.
