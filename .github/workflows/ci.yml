@@ -48,3 +48,29 @@ jobs:
           name: brewprint-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+
+  mcp-server:
+    name: MCP server checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: supabase/functions/brewprint-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check formatting
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Type-check
+        run: deno check index.ts
+
+      - name: Run tests
+        run: deno test --allow-read

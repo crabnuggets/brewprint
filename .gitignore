@@ -33,3 +33,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/

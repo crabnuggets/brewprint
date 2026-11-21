@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Connect to Brewprint</title>
+  <style>
+    :root {
+      --page: #f4f4f2; --card: #ffffff; --ink: #141414; --muted: #6b6b6b; --line: #e3e3e0;
+      --primary: #141414; --on-primary: #ffffff; --soft: #ececea; --danger: #b3261e;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #0f0f0f; --card: #1a1a1a; --ink: #f2f2f2; --muted: #a3a3a3; --line: #2c2c2c;
+        --primary: #f2f2f2; --on-primary: #141414; --soft: #2a2a2a; --danger: #f2b8b5;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+      background: var(--page); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { width: 100%; max-width: 420px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px 24px; }
+    h1 { font-size: 22px; font-weight: 650; line-height: 1.3; margin: 0 0 12px; }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .error { color: var(--danger); }
+    ul { margin: 0 0 16px; padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    .actions { display: grid; gap: 10px; margin-top: 20px; }
+    button {
+      font: inherit; font-weight: 600; border: 0; border-radius: 16px; padding: 14px 16px; cursor: pointer;
+      transition: transform 120ms ease-out;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.6; cursor: default; }
+    .primary { background: var(--primary); color: var(--on-primary); }
+    .secondary { background: var(--soft); color: var(--ink); }
+    #google { min-height: 44px; margin-top: 16px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <section id="loading"><p class="muted">Loading…</p></section>
+
+  <section id="sign-in" hidden>
+    <h1>Sign in to Brewprint</h1>
+    <p>Use the Google account you sign in with in the Brewprint app.</p>
+    <div id="google"></div>
+  </section>
+
+  <section id="consent" hidden>
+    <h1>Let <span class="client"></span> read your Brewprint?</h1>
+    <p><span class="client"></span> will be able to see:</p>
+    <ul>
+      <li>Your beans, grinders and recipes</li>
+      <li>Your brews, with their timing, scale readings and tasting notes</li>
+    </ul>
+    <p>It will also see your Google account's name, email address and profile picture.</p>
+    <p>It can't add, change or delete anything.</p>
+    <p class="muted">Signed in as <span id="email"></span>. You'll return to <span id="destination"></span>.</p>
+    <div class="actions">
+      <button id="allow" class="primary" type="button">Allow</button>
+      <button id="deny" class="secondary" type="button">Don't allow</button>
+    </div>
+  </section>
+
+  <section id="problem" hidden>
+    <h1>Couldn't connect</h1>
+    <p id="problem-text" class="error"></p>
+  </section>
+</main>
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm";
+
+  // Public by design, as in app/build.gradle.kts: row-level security protects the data, not these values.
+  const SUPABASE_URL = "https://ftwdmparhchrafsbmplv.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_GfVfBdnCKM-z6p7joMfvEw_KfOgUUTj";
+  const GOOGLE_CLIENT_ID = "728373646004-3f5dv4dfkg5v3goivnufkcp1k5kvoqks.apps.googleusercontent.com";
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false } });
+  const authorizationId = new URLSearchParams(location.search).get("authorization_id");
+
+  function show(id) {
+    for (const section of document.querySelectorAll("main > section")) section.hidden = section.id !== id;
+  }
+
+  function problem(message) {
+    document.getElementById("problem-text").textContent = message;
+    show("problem");
+  }
+
+  function loadGoogle() {
+    if (window.google?.accounts) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = Object.assign(document.createElement("script"), { src: "https://accounts.google.com/gsi/client" });
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("Google sign-in didn't load. Check your connection and reload."));
+      document.head.append(script);
+    });
+  }
+
+  async function signIn() {
+    await loadGoogle();
+    // Google signs the hashed nonce into its token; Supabase checks it against the raw one, as the app does.
+    const nonce = crypto.randomUUID();
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce));
+    const hashed = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      nonce: hashed,
+      callback: async ({ credential }) => {
+        const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: credential, nonce });
+        if (error) return problem(`Couldn't sign in: ${error.message}`);
+        await consent();
+      },
+    });
+    google.accounts.id.renderButton(document.getElementById("google"), { theme: "outline", size: "large", text: "signin_with" });
+    show("sign-in");
+  }
+
+  async function consent() {
+    show("loading");
+    const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    if (error) return problem(`${error.message}. Start connecting again from the app that sent you here.`);
+    // Approved before for the same access: go straight back.
+    if (!("authorization_id" in data)) return location.assign(data.redirect_url);
+    for (const name of document.querySelectorAll(".client")) name.textContent = data.client.name || "This app";
+    document.getElementById("email").textContent = data.user.email;
+    document.getElementById("destination").textContent = new URL(data.redirect_uri).host;
+    show("consent");
+  }
+
+  async function decide(approve) {
+    for (const button of document.querySelectorAll("button")) button.disabled = true;
+    const { data, error } = approve
+      ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
+      : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
+    if (error) return problem(error.message);
+    location.assign(data.redirect_url);
+  }
+
+  document.getElementById("allow").onclick = () => decide(true);
+  document.getElementById("deny").onclick = () => decide(false);
+  try {
+    // GitHub Pages can't send frame-blocking headers, so refuse to work inside another site's frame,
+    // where a hidden overlay could trick a signed-in user into clicking Allow.
+    if (window.top !== window.self) {
+      problem("Open this page in its own window to connect to Brewprint.");
+    } else if (!authorizationId) {
+      problem("This page opens when an app such as Claude asks to connect to Brewprint. Start from that app.");
+    } else {
+      const { data: { session } } = await supabase.auth.getSession();
+      await (session ? consent() : signIn());
+    }
+  } catch (error) {
+    problem(error.message);
+  }
+</script>
+</body>
+</html>

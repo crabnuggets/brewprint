@@ -1,0 +1,10 @@
+{
+  "name": "brewprint",
+  "version": "0.1.0",
+  "description": "Read your Brewprint brews and get help tasting and dialing in your filter coffee.",
+  "author": { "name": "Brewprint" },
+  "homepage": "https://github.com/crabnuggets/brewprint",
+  "repository": "https://github.com/crabnuggets/brewprint",
+  "license": "Apache-2.0",
+  "keywords": ["coffee", "pour-over", "brewing", "tasting"]
+}

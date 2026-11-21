@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "brewprint": {
+      "type": "http",
+      "url": "https://ftwdmparhchrafsbmplv.supabase.co/functions/v1/brewprint-mcp"
+    }
+  }
+}
