@@ -5,7 +5,7 @@ name: Deploy MCP server
 on:
   push:
     branches: [main]
-    paths: ['supabase/functions/**']
+    paths: ['supabase/functions/**', '.github/workflows/deploy-mcp.yml']
   workflow_dispatch:
 
 concurrency:
@@ -31,5 +31,6 @@ jobs:
           version: 3.2.0
 
       # verify_jwt = false comes from supabase/config.toml; the function checks tokens itself.
+      # --yes: the CLI asks before deploying and can't ask in CI.
       - name: Deploy
-        run: supabase functions deploy brewprint-mcp --project-ref ftwdmparhchrafsbmplv --use-api
+        run: supabase functions deploy brewprint-mcp --project-ref ftwdmparhchrafsbmplv --use-api --yes
