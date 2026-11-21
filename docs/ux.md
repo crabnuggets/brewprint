@@ -86,6 +86,14 @@ Below the list, show "Planned pours: 240 g / Target: 240 g". If the rounded puls
 
 Allow editing, duplicating, and archiving recipes. On a Library item's screen these sit in the header, as "Edit" and a "More actions" menu, so a long recipe never hides them. A brew-specific recipe adjustment is outside the first version: duplicate or edit the recipe before using it. Existing brew records retain the recipe as it was at the time.
 
+### Drafts from Claude
+
+With Brewprint connected to Claude, Claude can draft beans or a recipe from a product page, a photo of a bag, or a recipe link. Drafts reach the phone when it syncs, so they need a signed-in account.
+
+The Library lists them first, under "Drafts from Claude", each as its name with "Beans · [roaster]" or "Recipe · [dose] g · 1:[ratio] · [water] g". While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") under "New brew", which opens the Library.
+
+Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync, including on an open review the user hasn't edited. A review whose draft was added on another phone or discarded closes.
+
 ## Brew sheet and timing
 
 The brew sheet presents a static schedule with elapsed start times, per-pulse amounts, cumulative amounts, pour durations, and waits. Start time zero means the start of the first pour. Each following start time equals the previous start plus its pour duration plus its wait.
@@ -223,7 +231,7 @@ Settings opens with "Account". Signed out, it explains what signing in keeps and
 
 Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
 
-- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, and the paired scale stay on the phone.
+- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, and the paired scale stay on the phone. Each sync also fetches Claude's drafts; adding or discarding one deletes it from the account.
 - **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
 - **Signing in.** Anything made on the phone while signed out joins the account; a fresh install receives everything in the account.
 - **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's. If the earlier account still has changes waiting to upload, for example after its session ended while offline, sign-in is refused with "This phone has changes that haven't reached the Google account you used before. Sign in with that account first."

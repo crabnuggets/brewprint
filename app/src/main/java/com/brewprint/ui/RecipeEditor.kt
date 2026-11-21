@@ -41,15 +41,16 @@ private val pulseInputSaver = listSaver<List<PulseInput>, String>(
     restore = { it.chunked(5).map { fields -> PulseInput(fields[0], fields[1], fields[2], fields[3], fields[4]) } },
 )
 
+/** Adds or edits a recipe, or with [onDiscardDraft], reviews a library draft before adding it. */
 @Composable
-fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Unit) {
-    val original = remember(initial?.id) { initial ?: Recipe() }
+fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
+    var original by remember(initial?.id) { mutableStateOf(initial ?: Recipe()) }
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
     var dose by rememberSaveable { mutableStateOf(original.dose.takeIf { it > 0 }?.let(::formatAmount) ?: "") }
     var ratio by rememberSaveable { mutableStateOf(original.ratio.takeIf { it > 0 }?.let(::formatAmount) ?: "") }
     var notes by rememberSaveable { mutableStateOf(original.notes) }
-    val initialPulses = remember(original) { original.pulses.mapIndexed { index, pulse -> PulseInput(pulse.label, pulse.water.takeIf { it > 0 }?.let(::formatAmount) ?: "", pulse.pourSeconds.takeIf { it > 0 }?.toString() ?: "", pulse.waitSeconds.toString(), "initial-$index") } }
+    val initialPulses = remember(original) { pulseInputs(original) }
     var pulses by rememberSaveable(stateSaver = pulseInputSaver) { mutableStateOf(initialPulses) }
     var discard by rememberSaveable { mutableStateOf(false) }
     var announcement by rememberSaveable { mutableStateOf("") }
@@ -57,6 +58,17 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
     val originalDose = original.dose.takeIf { it > 0 }?.let(::formatAmount) ?: ""
     val originalRatio = original.ratio.takeIf { it > 0 }?.let(::formatAmount) ?: ""
     val dirty = name != original.name || dose != originalDose || ratio != originalRatio || notes != original.notes || pulses != initialPulses
+    // A draft Claude corrects while it's open shows the correction, unless the user has started editing.
+    LaunchedEffect(initial) {
+        if (initial != null && initial != original && !dirty) {
+            original = initial
+            name = initial.name
+            dose = initial.dose.takeIf { it > 0 }?.let(::formatAmount) ?: ""
+            ratio = initial.ratio.takeIf { it > 0 }?.let(::formatAmount) ?: ""
+            notes = initial.notes
+            pulses = pulseInputs(initial)
+        }
+    }
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(LocalScreenActive.current, back)
 
@@ -129,7 +141,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
     }
 
-    LibraryPage(if (initial == null) "New recipe" else "Edit recipe", back) {
+    LibraryPage(if (onDiscardDraft != null) "Review recipe" else if (initial == null) "New recipe" else "Edit recipe", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a recipe name." else null, required = true)
         LibraryField(dose, { dose = it }, "Coffee dose, g", KeyboardType.Decimal, error = if (doseValue == null) "Enter a positive amount with up to one decimal place." else null, required = true)
         LibraryField(ratio, { ratio = it }, "Brew ratio", KeyboardType.Decimal, error = if (ratioValue == null) "Enter a positive ratio denominator." else null, required = true, prefix = { Text("1 : ") })
@@ -221,13 +233,15 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
         Text("Scheduled pours end at ${formatDuration(schedule.last())}", style = MaterialTheme.typography.bodyMedium)
         LibraryField(notes, { notes = it }, "Preparation notes, optional", multiline = true)
-        PrimaryAction("Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
+        PrimaryAction(if (onDiscardDraft != null) "Add to Library" else "Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
             val recipe = original.copy(id = id, name = name.trim(), dose = doseValue!!, ratio = ratioValue!!, notes = notes, pulses = pulses.mapIndexed { index, pulse -> Pulse(pulse.label, pulse.water.toDouble(), pulse.pour.toInt(), if (index == pulses.lastIndex) 0 else pulse.wait.toInt()) })
             if (onSave(recipe)) onBack()
         }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)
 }
+
+private fun pulseInputs(recipe: Recipe) = recipe.pulses.mapIndexed { index, pulse -> PulseInput(pulse.label, pulse.water.takeIf { it > 0 }?.let(::formatAmount) ?: "", pulse.pourSeconds.takeIf { it > 0 }?.toString() ?: "", pulse.waitSeconds.toString(), "initial-$index") }
 
 private fun positiveDecimal(value: String): Double? = value.toDoubleOrNull()?.takeIf {
     value.matches(Regex("[0-9]+(?:\\.[0-9])?")) && it.isFinite() && it > 0

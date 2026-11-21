@@ -180,6 +180,36 @@ class UiScreenshotTest {
         capture("navigation-dark")
     }
 
+    @Test fun `capture drafts from Claude light and dark`() {
+        var appearance by mutableStateOf(Appearance.LIGHT)
+        val repository = seededRepository()
+        val beans = Beans(name = "Kii", roaster = "Tim Wendelboe", origin = "Kenya", variety = "SL28, SL34", processing = "Washed", expectedNotes = "Blackcurrant, hibiscus", notes = "https://timwendelboe.no/product/kii")
+        val recipe = Recipe(name = "Three pours", dose = 15.0, ratio = 16.0, notes = "Swirl after the bloom.",
+            pulses = listOf(Pulse("Bloom", 45.0, 10, 35), Pulse(water = 100.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 95.0, pourSeconds = 15)))
+        repository.applyDrafts(listOf(LibraryDraft(beans.id, beans = beans), LibraryDraft(recipe.id, recipe = recipe))).getOrThrow()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            BrewprintTheme(appearance) { BrewprintApp(state, repository) }
+        }
+        fun pair(name: String) {
+            compose.runOnIdle { appearance = Appearance.LIGHT }
+            capture("$name-light")
+            compose.runOnIdle { appearance = Appearance.DARK }
+            capture("$name-dark")
+        }
+        pair("drafts-home")
+        tap("Review 2 drafts from Claude")
+        pair("drafts-library")
+        tap("Kii")
+        pair("drafts-review-beans")
+        tap("Discard draft")
+        capture("drafts-discard-dialog", dialog = true)
+        tap("Keep draft")
+        tap("Back")
+        tap("Three pours")
+        pair("drafts-review-recipe")
+    }
+
     @Test fun `capture untouched new recipe light and dark`() {
         var appearance by mutableStateOf(Appearance.LIGHT)
         compose.setContent {

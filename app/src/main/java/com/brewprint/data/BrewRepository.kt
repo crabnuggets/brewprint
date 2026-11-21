@@ -65,7 +65,8 @@ class BrewRepository(context: Context) {
     fun upsertBeans(beans: Beans): Result<Unit> = change { current ->
         require(beans.name.isNotBlank()) { "Enter a name." }
         require(beans.roaster.isNotBlank()) { "Enter a roaster." }
-        current.copy(beans = current.beans.filterNot { it.id == beans.id } + beans) to Unit
+        // Saving a library draft's beans adds it to the Library, so the draft is done.
+        current.copy(beans = current.beans.filterNot { it.id == beans.id } + beans).resolvingDraft(beans.id) to Unit
     }
 
     fun upsertGrinder(grinder: Grinder): Result<Unit> = change { current ->
@@ -78,8 +79,11 @@ class BrewRepository(context: Context) {
 
     fun upsertRecipe(recipe: Recipe): Result<Unit> = change { current ->
         require(recipe.validationErrors().isEmpty()) { recipe.validationErrors().first() }
-        current.copy(recipes = current.recipes.filterNot { it.id == recipe.id } + recipe) to Unit
+        current.copy(recipes = current.recipes.filterNot { it.id == recipe.id } + recipe).resolvingDraft(recipe.id) to Unit
     }
+
+    /** Discards a library draft without adding it. */
+    fun discardLibraryDraft(id: String): Result<Unit> = change { it.resolvingDraft(id) to Unit }
 
     fun archiveBeans(id: String): Result<Unit> = change { current ->
         require(current.beans.any { it.id == id }) { "Beans not found." }
@@ -261,4 +265,6 @@ class BrewRepository(context: Context) {
     fun markPushed(pushed: Map<String, JsonElement?>): Result<Unit> = change(track = false) { it.afterPush(pushed) to Unit }
 
     fun applyRemote(items: List<RemoteItem>, pulledUpTo: String?): Result<Unit> = change(track = false) { it.withRemote(items, pulledUpTo) to Unit }
+
+    fun applyDrafts(drafts: List<LibraryDraft>): Result<Unit> = change(track = false) { it.withDrafts(drafts) to Unit }
 }

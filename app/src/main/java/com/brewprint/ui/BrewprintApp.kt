@@ -158,7 +158,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 else -> when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it })
                     "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
-                    else -> BrewHome(shown, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" })
+                    else -> BrewHome(shown, { repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") } }, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { route = "settings" }, { tab = "Library" })
                 }
             }
             } }
@@ -178,7 +178,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
 }
 
 @Composable
-private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onSettings: () -> Unit) {
+private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onSettings: () -> Unit, onDrafts: () -> Unit) {
     Page("Brew", actions = { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings") } }) {
         val draft = state.draft
         if (draft?.timer != null && draft.recipe != null) {
@@ -202,6 +202,10 @@ private fun BrewHome(state: AppState, onNew: () -> Unit, onResume: () -> Unit, o
             PrimaryAction("Resume brew", onClick = onResume)
             Text("One brew is in progress.", style = MaterialTheme.typography.bodyMedium)
         } else PrimaryAction("New brew", icon = Icons.Outlined.Add, onClick = onNew)
+        val drafts = state.libraryDrafts.size
+        if (drafts > 0) SoftButton(onClick = onDrafts, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+            Text(if (drafts == 1) "Review 1 draft from Claude" else "Review $drafts drafts from Claude")
+        }
         val grinder = state.grinders.find { it.id == state.defaultGrinderId && !it.archived }
         if (grinder != null) Panel {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

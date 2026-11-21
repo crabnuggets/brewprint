@@ -8,7 +8,9 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.brewprint.BuildConfig
 import com.brewprint.data.BrewRepository
+import com.brewprint.data.DRAFTS
 import com.brewprint.data.RemoteItem
+import com.brewprint.data.libraryDraft
 import com.brewprint.data.syncData
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -62,6 +64,10 @@ private data class RecordRow(
     val deleted: Boolean,
     @SerialName("updated_at") val updatedAt: String? = null,
 )
+
+/** A library draft Claude wrote to the account. */
+@Serializable
+private data class DraftRow(val id: String, val kind: String, val data: JsonElement)
 
 /** Signs in with Google through Supabase and keeps this device's library and brews in step with the account. */
 object CloudSync {
@@ -129,14 +135,21 @@ object CloudSync {
         val state = repository.state.value
         val pushed = state.sync.pending.associateWith { state.syncData(it) }
         if (pushed.isEmpty()) return
-        pushed.entries.chunked(500).forEach { chunk ->
+        // Library drafts added or discarded here are deleted from the account, after the items added from them are uploaded.
+        val (drafts, records) = pushed.entries.partition { it.key.startsWith("$DRAFTS/") }
+        records.chunked(500).forEach { chunk ->
             val rows = chunk.map { (key, data) ->
                 val (kind, id) = key.split('/', limit = 2)
                 RecordRow(userId, kind, id, data, deleted = data == null)
             }
             client.from("records").upsert(rows) { onConflict = "user_id,kind,id" }
         }
-        repository.markPushed(pushed).getOrThrow()
+        // Uploaded records are marked first, so a failed deletion can't make them upload again over a newer edit.
+        repository.markPushed(records.associate { it.toPair() }).getOrThrow()
+        drafts.map { it.key.substringAfter('/') }.chunked(500).forEach { ids ->
+            client.from("drafts").delete { filter { isIn("id", ids) } }
+        }
+        repository.markPushed(drafts.associate { it.toPair() }).getOrThrow()
     }
 
     private suspend fun pull() {
@@ -153,6 +166,9 @@ object CloudSync {
         }
         val newest = rows.mapNotNull { it.updatedAt?.let(OffsetDateTime::parse) }.maxOrNull()?.toString()
         repository.applyRemote(rows.map { RemoteItem(it.kind, it.id, if (it.deleted) null else it.data) }, newest).getOrThrow()
+        // Drafts are few and short-lived, so every sync fetches them all.
+        val drafts = client.from("drafts").select { order("created_at", Order.ASCENDING) }.decodeList<DraftRow>()
+        repository.applyDrafts(drafts.mapNotNull { libraryDraft(it.kind, it.id, it.data) }).getOrThrow()
     }
 
     /** Shows Google's account picker and signs in. Returns a message for the user, or null on success or cancel. */

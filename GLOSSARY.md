@@ -15,6 +15,10 @@ _Avoid_: Recipe
 **Beans**:
 A named coffee with a roaster, origin, variety, and expected tasting notes. A blend may have multiple origins or varieties.
 
+**Library draft**:
+Beans or a recipe Claude proposes, waiting in the Library until the user adds it, after any edits, or discards it. Shown in the app as a draft from Claude.
+_Avoid_: Brew draft, suggestion
+
 **Dose**:
 The mass of dry coffee used for a brew, measured in grams.
 _Avoid_: Serving size
