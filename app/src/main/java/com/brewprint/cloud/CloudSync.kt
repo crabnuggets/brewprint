@@ -144,10 +144,12 @@ object CloudSync {
             }
             client.from("records").upsert(rows) { onConflict = "user_id,kind,id" }
         }
+        // Uploaded records are marked first, so a failed deletion can't make them upload again over a newer edit.
+        repository.markPushed(records.associate { it.toPair() }).getOrThrow()
         drafts.map { it.key.substringAfter('/') }.chunked(500).forEach { ids ->
             client.from("drafts").delete { filter { isIn("id", ids) } }
         }
-        repository.markPushed(pushed).getOrThrow()
+        repository.markPushed(drafts.associate { it.toPair() }).getOrThrow()
     }
 
     private suspend fun pull() {
