@@ -92,7 +92,7 @@ With Brewprint connected to Claude, Claude can draft beans or a recipe from a pr
 
 The Library lists them first, under "Drafts from Claude", each as its name with "Beans · [roaster]" or "Recipe · [dose] g · 1:[ratio] · [water] g". While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") under "New brew", which opens the Library.
 
-Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync.
+Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync, including on an open review the user hasn't edited. A review whose draft was added on another phone or discarded closes.
 
 ## Brew sheet and timing
 

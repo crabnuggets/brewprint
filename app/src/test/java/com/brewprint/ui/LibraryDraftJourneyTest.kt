@@ -88,6 +88,41 @@ class LibraryDraftJourneyTest {
         assertTrue("drafts/${plan.id}" in state.sync.pending)
     }
 
+    @Test fun `a correction from Claude reaches an open review until the user edits it`() {
+        val repository = repository()
+        show(repository)
+        compose.onNodeWithText("Review 2 drafts from Claude").performClick()
+        compose.onNodeWithText("Three pours").performClick()
+        val corrected = plan.copy(name = "Two pours", pulses = listOf(Pulse("Bloom", 40.0, 10, 30), Pulse(water = 200.0, pourSeconds = 40)))
+        compose.runOnIdle { repository.applyDrafts(listOf(LibraryDraft(kii.id, beans = kii), LibraryDraft(plan.id, recipe = corrected))).getOrThrow() }
+        compose.onNodeWithText("Two pours").assertIsDisplayed()
+        compose.onNodeWithText("Planned pours: 240 g / Target: 240 g").assertExists()
+        compose.onNodeWithText("Add to Library").performScrollTo().performClick()
+        assertEquals(listOf(corrected), repository.state.value.recipes)
+
+        compose.onNodeWithText("Two pours").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Kii").performClick()
+        compose.onNode(hasText("Processing method, optional") and hasSetTextAction()).performTextInput("Washed")
+        compose.runOnIdle { repository.applyDrafts(listOf(LibraryDraft(kii.id, beans = kii.copy(origin = "Kenya, Nyeri")))).getOrThrow() }
+        // The user's edits stay; adding saves what they see.
+        compose.onNodeWithText("Kenya, Nyeri").assertDoesNotExist()
+        compose.onNodeWithText("Add to Library").performScrollTo().performClick()
+        assertEquals(listOf(kii.copy(processing = "Washed")), repository.state.value.beans)
+    }
+
+    @Test fun `a draft added or discarded elsewhere closes its review`() {
+        val repository = repository()
+        show(repository)
+        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.onNodeWithText("Kii").performClick()
+        compose.onNodeWithText("Review beans").assertIsDisplayed()
+        compose.runOnIdle { repository.applyDrafts(listOf(LibraryDraft(plan.id, recipe = plan))).getOrThrow() }
+        compose.onNodeWithText("Review beans").assertDoesNotExist()
+        compose.onNodeWithText("Drafts from Claude").assertIsDisplayed()
+        assertTrue(repository.state.value.beans.isEmpty())
+    }
+
     @Test fun `with no drafts, the Brew screen and Library don't mention them`() {
         val data = temporary.newFolder("empty")
         val repository = BrewRepository(object : ContextWrapper(RuntimeEnvironment.getApplication()) {

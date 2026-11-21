@@ -135,17 +135,17 @@ object CloudSync {
         val state = repository.state.value
         val pushed = state.sync.pending.associateWith { state.syncData(it) }
         if (pushed.isEmpty()) return
-        // Library drafts added or discarded here are deleted from the account; everything else is a record.
+        // Library drafts added or discarded here are deleted from the account, after the items added from them are uploaded.
         val (drafts, records) = pushed.entries.partition { it.key.startsWith("$DRAFTS/") }
-        drafts.map { it.key.substringAfter('/') }.chunked(500).forEach { ids ->
-            client.from("drafts").delete { filter { isIn("id", ids) } }
-        }
         records.chunked(500).forEach { chunk ->
             val rows = chunk.map { (key, data) ->
                 val (kind, id) = key.split('/', limit = 2)
                 RecordRow(userId, kind, id, data, deleted = data == null)
             }
             client.from("records").upsert(rows) { onConflict = "user_id,kind,id" }
+        }
+        drafts.map { it.key.substringAfter('/') }.chunked(500).forEach { ids ->
+            client.from("drafts").delete { filter { isIn("id", ids) } }
         }
         repository.markPushed(pushed).getOrThrow()
     }

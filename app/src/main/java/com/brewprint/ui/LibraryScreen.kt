@@ -55,6 +55,8 @@ fun LibraryScreen(
     val grinder = state.grinders.find { it.id == detailId }
     val recipe = state.recipes.find { it.id == detailId }
     val libraryDraft = state.libraryDrafts.find { it.id == draftId }
+    // Added on another phone or discarded by Claude while under review: there is nothing left to add.
+    if (draftId != null && libraryDraft == null) LaunchedEffect(Unit) { leaveEditor() }
     val closeDetail = { detailId = null; editing = false; Unit }
     fun save(result: Result<Unit>): Boolean {
         result.exceptionOrNull()?.let { onError(it.message ?: "Couldn't save changes. Try again.") }
@@ -231,7 +233,7 @@ internal fun DiscardDraftAction(onDiscard: () -> Unit) {
 /** Adds or edits beans, or with [onDiscardDraft], reviews a library draft before adding it. */
 @Composable
 private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
-    val original = remember(initial?.id) { initial ?: Beans() }
+    var original by remember(initial?.id) { mutableStateOf(initial ?: Beans()) }
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
     var roaster by rememberSaveable { mutableStateOf(original.roaster) }
@@ -242,6 +244,14 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     var notes by rememberSaveable { mutableStateOf(original.notes) }
     var discard by rememberSaveable { mutableStateOf(false) }
     val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes)
+    // A draft Claude corrects while it's open shows the correction, unless the user has started editing.
+    LaunchedEffect(initial) {
+        if (initial != null && initial != original && !dirty) {
+            original = initial
+            name = initial.name; roaster = initial.roaster; origin = initial.origin; variety = initial.variety
+            processing = initial.processing; expectedNotes = initial.expectedNotes; notes = initial.notes
+        }
+    }
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(LocalScreenActive.current, back)
     LibraryPage(if (onDiscardDraft != null) "Review beans" else if (initial == null) "Add beans" else "Edit beans", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {

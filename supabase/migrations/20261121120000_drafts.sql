@@ -7,12 +7,8 @@ create table public.drafts (
   kind text not null check (kind in ('beans', 'recipes')),
   data jsonb not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
   primary key (user_id, id)
 );
-
-create trigger drafts_touch before insert or update on public.drafts
-for each row execute function public.records_touch();
 
 alter table public.drafts enable row level security;
 
