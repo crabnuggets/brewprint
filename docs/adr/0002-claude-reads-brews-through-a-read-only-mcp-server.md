@@ -1,5 +1,7 @@
 # Claude reads brews through a read-only MCP server on Supabase
 
+Claude may now also draft beans and recipes, in a separate table; `records` stays read-only to it. See [ADR 0003](0003-claude-drafts-beans-and-recipes-for-the-user-to-add.md).
+
 Claude reaches a user's beans, grinders, recipes and brew records through an MCP server, `supabase/functions/brewprint-mcp`, an Edge Function next to the `records` table. Claude signs in through Supabase Auth's OAuth 2.1 server as the user, approves access on a consent page served by GitHub Pages (`web/oauth/consent.html`), and row-level security limits it to that user's rows. Claude can only read: the policies refuse inserts and updates from any token with a `client_id` claim, which Supabase puts on tokens it issues to OAuth clients and not on the app's own sessions.
 
 ADR 0001 kept each item's JSON in `records.data` partly because nothing read it on the server. The MCP server now reads it, but still only as whole items, so the JSON column stays. `fixtures/brew-record.json` holds a brew as the app writes it, and the app's `McpContractTest` fails when the Kotlin model and that fixture disagree, so a model change can't silently break the server.

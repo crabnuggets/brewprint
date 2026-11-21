@@ -1,12 +1,23 @@
-// Brewprint's MCP server: lets Claude read the signed-in user's beans, grinders, recipes and brews.
-// Claude signs in through Supabase Auth's OAuth server; row-level security keeps it to that user's
-// rows and to reading them (supabase/migrations/20261121090000_read_only_oauth_clients.sql).
+// Brewprint's MCP server: lets Claude read the signed-in user's beans, grinders, recipes and brews, and draft beans and
+// recipes for the user to add in the app. Claude signs in through Supabase Auth's OAuth server; row-level security
+// keeps it to that user's rows, lets it only read records (20261121090000_read_only_oauth_clients.sql) and lets it
+// write drafts (20261121120000_drafts.sql).
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { brewDetail, type BrewFilter, brewSummary, findBrews, library, type Row } from "./brews.ts";
+import {
+  type Beans,
+  brewDetail,
+  type BrewFilter,
+  brewSummary,
+  findBrews,
+  library,
+  type Recipe,
+  type Row,
+} from "./brews.ts";
+import { type BeansInput, buildBeans, buildRecipe, type Built, type DraftKind, type RecipeInput } from "./drafts.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // Inside the local stack SUPABASE_URL is an internal address, so links handed to clients can come from here instead.
@@ -22,7 +33,10 @@ const CORS = {
   "Access-Control-Expose-Headers": "WWW-Authenticate, Mcp-Session-Id",
 };
 
-const INSTRUCTIONS = `Brewprint is the user's filter coffee journal. These tools read it; nothing here can change it.
+const INSTRUCTIONS =
+  `Brewprint is the user's filter coffee journal. These tools read it, and can draft new beans and recipes;
+nothing here can change the user's library or brews. A draft waits in the app's Library until the user adds it,
+after editing it if they like, or discards it. Correct a draft with its id rather than drafting it again.
 A brew record keeps the beans, grinder, grind setting and recipe as they were on that day, plus the timing,
 scale readings and the user's tasting journal. Grind settings are ticks from each grinder's own reference
 point, so compare them only within one grinder. Times are UTC; the user's app shows their local time. Measured water is the scale's reading after the last pour,
@@ -61,7 +75,55 @@ async function readRows(client: SupabaseClient): Promise<Row[]> {
   }
 }
 
+interface Draft {
+  id: string;
+  kind: DraftKind;
+  data: Beans | Recipe;
+}
+
+async function readDrafts(client: SupabaseClient): Promise<Draft[]> {
+  const { data, error } = await client.from("drafts").select("id, kind, data").order("created_at");
+  if (error) throw new Error(`Couldn't read drafts: ${error.message}`);
+  return data;
+}
+
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }] });
+const failure = (message: string) => ({ ...text({ error: message }), isError: true });
+
+const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it.";
+const GONE = "isn't waiting any more: the user may have added or discarded it. get_library shows what's there.";
+
+/**
+ * Drafts a new item when [draftId] is absent, or corrects that draft, keeping the fields [build] isn't given.
+ * The app refuses invalid items, so the draft is only saved once [build] finds nothing to fix.
+ */
+async function saveDraft<T extends Beans | Recipe>(
+  client: SupabaseClient,
+  kind: DraftKind,
+  draftId: string | undefined,
+  build: (id: string, existing?: T) => Built<T>,
+) {
+  let existing: T | undefined;
+  if (draftId) {
+    const { data, error } = await client.from("drafts").select("data").eq("id", draftId).eq("kind", kind)
+      .maybeSingle();
+    if (error) throw new Error(`Couldn't read the draft: ${error.message}`);
+    if (!data) return failure(`Draft ${draftId} ${GONE}`);
+    existing = data.data as T;
+  }
+  const built = build(draftId ?? crypto.randomUUID(), existing);
+  if (!built.item) return failure(`Nothing was saved. Fix these first: ${built.errors.join(" ")}`);
+  const item = built.item;
+  if (draftId) {
+    const { data, error } = await client.from("drafts").update({ data: item }).eq("id", draftId).select("id");
+    if (error) throw new Error(`Couldn't save the draft: ${error.message}`);
+    if (!data.length) return failure(`Draft ${draftId} ${GONE}`);
+  } else {
+    const { error } = await client.from("drafts").insert({ id: item.id, kind, data: item });
+    if (error) throw new Error(`Couldn't save the draft: ${error.message}`);
+  }
+  return text({ draftId: item.id, status: WAITING, draft: item });
+}
 
 function server(client: SupabaseClient) {
   const mcp = new McpServer({ name: "brewprint", version: "0.1.0" }, { instructions: INSTRUCTIONS });
@@ -70,11 +132,13 @@ function server(client: SupabaseClient) {
   mcp.registerTool("get_library", {
     title: "Beans, grinders and recipes",
     description: "The user's beans (with roaster, origin, process and expected tasting notes), grinders and recipes, " +
-      "plus how many brews each beans and recipe has. Archived items are left out unless asked for.",
+      "plus how many brews each beans and recipe has, and the drafts waiting for the user to add or discard. " +
+      "Archived items are left out unless asked for.",
     inputSchema: { includeArchived: z.boolean().optional().describe("Include archived beans, grinders and recipes.") },
     annotations: read,
   }, async ({ includeArchived }: { includeArchived?: boolean }) => {
-    const { beans, grinders, recipes, brews } = library(await readRows(client));
+    const [rows, drafts] = await Promise.all([readRows(client), readDrafts(client)]);
+    const { beans, grinders, recipes, brews } = library(rows);
     const shown = <T extends { archived: boolean }>(items: T[]) =>
       items.filter((item) => includeArchived || !item.archived);
     return text({
@@ -85,6 +149,10 @@ function server(client: SupabaseClient) {
         brews: brews.filter((brew) => brew.recipe.id === item.id).length,
       })),
       totalBrews: brews.length,
+      drafts: {
+        beans: drafts.filter((draft) => draft.kind === "beans").map((draft) => draft.data),
+        recipes: drafts.filter((draft) => draft.kind === "recipes").map((draft) => draft.data),
+      },
     });
   });
 
@@ -118,6 +186,87 @@ function server(client: SupabaseClient) {
     const brew = library(await readRows(client)).brews.find((item) => item.id === id);
     if (!brew) return { ...text({ error: `No brew with id ${id}.` }), isError: true };
     return text(brewDetail(brew));
+  });
+
+  const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+  const draftId = z.string().optional().describe(
+    "The id of a draft to correct, from an earlier result or get_library's drafts. Leave out to start a new draft.",
+  );
+  const field = (description: string) => z.string().optional().describe(description);
+
+  mcp.registerTool(
+    "draft_beans",
+    {
+      title: "Draft beans",
+      description: "Drafts beans for the user to add to their Brewprint library, or corrects a draft with draftId, " +
+        "changing only the fields given. Check get_library first so the same beans aren't drafted twice. " +
+        "A new draft needs a name and roaster; leave out what the source doesn't say rather than guessing.",
+      inputSchema: {
+        draftId,
+        name: field('What the roaster calls the coffee, such as "Kii" or "Ethiopia natural".'),
+        roaster: field("The roaster's name."),
+        origin: field("Country, region or farm. A blend may list several."),
+        variety: field('Variety or cultivar, such as "SL28, SL34".'),
+        processing: field("Processing method, such as washed, natural or honey."),
+        expectedNotes: field('The roaster\'s tasting notes, comma-separated, such as "Blackcurrant, hibiscus".'),
+        notes: field(
+          "Anything else worth keeping, such as altitude, roast level, harvest or the product page's address.",
+        ),
+      },
+      annotations: write,
+    },
+    ({ draftId, ...input }: BeansInput & { draftId?: string }) =>
+      saveDraft<Beans>(client, "beans", draftId, (id, existing) => buildBeans(id, input, existing)),
+  );
+
+  mcp.registerTool(
+    "draft_recipe",
+    {
+      title: "Draft a recipe",
+      description:
+        "Drafts a recipe for the user to add to their Brewprint library, or corrects a draft with draftId, " +
+        "changing only the fields given (pulses are replaced as a whole). Check get_library first so the same " +
+        "recipe isn't drafted twice. Dose and each pulse's water take up to one decimal place. The pulses' water " +
+        "must add up to dose × ratio rounded to 0.1 g; when a recipe gives total water rather than a ratio, use " +
+        "water ÷ dose with enough decimals, such as 16.667 for 15 g and 250 g.",
+      inputSchema: {
+        draftId,
+        name: field("The recipe's name, such as the author's name for it."),
+        dose: z.number().optional().describe("Coffee dose in grams."),
+        ratio: z.number().optional().describe("Grams of water per gram of coffee: 16 for 1:16."),
+        pulses: z.array(z.object({
+          label: z.string().optional().describe('Such as "Bloom"; leave out for a plain pour.'),
+          water: z.number().describe("Grams of water this pour adds, not the running total."),
+          pourSeconds: z.number().int().describe(
+            "How long the pour takes. If the recipe doesn't say, estimate about 5 g per second.",
+          ),
+          waitSeconds: z.number().int().optional().describe(
+            "From the end of this pour to the start of the next. Ignored on the last pulse.",
+          ),
+        })).optional().describe(
+          "Every pour in order. When a recipe gives start times, a wait is the next pour's start minus this " +
+            'pour\'s start and pourSeconds; when it gives running totals ("pour to 150 g"), water is the difference.',
+        ),
+        notes: field(
+          "Preparation notes: grind, water temperature, dripper, swirls or stirs, and the source's address.",
+        ),
+      },
+      annotations: write,
+    },
+    ({ draftId, ...input }: RecipeInput & { draftId?: string }) =>
+      saveDraft<Recipe>(client, "recipes", draftId, (id, existing) => buildRecipe(id, input, existing)),
+  );
+
+  mcp.registerTool("discard_draft", {
+    title: "Discard a draft",
+    description: "Removes a draft beans or recipe that the user no longer wants, such as a duplicate. " +
+      "Items already in the library can't be changed here.",
+    inputSchema: { draftId: z.string().describe("The draft's id.") },
+    annotations: { ...write, destructiveHint: true },
+  }, async ({ draftId }: { draftId: string }) => {
+    const { data, error } = await client.from("drafts").delete().eq("id", draftId).select("id");
+    if (error) throw new Error(`Couldn't discard the draft: ${error.message}`);
+    return data.length ? text({ discarded: draftId }) : failure(`Draft ${draftId} ${GONE}`);
   });
 
   return mcp;

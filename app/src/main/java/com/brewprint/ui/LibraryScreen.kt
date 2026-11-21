@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,6 +36,8 @@ fun LibraryScreen(
 ) {
     var kind by rememberSaveable(requestedKind) { mutableStateOf(requestedKind ?: "") }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    // A library draft open for review: its editor adds it to the Library.
+    var draftId by rememberSaveable { mutableStateOf<String?>(null) }
     // Picking from an empty list can only mean adding one, so the form opens directly and Back returns to the caller.
     val pickingFromEmpty = onPicked != null && when (requestedKind) {
         "beans" -> state.beans.none { !it.archived }
@@ -43,7 +46,7 @@ fun LibraryScreen(
         else -> false
     }
     var editing by rememberSaveable { mutableStateOf(pickingFromEmpty) }
-    val leaveEditor = { editing = false; if (pickingFromEmpty) onClose?.invoke(); Unit }
+    val leaveEditor = { editing = false; draftId = null; if (pickingFromEmpty) onClose?.invoke(); Unit }
     var archive by rememberSaveable { mutableStateOf(false) }
     var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var settingDialog by rememberSaveable { mutableStateOf(false) }
@@ -51,6 +54,7 @@ fun LibraryScreen(
     val beans = state.beans.find { it.id == detailId }
     val grinder = state.grinders.find { it.id == detailId }
     val recipe = state.recipes.find { it.id == detailId }
+    val libraryDraft = state.libraryDrafts.find { it.id == draftId }
     val closeDetail = { detailId = null; editing = false; Unit }
     fun save(result: Result<Unit>): Boolean {
         result.exceptionOrNull()?.let { onError(it.message ?: "Couldn't save changes. Try again.") }
@@ -58,6 +62,7 @@ fun LibraryScreen(
     }
     fun saved(id: String) {
         editing = false
+        draftId = null
         if (onPicked != null) onPicked(kind, id) else detailId = id
     }
     LaunchedEffect(editing) { onEditingChanged(editing) }
@@ -65,15 +70,15 @@ fun LibraryScreen(
 
     if (editing) {
         when (kind) {
-            "beans" -> BeansEditor(beans, onSave = { item ->
+            "beans" -> BeansEditor(libraryDraft?.beans ?: beans, onSave = { item ->
                 save(repository.upsertBeans(item)).also { if (it) saved(item.id) }
-            }, onBack = leaveEditor)
+            }, onBack = leaveEditor, onDiscardDraft = libraryDraft?.let { draft -> { if (save(repository.discardLibraryDraft(draft.id))) leaveEditor() } })
             "grinders" -> GrinderEditor(grinder, onSave = { item ->
                 save(repository.upsertGrinder(item)).also { if (it) saved(item.id) }
             }, onBack = leaveEditor)
-            "recipes" -> RecipeEditor(recipe, onSave = { item ->
+            "recipes" -> RecipeEditor(libraryDraft?.recipe ?: recipe, onSave = { item ->
                 save(repository.upsertRecipe(item)).also { if (it) saved(item.id) }
-            }, onBack = leaveEditor)
+            }, onBack = leaveEditor, onDiscardDraft = libraryDraft?.let { draft -> { if (save(repository.discardLibraryDraft(draft.id))) leaveEditor() } })
         }
         return
     }
@@ -131,6 +136,15 @@ fun LibraryScreen(
     } else {
         if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
         LibraryPage(if (requestedKind == null) "Library" else "Choose ${kindLabel(requestedKind)}", onClose) {
+            if (onPicked == null && state.libraryDrafts.isNotEmpty()) {
+                SectionTitle("Drafts from Claude")
+                state.libraryDrafts.forEach { draft ->
+                    val (draftKind, title, detail) = draft.beans?.let { Triple("beans", it.name, "Beans · ${it.roaster}") }
+                        ?: draft.recipe!!.let { Triple("recipes", it.name, "Recipe · ${recipeSummary(it)}") }
+                    LibraryRow(title, detail) { kind = draftKind; detailId = null; draftId = draft.id; editing = true }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             val kinds = requestedKind?.let(::listOf) ?: listOf("recipes", "beans", "grinders")
             kinds.forEach { currentKind ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -143,21 +157,13 @@ fun LibraryScreen(
                         if (it.id == state.defaultGrinderId) append("Default · ")
                         append(it.lastSetting?.let { setting -> "Last recorded: $setting ticks" } ?: "No recorded setting")
                     }) }
-                    else -> state.recipes.filterNot { it.archived }.map { it.id to (it.name to "${formatAmount(it.dose)} g · 1:${formatAmount(it.ratio)} · ${formatAmount(it.totalWater)} g") }
+                    else -> state.recipes.filterNot { it.archived }.map { it.id to (it.name to recipeSummary(it)) }
                 }
                 if (items.isEmpty()) Text("No $currentKind yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 items.forEach { (id, content) ->
-                    Surface(onClick = {
+                    LibraryRow(content.first, content.second) {
                         kind = currentKind
                         if (onPicked != null) onPicked(currentKind, id) else detailId = id
-                    }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(content.first, style = MaterialTheme.typography.titleMedium)
-                                Text(content.second, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
                     }
                     if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) SoftTextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
                 }
@@ -199,7 +205,32 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () -> Unit) {
+private fun LibraryRow(title: String, detail: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g"
+
+/** The header action that discards a library draft under review, after asking. */
+@Composable
+internal fun DiscardDraftAction(onDiscard: () -> Unit) {
+    var asking by rememberSaveable { mutableStateOf(false) }
+    IconAction(Icons.Outlined.Delete, "Discard draft", danger = true) { asking = true }
+    if (asking) AlertDialog(onDismissRequest = { asking = false }, title = { Text("Discard this draft?") }, text = { Text("It won't be added to your Library.") },
+        confirmButton = { SoftTextButton(onClick = { asking = false; onDiscard() }, danger = true) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = { asking = false }) { Text("Keep draft") } })
+}
+
+/** Adds or edits beans, or with [onDiscardDraft], reviews a library draft before adding it. */
+@Composable
+private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
     val original = remember(initial?.id) { initial ?: Beans() }
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
@@ -213,7 +244,7 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes)
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(LocalScreenActive.current, back)
-    LibraryPage(if (initial == null) "Add beans" else "Edit beans", back) {
+    LibraryPage(if (onDiscardDraft != null) "Review beans" else if (initial == null) "Add beans" else "Edit beans", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
         LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
         LibraryField(origin, { origin = it }, "Origin, optional", helper = "Country, region, or farm if known")
@@ -221,7 +252,7 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
         LibraryField(processing, { processing = it }, "Processing method, optional")
         LibraryField(expectedNotes, { expectedNotes = it }, "Expected tasting notes, optional", multiline = true)
         LibraryField(notes, { notes = it }, "General notes, optional", multiline = true)
-        PrimaryAction("Save beans", enabled = name.isNotBlank() && roaster.isNotBlank(), icon = Icons.Outlined.Check) {
+        PrimaryAction(if (onDiscardDraft != null) "Add to Library" else "Save beans", enabled = name.isNotBlank() && roaster.isNotBlank(), icon = Icons.Outlined.Check) {
             if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes))) onBack()
         }
     }

@@ -64,10 +64,11 @@ class SyncTest {
         repository.setAppearance(Appearance.DARK).getOrThrow()
         repository.syncWith("user-1").getOrThrow()
         repository.startDraft().getOrThrow()
+        repository.applyDrafts(listOf(LibraryDraft("draft-1", beans = Beans(id = "draft-1", name = "Kii", roaster = "Tim Wendelboe")))).getOrThrow()
         repository.markPushed(repository.state.value.let { state -> state.sync.pending.associateWith(state::syncData) }).getOrThrow()
         repository.signedOut().getOrThrow()
         val state = repository.state.value
-        assertTrue(state.beans.isEmpty() && state.grinders.isEmpty() && state.draft == null)
+        assertTrue(state.beans.isEmpty() && state.grinders.isEmpty() && state.draft == null && state.libraryDrafts.isEmpty())
         assertEquals(SyncState(), state.sync)
         assertEquals(Appearance.DARK, state.appearance)
         // The next account starts from its own data alone.
@@ -122,5 +123,45 @@ class SyncTest {
         assertEquals(listOf(beans), merged.beans)
         assertTrue(merged.brews.isEmpty())
         assertTrue(merged.noteEdits.isEmpty())
+    }
+
+    @Test fun `adding or discarding a library draft deletes it from the account, once`() {
+        val repository = BrewRepository(context)
+        val kii = Beans(name = "Kii", roaster = "Tim Wendelboe")
+        val plan = Recipe(name = "Three pours", dose = 15.0, ratio = 16.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 40)))
+        val drafts = listOf(LibraryDraft(kii.id, beans = kii), LibraryDraft(plan.id, recipe = plan))
+        repository.applyDrafts(drafts).getOrThrow()
+        assertEquals(drafts, repository.state.value.libraryDrafts)
+        assertTrue(repository.state.value.sync.pending.isEmpty())
+
+        // Adding saves the user's edited copy as beans with the draft's id; discarding saves nothing.
+        repository.upsertBeans(kii.copy(processing = "Washed")).getOrThrow()
+        repository.discardLibraryDraft(plan.id).getOrThrow()
+        val state = repository.state.value
+        assertEquals(listOf(kii.copy(processing = "Washed")), state.beans)
+        assertTrue(state.recipes.isEmpty() && state.libraryDrafts.isEmpty())
+        assertEquals(setOf("beans/${kii.id}", "drafts/${kii.id}", "drafts/${plan.id}"), state.sync.pending)
+        assertNull(state.syncData("drafts/${kii.id}"))
+
+        // A fetch made before the deletions reach the account doesn't bring the drafts back.
+        repository.applyDrafts(drafts).getOrThrow()
+        assertTrue(repository.state.value.libraryDrafts.isEmpty())
+        repository.markPushed(state.sync.pending.associateWith(state::syncData)).getOrThrow()
+        assertTrue(repository.state.value.sync.pending.isEmpty())
+        repository.applyDrafts(listOf(drafts[0])).getOrThrow()
+        assertTrue(repository.state.value.libraryDrafts.isEmpty())
+    }
+
+    @Test fun `editing beans that aren't a draft deletes no draft`() {
+        val repository = BrewRepository(context)
+        repository.upsertBeans(beans).getOrThrow()
+        assertEquals(setOf("beans/${beans.id}"), repository.state.value.sync.pending)
+    }
+
+    @Test fun `a draft takes its id from the account and unreadable drafts are left out`() {
+        val data = syncJson.parseToJsonElement("""{"id":"other","name":"Kii","roaster":"Tim Wendelboe"}""")
+        assertEquals(LibraryDraft("draft-1", beans = Beans(id = "draft-1", name = "Kii", roaster = "Tim Wendelboe")), libraryDraft("beans", "draft-1", data))
+        assertNull(libraryDraft("grinders", "draft-2", data))
+        assertNull(libraryDraft("recipes", "draft-3", syncJson.parseToJsonElement("""{"pulses":"none"}""")))
     }
 }

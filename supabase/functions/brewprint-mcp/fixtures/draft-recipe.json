@@ -1,0 +1,28 @@
+{
+  "id": "draft-recipe-1",
+  "name": "Three pours",
+  "dose": 15,
+  "ratio": 16,
+  "pulses": [
+    {
+      "label": "Bloom",
+      "water": 45,
+      "pourSeconds": 10,
+      "waitSeconds": 35
+    },
+    {
+      "label": "",
+      "water": 100,
+      "pourSeconds": 15,
+      "waitSeconds": 20
+    },
+    {
+      "label": "",
+      "water": 95,
+      "pourSeconds": 15,
+      "waitSeconds": 0
+    }
+  ],
+  "notes": "Swirl after the bloom.",
+  "archived": false
+}

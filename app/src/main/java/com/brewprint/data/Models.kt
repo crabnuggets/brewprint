@@ -184,6 +184,13 @@ data class BrewDraft(
 @Serializable
 data class NoteEdit(val brewId: String, val journal: Journal)
 
+/**
+ * Beans or a recipe Claude drafted, waiting in the Library for the user to add or discard. Exactly one of [beans] and
+ * [recipe] is set, with this draft's [id]. The account holds drafts; this phone keeps the latest copy it fetched.
+ */
+@Serializable
+data class LibraryDraft(val id: String, val beans: Beans? = null, val recipe: Recipe? = null)
+
 @Serializable
 data class AppState(
     val beans: List<Beans> = emptyList(),
@@ -192,6 +199,7 @@ data class AppState(
     val brews: List<BrewRecord> = emptyList(),
     val draft: BrewDraft? = null,
     val noteEdits: List<NoteEdit> = emptyList(),
+    val libraryDrafts: List<LibraryDraft> = emptyList(),
     val defaultGrinderId: String? = null,
     val lastBeansId: String? = null,
     val lastRecipeId: String? = null,

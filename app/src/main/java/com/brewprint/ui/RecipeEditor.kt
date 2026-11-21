@@ -41,8 +41,9 @@ private val pulseInputSaver = listSaver<List<PulseInput>, String>(
     restore = { it.chunked(5).map { fields -> PulseInput(fields[0], fields[1], fields[2], fields[3], fields[4]) } },
 )
 
+/** Adds or edits a recipe, or with [onDiscardDraft], reviews a library draft before adding it. */
 @Composable
-fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Unit) {
+fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
     val original = remember(initial?.id) { initial ?: Recipe() }
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
@@ -129,7 +130,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
     }
 
-    LibraryPage(if (initial == null) "New recipe" else "Edit recipe", back) {
+    LibraryPage(if (onDiscardDraft != null) "Review recipe" else if (initial == null) "New recipe" else "Edit recipe", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a recipe name." else null, required = true)
         LibraryField(dose, { dose = it }, "Coffee dose, g", KeyboardType.Decimal, error = if (doseValue == null) "Enter a positive amount with up to one decimal place." else null, required = true)
         LibraryField(ratio, { ratio = it }, "Brew ratio", KeyboardType.Decimal, error = if (ratioValue == null) "Enter a positive ratio denominator." else null, required = true, prefix = { Text("1 : ") })
@@ -221,7 +222,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
         Text("Scheduled pours end at ${formatDuration(schedule.last())}", style = MaterialTheme.typography.bodyMedium)
         LibraryField(notes, { notes = it }, "Preparation notes, optional", multiline = true)
-        PrimaryAction("Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
+        PrimaryAction(if (onDiscardDraft != null) "Add to Library" else "Save recipe", enabled = valid, icon = Icons.Outlined.Check) {
             val recipe = original.copy(id = id, name = name.trim(), dose = doseValue!!, ratio = ratioValue!!, notes = notes, pulses = pulses.mapIndexed { index, pulse -> Pulse(pulse.label, pulse.water.toDouble(), pulse.pour.toInt(), if (index == pulses.lastIndex) 0 else pulse.wait.toInt()) })
             if (onSave(recipe)) onBack()
         }
