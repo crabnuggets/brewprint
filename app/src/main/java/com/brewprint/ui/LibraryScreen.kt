@@ -52,12 +52,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
 
-/**
- * Where the Library is: its hub ([section] null), one section's list ("recipes", "beans", "grinders" or "archived"),
- * or one item ([detailId]) in that section. The Library tab keeps it above the screen, so starting a brew from an
- * item and coming back lands on that item again.
- */
-@Stable
 /** The kind of item a Library section holds; the archived list holds beans. */
 private fun kindOf(section: String?): String = when (section) { null -> ""; "archived" -> "beans"; else -> section }
 
@@ -66,6 +60,12 @@ private data class LibraryView(val section: String?, val detailId: String?, val 
     val depth: Int get() = when { editing -> 4; detailId != null -> 3; section == "archived" -> 2; section != null -> 1; else -> 0 }
 }
 
+/**
+ * Where the Library is: its hub ([section] null), one section's list ("recipes", "beans", "grinders" or "archived"),
+ * or one item ([detailId]) in that section. The Library tab keeps it above the screen, so starting a brew from an
+ * item and coming back lands on that item again.
+ */
+@Stable
 class LibraryNav(section: String? = null, detailId: String? = null) {
     var section by mutableStateOf(section)
     var detailId by mutableStateOf(detailId)

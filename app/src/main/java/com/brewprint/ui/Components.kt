@@ -284,7 +284,8 @@ internal val Destinations = listOf("Brew", "History", "Library", "Settings")
 internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: Modifier = Modifier, syncFailed: Boolean = false, onSelect: (String) -> Unit) {
     AnimatedVisibility(shown, modifier, enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)), exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))) {
         Surface(
-            modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).testTag("bottom-navigation"),
+            // On its way out it takes no taps, so a tab can't change the screen that is replacing it.
+            modifier = Modifier.inert(transition.targetState == EnterExitState.PostExit).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).testTag("bottom-navigation"),
             shape = RoundedCornerShape(LocalLook.current.navRadius),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -396,6 +397,7 @@ internal fun ActionRow(content: @Composable () -> Unit) {
     androidx.compose.ui.layout.Layout(content, Modifier.fillMaxWidth()) { measurables, constraints ->
         val width = constraints.maxWidth
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        if (measurables.isEmpty()) return@Layout layout(width, 0) {}
         if (measurables.size == 1) {
             val only = measurables.single().measure(loose)
             return@Layout layout(width, only.height) { only.place((width - only.width) / 2, 0) }

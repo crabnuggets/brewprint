@@ -219,18 +219,17 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             // "New brew", or "Resume brew" while one is in progress, floats over Brew above the navigation,
             // and drops to the corner while the navigation is hidden. Screen readers reach it after the screen's content.
             val onBrew = route == null && tab == "Brew"
-            // Off Brew it keeps its place while it fades, rather than following the navigation down.
-            val fabHeld = remember { arrayOf(86.dp) }
-            if (onBrew) fabHeld[0] = if (navShown) 86.dp else 16.dp
-            val fabTarget = fabHeld[0]
-            val fabBottom by androidx.compose.animation.core.animateDpAsState(fabTarget, tween(280), label = "fab")
-            // It fades out with Brew, keeping its label, rather than vanishing as another screen opens.
-            val resumeLabel = remember { booleanArrayOf(false) }
-            if (onBrew) resumeLabel[0] = state.draft != null
-            AnimatedVisibility(onBrew, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = fabBottom).semantics { traversalIndex = 1f },
+            val fabTarget = if (navShown) 86.dp else 16.dp
+            // It fades out with Brew rather than vanishing as another screen opens, keeping its label and place,
+            // and takes no taps on its way out.
+            AnimatedVisibility(onBrew, Modifier.align(Alignment.BottomEnd).semantics { traversalIndex = 1f },
                 enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.92f),
                 exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 0.92f)) {
-                BrewAction(resumeLabel[0]) { if (state.draft != null) resumeDraft() else startBrew() }
+                val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+                val held = remember { arrayOf<Any>(fabTarget, state.draft != null) }
+                if (!leaving) { held[0] = fabTarget; held[1] = state.draft != null }
+                val fabBottom by androidx.compose.animation.core.animateDpAsState(held[0] as androidx.compose.ui.unit.Dp, tween(280), label = "fab")
+                BrewAction(held[1] as Boolean, Modifier.padding(end = 16.dp, bottom = fabBottom)) { if (!leaving) { if (state.draft != null) resumeDraft() else startBrew() } }
             }
             // Always composed, so leaving a destination slides it away instead of removing it.
             FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) {
