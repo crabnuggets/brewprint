@@ -150,7 +150,7 @@ class BrewRepository(context: Context) {
         require(current.beans.any { it.id == id }) { "Beans not found." }
         val batches = current.beans.find { it.id == id }?.batches.orEmpty().map { it.id }
         current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id },
-            lastBatchId = current.lastBatchId?.takeIf { it !in batches }, sync = current.sync.copy(raw = current.sync.raw - "beans/$id")) to Unit
+            lastBatchId = current.lastBatchId?.takeIf { current.lastBeansId != id && it !in batches }, sync = current.sync.copy(raw = current.sync.raw - "beans/$id")) to Unit
     }
 
     /**
@@ -334,7 +334,7 @@ class BrewRepository(context: Context) {
         require(brew.beans.name.isNotBlank() && brew.beans.roaster.isNotBlank()) { "Enter beans and roaster." }
         require(brew.grinder.name.isNotBlank()) { "Enter a grinder name." }
         require(brew.recipe.validationErrors().isEmpty()) { "Check the recipe plan." }
-        val saved = brew.copy(recipe = brew.recipe.normalized())
+        val saved = brew.copy(recipe = brew.recipe.normalized(), beans = brew.beans.copy(batches = emptyList()))
         current.copy(brews = current.brews.map { if (it.id == brew.id) saved else it }.sortedByDescending { it.startedAt }) to Unit
     }
 

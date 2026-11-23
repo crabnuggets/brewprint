@@ -43,9 +43,11 @@ Deno.test("a roast date redates the draft's one batch, and an empty one clears i
   ]);
   assertEquals(buildBeans(existing.id, { roastDate: "" }, existing).item?.batches, []);
   assertEquals(buildBeans("x", { name: "Kii", roaster: "Tim Wendelboe" }).item?.batches, []);
-  assertEquals(buildBeans("x", { name: "Kii", roaster: "Tim Wendelboe", roastDate: "2026-02-30" }).errors, [
-    "Give the roast date as YYYY-MM-DD.",
-  ]);
+  for (const date of ["2026-02-30", "2026-13-01", "2026-00-10", "2026-01-32", "10 Nov"]) {
+    assertEquals(buildBeans("x", { name: "Kii", roaster: "Tim Wendelboe", roastDate: date }).errors, [
+      "Give the roast date as YYYY-MM-DD.",
+    ]);
+  }
 });
 
 Deno.test("recipe drafts are built exactly as the app saves recipes, with no wait after the last pour", async () => {

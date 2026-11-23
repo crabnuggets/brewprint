@@ -721,7 +721,9 @@ private fun BatchChoice(draft: BrewDraft, state: AppState, onChange: (BrewDraft)
     if (choosing) BatchPickerDialog(live, draft.batchId, { id ->
         choosing = false
         if (id != draft.batchId) onChange(draft.withBeans(live, batchId = id).copy(beans = draft.beans, allowArchivedBeans = draft.allowArchivedBeans).let {
-            if (it.timer == null && it.scale != null) it.copy(scale = null, scaleStep = ScaleStep.BREWER) else it
+            if (it.timer == null && it.scale != null) it.copy(scale = null, scaleStep = ScaleStep.BREWER,
+                recipe = if (it.scale.weighedDose != null) state.recipes.firstOrNull { recipe -> recipe.id == it.recipe?.id } ?: it.recipe else it.recipe)
+            else it
         })
     }) { choosing = false }
 }

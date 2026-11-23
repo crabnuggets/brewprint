@@ -483,7 +483,7 @@ private fun BatchesSection(beans: Beans, brews: List<BrewRecord>, onAdd: (String
                         }
                         val used = brews.count { it.batchId == batch.id }
                         Text(listOfNotNull(
-                            daysOffRoast(batch.roastDate, java.time.LocalDate.now())?.let { if (it == 1) "1 day ago" else "$it days ago" },
+                            daysAgo(batch.roastDate),
                             batch.addedAt.takeIf { it > 0 }?.let { "bought " + java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("d MMM")) },
                             if (used == 1) "1 brew" else "$used brews",
                         ).joinToString(" · "), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)

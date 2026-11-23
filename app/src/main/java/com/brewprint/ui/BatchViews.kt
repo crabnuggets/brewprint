@@ -1,6 +1,8 @@
 package com.brewprint.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
@@ -25,8 +27,12 @@ internal fun roastedLabel(roastDate: String, today: LocalDate = LocalDate.now())
 
 /** "Roasted 10 Nov · 12 days ago", counted on this phone's calendar; no count for a date after today. */
 internal fun roastLine(roastDate: String?, today: LocalDate = LocalDate.now()): String? = roastDate?.let { date ->
-    roastedLabel(date, today) + (daysOffRoast(date, today)?.let { " · " + when (it) { 0 -> "today"; 1 -> "1 day ago"; else -> "$it days ago" } } ?: "")
+    roastedLabel(date, today) + (daysAgo(date, today)?.let { " · $it" } ?: "")
 }
+
+/** "today", "1 day ago", "12 days ago" since [roastDate]; null without a date or for one after [today]. */
+internal fun daysAgo(roastDate: String?, today: LocalDate = LocalDate.now()): String? =
+    daysOffRoast(roastDate, today)?.let { when (it) { 0 -> "today"; 1 -> "1 day ago"; else -> "$it days ago" } }
 
 /** "12 days off roast" on the day of a brew. */
 internal fun offRoast(roastDate: String?, brewedAt: Long): String? =
@@ -41,7 +47,8 @@ internal fun batchName(batch: BeanBatch): String = batch.roastDate?.let { roaste
 internal fun RoastDateDialog(initial: String?, confirm: String, onConfirm: (String?) -> Unit, onDismiss: () -> Unit) {
     val today = LocalDate.now()
     val picker = rememberDatePickerState(
-        initialSelectedDateMillis = initial?.let { runCatching { LocalDate.parse(it).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull() },
+        // A stored date outside the picker's years, such as a typo in a draft, opens on no date rather than failing.
+        initialSelectedDateMillis = initial?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.takeIf { it.year in 1990..today.year }?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
         yearRange = 1990..today.year,
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long) = !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(today)
@@ -79,13 +86,13 @@ internal fun RoastDateField(value: String?, onChange: (String?) -> Unit) {
 @Composable
 internal fun BatchPickerDialog(beans: Beans, selectedId: String?, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Choose a batch") }, text = {
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.selectableGroup().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             beans.batchesNewestFirst.forEach { batch ->
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(batch.id == selectedId, role = Role.RadioButton) { onPick(batch.id) }, verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = batch.id == selectedId, onClick = null)
                     Column(Modifier.padding(start = 12.dp)) {
                         Text(batchName(batch))
-                        daysOffRoast(batch.roastDate, LocalDate.now())?.let { Text(if (it == 1) "1 day ago" else "$it days ago", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
+                        daysAgo(batch.roastDate)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
                     }
                 }
             }
