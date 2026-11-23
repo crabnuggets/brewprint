@@ -142,7 +142,7 @@ export function totalWater(pulses: Pulse[]): number {
 export function ratioOf(dose: number, grams: number, places: number): number {
   const d = decimal(dose);
   const tenths = Math.round(grams * 10);
-  if (!d || dose <= 0 || tenths <= 0) return 0;
+  if (!d || dose <= 0 || !Number.isFinite(tenths) || tenths <= 0) return 0;
   const numerator = BigInt(tenths) * 10n ** BigInt(d[1] + places);
   const denominator = d[0] * 10n;
   const quotient = numerator / denominator + (2n * (numerator % denominator) >= denominator ? 1n : 0n);
@@ -154,7 +154,9 @@ export const recipeRatio = (recipe: Recipe) => ratioOf(recipe.dose, totalWater(r
 
 /** For an iced recipe with its ice given, water and ice together per gram of coffee, to one decimal. */
 export function overallRatio(recipe: Recipe): number | null {
-  if (recipe.drinkStyle !== "ICED" || !(recipe.iceGrams != null && recipe.iceGrams > 0)) return null;
+  if (recipe.drinkStyle !== "ICED" || !(recipe.iceGrams != null && recipe.iceGrams > 0) || !(recipe.dose > 0)) {
+    return null;
+  }
   return ratioOf(recipe.dose, totalWater(recipe.pulses) + recipe.iceGrams, 1);
 }
 

@@ -67,6 +67,12 @@ class ScaleTest {
         assertEquals(recipe.pulses.map { it.pourSeconds }, scaled.pulses.map { it.pourSeconds })
     }
 
+    @Test fun `scaling rounds an exact half tenth up`() {
+        // 45.3 g × 15 / 18 is exactly 37.75 g.
+        val scaled = Recipe(name = "Down", dose = 18.0, pulses = listOf(Pulse(water = 45.3, pourSeconds = 5, waitSeconds = 5), Pulse(water = 54.7, pourSeconds = 5))).scaledTo(15.0)
+        assertEquals(listOf(37.8, 45.5), scaled.pulses.map { it.water })
+    }
+
     @Test fun `scaling never leaves a pulse at 0 g, and a weighed dose leaves the ice alone`() {
         // Halved, 0.5 g pulses round up to 0.3 g each, which would leave the last at 0 g; it borrows from the largest.
         val tiny = Recipe(name = "Tiny last", dose = 10.0, drinkStyle = DrinkStyle.ICED, iceGrams = 70.0,

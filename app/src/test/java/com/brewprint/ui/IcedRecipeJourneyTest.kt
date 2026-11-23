@@ -30,6 +30,7 @@ class IcedRecipeJourneyTest {
             android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888).also { view.draw(android.graphics.Canvas(it)) }
         }
         File(screenshots, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
     @get:Rule val compose = createAndroidComposeRule<androidx.activity.ComponentActivity>()
     @get:Rule val temporary = TemporaryFolder()

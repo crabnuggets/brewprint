@@ -117,6 +117,15 @@ class RecipeEditorTest {
         assertEquals("Stir gently 3 times", result.pulses.first().notes)
     }
 
+    @Test fun `pours changed by hand after a new dose become the plan, so no scaling is offered`() {
+        show(recipe.copy(pulses = listOf(Pulse(water = 240.0, pourSeconds = 30))))
+        compose.onNode(hasText("Coffee dose, g") and hasSetTextAction()).performTextReplacement("18")
+        compose.onNodeWithText("Scale pours to keep 1:16").performScrollTo().assertExists()
+        compose.onNode(hasText("Water, g") and hasSetTextAction()).performScrollTo().performTextReplacement("270")
+        compose.onNodeWithText("Scale pours to keep 1:16").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Brew ratio 1 to 15").assertExists()
+    }
+
     @Test fun `a hot recipe keeps no ice, and details are checked before saving`() {
         show(recipe)
         compose.onNodeWithText("Ice in server, g").assertDoesNotExist()

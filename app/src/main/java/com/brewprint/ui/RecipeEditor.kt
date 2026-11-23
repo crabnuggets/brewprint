@@ -65,7 +65,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
     var dose by rememberSaveable { mutableStateOf(original.dose.takeIf { it > 0 }?.let(::formatAmount) ?: "") }
-    // The dose the pours were planned for. Changing the dose offers to scale the pours from it.
+    // The dose the pours were planned for. Changing the dose offers to scale the pours from it; changing the pours by hand makes them the plan for the dose shown.
     var referenceDose by rememberSaveable { mutableStateOf(dose) }
     var details by rememberSaveable(stateSaver = detailsSaver) { mutableStateOf(Details(original)) }
     val initialPulses = remember(original) { pulseInputs(original) }
@@ -263,7 +263,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                 LibraryField(pulse.label, { value -> replace(pulse.id) { it.copy(label = value) } }, "Label, optional")
                                 // Water, pour and wait share a row where they fit; the last pulse has no wait.
                                 SideBySide(3) { modifier ->
-                                    LibraryField(pulse.water, { value -> replace(pulse.id) { it.copy(water = value) } }, "Water, g", KeyboardType.Decimal, error = if (currentWater == null) "Positive, up to 0.1 g" else null, modifier = modifier)
+                                    LibraryField(pulse.water, { value -> replace(pulse.id) { it.copy(water = value) }; referenceDose = dose }, "Water, g", KeyboardType.Decimal, error = if (currentWater == null) "Positive, up to 0.1 g" else null, modifier = modifier)
                                     LibraryField(pulse.pour, { value -> replace(pulse.id) { it.copy(pour = value) } }, "Pour, s", KeyboardType.Number, error = if (pulse.pour.toIntOrNull()?.let { it > 0 } != true) "Whole seconds above 0" else null, modifier = modifier)
                                     if (index < pulses.lastIndex) LibraryField(pulse.wait, { value -> replace(pulse.id) { it.copy(wait = value) } }, "Wait, s", KeyboardType.Number, error = if (pulse.wait.toIntOrNull()?.let { it >= 0 } != true) "Whole seconds, 0 or more" else null, modifier = modifier)
                                     else Box(modifier.heightIn(min = 56.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
@@ -275,7 +275,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
                                     if (pulse.notes.isEmpty() && pulse.id !in openNotes) SoftTextButton(onClick = { openNotes = openNotes + pulse.id }) {
                                         Icon(Icons.Outlined.Add, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Add note")
                                     }
-                                    if (pulses.size > 1) SoftTextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }) }) { Text("Remove pulse ${index + 1}") }
+                                    if (pulses.size > 1) SoftTextButton(onClick = { reorderOrRemove(pulses.filterIndexed { pulseIndex, _ -> pulseIndex != index }); referenceDose = dose }) { Text("Remove pulse ${index + 1}") }
                                 }
                             }
                         }
@@ -287,6 +287,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
             val last = pulses.last()
             // A new pulse copies the last one's water and pour time; its label and note start empty.
             pulses = pulses.dropLast(1) + last.copy(wait = "0") + PulseInput("", last.water, last.pour, "0")
+            referenceDose = dose
         }, modifier = Modifier.fillMaxWidth()) { Text("Add pulse") }
         Text("Copies the previous water amount and pour duration. Check its new wait, which starts at zero.", style = MaterialTheme.typography.bodySmall)
         if (announcement.isNotEmpty()) Text(announcement, style = MaterialTheme.typography.bodySmall)

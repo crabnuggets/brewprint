@@ -276,7 +276,7 @@ class BrewRepository(context: Context) {
     }
 
     fun deleteBrew(id: String): Result<Unit> = change { current ->
-        current.copy(brews = current.brews.filterNot { it.id == id }, noteEdits = current.noteEdits.filterNot { it.brewId == id }) to Unit
+        current.copy(brews = current.brews.filterNot { it.id == id }, noteEdits = current.noteEdits.filterNot { it.brewId == id }, sync = current.sync.copy(raw = current.sync.raw - "brews/$id")) to Unit
     }
 
     fun saveNoteEdit(brewId: String, journal: Journal): Result<Unit> = change { current ->

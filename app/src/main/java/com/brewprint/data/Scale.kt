@@ -77,19 +77,19 @@ fun AppState.scaleBrewRunning(now: Long): Boolean {
 fun Recipe.scaledTo(dose: Double, scaleIce: Boolean = false): Recipe {
     val rounded = roundedAmount(dose)
     if (this.dose <= 0 || rounded <= 0 || pulses.isEmpty()) return copy(dose = rounded).normalized()
-    val factor = BigDecimal.valueOf(rounded).divide(BigDecimal.valueOf(this.dose), 12, RoundingMode.HALF_UP)
-    fun tenths(grams: Double) = BigDecimal.valueOf(grams).movePointRight(1).multiply(factor).setScale(0, RoundingMode.HALF_UP).toLong()
+    fun scaled(grams: Double, places: Int) = BigDecimal.valueOf(grams).multiply(BigDecimal.valueOf(rounded)).divide(BigDecimal.valueOf(this.dose), places, RoundingMode.HALF_UP)
+    fun tenths(grams: Double) = scaled(grams, 1).movePointRight(1).toLong()
     val total = maxOf(tenths(totalWater), pulses.size.toLong())
     val scaled = pulses.map { maxOf(1L, tenths(it.water)) }.toMutableList()
     scaled[scaled.lastIndex] = total - scaled.dropLast(1).sum()
     while (scaled.any { it < 1 }) {
         val short = scaled.indexOfFirst { it < 1 }
         val largest = scaled.indices.maxBy { scaled[it] }
-        val need = 1 - scaled[short]
-        scaled[short] += need
-        scaled[largest] -= need
+        val take = minOf(1 - scaled[short], scaled[largest] - 1)
+        scaled[short] += take
+        scaled[largest] -= take
     }
-    val ice = if (scaleIce) iceGrams?.let { BigDecimal.valueOf(it).multiply(factor).setScale(1, RoundingMode.HALF_UP).toDouble() } else iceGrams
+    val ice = if (scaleIce) iceGrams?.let { maxOf(0.1, scaled(it, 1).toDouble()) } else iceGrams
     return copy(dose = rounded, iceGrams = ice, pulses = pulses.mapIndexed { index, pulse -> pulse.copy(water = scaled[index] / 10.0) }).normalized()
 }
 

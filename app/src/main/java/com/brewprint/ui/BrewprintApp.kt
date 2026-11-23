@@ -603,7 +603,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 if (scaleOn || scaleLost) {
                     val data = draft.scale ?: ScaleData()
                     ScalePrep(
-                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, if (scaleLost) scale.live.copy(silent = true) else scale.live, draft.recipe.dose, draft.recipe.computedRatio, data.weighedDose, reconnected, ice = draft.recipe.iceGrams,
+                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, if (scaleLost) scale.live.copy(silent = true) else scale.live, draft.recipe.dose, draft.recipe.computedRatio, data.weighedDose, reconnected, ice = draft.recipe.iceGrams?.takeIf { draft.recipe.drinkStyle == DrinkStyle.ICED },
                         onTare = { scale.tare(); if (draft.scale == null || draft.scaleStep == ScaleStep.BREWER) change(draft.copy(scale = data, scaleStep = ScaleStep.COFFEE)) },
                         // The weighed dose sets this brew's plan; the recipe in the Library keeps its own.
                         onUse = { dose -> change(draft.copy(recipe = draft.recipe.scaledTo(dose), scale = data.copy(weighedDose = dose), scaleStep = ScaleStep.ARMED)); scale.tare() },
@@ -735,7 +735,7 @@ private fun RecipeNumbers(recipe: Recipe) {
             val iced = recipe.drinkStyle == DrinkStyle.ICED
             listOfNotNull(Triple("Coffee dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Brew ratio", ratio.value + ratio.unit.takeIf { it.isNotEmpty() }?.let { " · $it" }.orEmpty(), ratio.spoken),
                 Triple("Total brew water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams"),
-                if (iced) Triple("Iced", recipe.iceGrams?.let { "${formatAmount(it)} g ice" } ?: "Iced", "Iced" + (recipe.iceGrams?.let { ", ${formatAmount(it)} grams of ice" } ?: "")) else null,
+                if (iced) Triple("Style", recipe.iceGrams?.let { "Iced, ${formatAmount(it)} g ice" } ?: "Iced", "Iced" + (recipe.iceGrams?.let { ", ${formatAmount(it)} grams of ice" } ?: "")) else null,
                 recipe.waterTempC?.let { Triple("Water temp", "$it °C", "Water temperature $it degrees Celsius") }).forEach { (label, value, spoken) -> Column(Modifier.clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleLarge) } }
         }
     }
