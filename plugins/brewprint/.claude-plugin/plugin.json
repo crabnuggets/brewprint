@@ -1,7 +1,7 @@
 {
   "name": "brewprint",
-  "version": "0.3.0",
-  "description": "Read your Brewprint brews, get help tasting and dialing in your filter coffee, and have Claude draft new beans and recipes.",
+  "version": "0.4.0",
+  "description": "Read your Brewprint brews, get help tasting and dialing in your filter coffee, and have Claude draft new beans, recipes and tasting notes.",
   "author": { "name": "Brewprint" },
   "homepage": "https://github.com/crabnuggets/brewprint",
   "repository": "https://github.com/crabnuggets/brewprint",

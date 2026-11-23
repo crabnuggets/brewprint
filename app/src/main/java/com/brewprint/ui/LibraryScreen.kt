@@ -634,12 +634,12 @@ private fun SwipeRow(onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Uni
 
 private fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatRatio(recipe.computedRatio)} · ${formatAmount(recipe.totalWater)} g"
 
-/** The header action that discards a library draft under review, after asking. */
+/** The header action that discards a draft from Claude under review, after asking. */
 @Composable
-internal fun DiscardDraftAction(onDiscard: () -> Unit) {
+internal fun DiscardDraftAction(title: String = "Discard this draft?", message: String = "It won't be added to your Library.", onDiscard: () -> Unit) {
     var asking by rememberSaveable { mutableStateOf(false) }
     IconAction(Icons.Outlined.Delete, "Discard draft", danger = true) { asking = true }
-    if (asking) AlertDialog(onDismissRequest = { asking = false }, title = { Text("Discard this draft?") }, text = { Text("It won't be added to your Library.") },
+    if (asking) AlertDialog(onDismissRequest = { asking = false }, title = { Text(title) }, text = { Text(message) },
         confirmButton = { SoftTextButton(onClick = { asking = false; onDiscard() }, danger = true) { Text("Discard") } }, dismissButton = { SoftTextButton(onClick = { asking = false }) { Text("Keep draft") } })
 }
 
@@ -669,7 +669,7 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans, String?) -> Boolean, on
     }
     val back = { if (dirty) discard = true else onBack() }
     BackHandler(LocalScreenActive.current, back)
-    LibraryPage(if (onDiscardDraft != null) "Review beans" else if (initial == null) "Add beans" else "Edit beans", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
+    LibraryPage(if (onDiscardDraft != null) "Review beans" else if (initial == null) "Add beans" else "Edit beans", back, actions = { onDiscardDraft?.let { DiscardDraftAction(onDiscard = it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
         LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
         if (original.batches.size <= 1) RoastDateField(roastDate) { roastDate = it }

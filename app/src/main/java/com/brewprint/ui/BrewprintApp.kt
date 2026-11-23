@@ -193,8 +193,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
                     // Only the screen being opened may close itself; the one animating out after a save has no draft by design.
                     ?: if (route == "draft") LaunchedEffect(Unit) { route = null } else Unit
-                "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
-                "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
+                "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, state.journalDrafts.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
+                "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, state.journalDrafts.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
                 else -> { val state = held[0]; val shown = held[1]; when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo, nav = libraryNav,
@@ -269,6 +269,12 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
             onClick = onDrafts,
         )
         val recent = state.brews.maxByOrNull { it.startedAt }
+        // Claude's notes for the most recent brew are reviewed from its card; older brews get a card each.
+        state.journalDrafts.forEach { draft ->
+            state.brews.find { it.id == draft.brewId && it.id != recent?.id }?.let { brew ->
+                HomeBanner(Icons.Outlined.EditNote, "Review tasting notes from Claude", "${brew.beans.name} · ${dateTime(brew.startedAt)}") { onNotes(brew.id) }
+            }
+        }
         if (recent == null) {
             Column(Modifier.fillMaxWidth().padding(top = 52.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Icon(Icons.Outlined.Coffee, null, Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface, CircleShape).padding(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -292,7 +298,7 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 val journal = recent.journal
                 if (journal.impression.isNotBlank()) Text(journal.impression, maxLines = 3, overflow = TextOverflow.Ellipsis, style = LocalLook.current.hand(MaterialTheme.typography.bodyLarge))
                 if (journal.nextTime.isNotBlank()) NextTimeLine(journal.nextTime, maxLines = 2)
-                val notes = if (state.noteEdits.any { it.brewId == recent.id }) "Resume tasting notes" else if (journal.isEmpty) "Add tasting notes" else "Edit tasting notes"
+                val notes = notesAction(recent, state.noteEdits.any { it.brewId == recent.id }, state.journalDrafts.any { it.brewId == recent.id })
                 // Side by side where they fit; stacked on a narrow screen or with large text.
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
@@ -303,7 +309,8 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 }
             } }
         }
-        state.noteEdits.filter { it.brewId != recent?.id }.forEach { edit ->
+        // A brew with Claude's notes waiting has its card above, which opens the review.
+        state.noteEdits.filter { edit -> edit.brewId != recent?.id && state.journalDrafts.none { it.brewId == edit.brewId } }.forEach { edit ->
             state.brews.find { it.id == edit.brewId }?.let { brew -> SoftButton(onClick = { onNotes(brew.id) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("Resume tasting notes · ${brew.beans.name}") } }
         }
         // Room for the floating action, so it never covers the last card's buttons.
@@ -889,8 +896,16 @@ private fun recordCells(brew: BrewRecord): List<Cell> {
     ) + recipeDetailCells(recipe)
 }
 
+/** The action that opens a brew's tasting notes: Claude's to review first, then unsaved edits, then the notes. */
+private fun notesAction(brew: BrewRecord, hasNoteEdit: Boolean, hasClaudeNotes: Boolean) = when {
+    hasClaudeNotes -> "Review tasting notes from Claude"
+    hasNoteEdit -> "Resume tasting notes"
+    brew.journal.isEmpty -> "Add tasting notes"
+    else -> "Edit tasting notes"
+}
+
 @Composable
-private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> Unit, onRepeat: () -> Unit, onNotes: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, hasClaudeNotes: Boolean, onClose: () -> Unit, onRepeat: () -> Unit, onNotes: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     BackHandler(LocalScreenActive.current) { onClose() }
     Page("Brew record", onClose) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -899,7 +914,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         }
         // The tasting journal comes first, "Next time" included, in every theme.
         if (!brew.journal.isEmpty) Taped { Panel { JournalSummary(brew.journal) } }
-        PrimaryAction(if (hasNoteEdit) "Resume tasting notes" else if (brew.journal.isEmpty) "Add tasting notes" else "Edit tasting notes", icon = Icons.Outlined.EditNote, onClick = onNotes)
+        PrimaryAction(notesAction(brew, hasNoteEdit, hasClaudeNotes), icon = Icons.Outlined.EditNote, onClick = onNotes)
         SecondaryAction("Repeat", icon = Icons.Outlined.Repeat, onClick = onRepeat)
         SectionTitle("Preparation")
         SetupBlock(recordCells(brew))
@@ -921,26 +936,50 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
     }
 }
 
+/**
+ * Edits a brew's tasting notes, or with [claude], reviews the notes Claude drafted for it before saving them. A review
+ * starts from Claude's notes, keeps no edits after Back, and leaves the draft waiting until it is saved or discarded.
+ */
 @Composable
-private fun NotesScreen(brew: BrewRecord, pending: Journal?, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit) {
-    var encoded by rememberSaveable(brew.id) { mutableStateOf(Json.encodeToString(pending ?: brew.journal)) }
+private fun NotesScreen(brew: BrewRecord, pending: Journal?, claude: Journal?, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit) {
+    // Whether this opened as a review is fixed while it's open, so a draft arriving mid-edit doesn't change the screen.
+    val reviewing = rememberSaveable(brew.id) { claude != null }
+    // What Back compares with: the brew's notes, or in a review, Claude's notes as last shown.
+    var originalEncoded by rememberSaveable(brew.id) { mutableStateOf(Json.encodeToString(if (reviewing) claude ?: Journal() else brew.journal)) }
+    val original = remember(originalEncoded) { Json.decodeFromString<Journal>(originalEncoded) }
+    var encoded by rememberSaveable(brew.id) { mutableStateOf(Json.encodeToString(if (reviewing) original else pending ?: brew.journal)) }
     val journal = remember(encoded) { Json.decodeFromString<Journal>(encoded) }
     var discard by remember { mutableStateOf(false) }
-    fun back() { if (journal != brew.journal) discard = true else onClose() }
-    BackHandler(LocalScreenActive.current) { back() }
-    Page("Tasting notes", ::back, footer = {
+    val active = LocalScreenActive.current
+    if (reviewing) {
+        // A correction from Claude replaces the review unless the user has started editing; a draft saved or
+        // discarded elsewhere ends it.
+        LaunchedEffect(claude) {
+            if (claude == null) { if (active) onClose() }
+            else if (claude != original && journal == original) { originalEncoded = Json.encodeToString(claude); encoded = originalEncoded }
+        }
+    }
+    fun back() { if (journal != original) discard = true else onClose() }
+    BackHandler(active) { back() }
+    Page(if (reviewing) "Review tasting notes" else "Tasting notes", ::back, actions = { if (reviewing) DiscardDraftAction("Discard Claude's notes?", "Your brew keeps the notes it has.") { repository.discardJournalDraft(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard Claude's notes.") } } }, footer = {
         PrimaryAction("Save notes", icon = Icons.Outlined.Check) {
-            repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
+            if (reviewing) repository.saveDraftedNotes(brew.id, journal).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") }
+            else repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
         }
     }) {
         Text(brew.beans.name, style = MaterialTheme.typography.titleMedium)
-        JournalEditor(journal, brew.beans.expectedNotes) { updated ->
+        if (reviewing) Text("Claude filled these in from your conversation. Check them, change anything, then save.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // A review shows every guided field Claude filled in, not only the written impression.
+        JournalEditor(journal, brew.beans.expectedNotes, exploring = reviewing && journal.copy(impression = "", nextTime = "", asItCools = "") != Journal()) { updated ->
             encoded = Json.encodeToString(updated)
-            repository.saveNoteEdit(brew.id, updated).onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") }
+            if (!reviewing) repository.saveNoteEdit(brew.id, updated).onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") }
         }
-        SecondaryAction("Continue later") { repository.saveNoteEdit(brew.id, journal).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") } }
+        if (!reviewing) SecondaryAction("Continue later") { repository.saveNoteEdit(brew.id, journal).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") } }
     }
-    if (discard) DiscardDialog({ discard = false }, { repository.discardNoteEdit(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard notes.") }; discard = false })
+    if (discard) DiscardDialog({ discard = false }, {
+        discard = false
+        if (reviewing) onClose() else repository.discardNoteEdit(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard notes.") }
+    })
 }
 
 @Composable

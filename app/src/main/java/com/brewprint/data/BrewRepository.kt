@@ -338,7 +338,9 @@ class BrewRepository(context: Context) {
     }
 
     fun deleteBrew(id: String): Result<Unit> = change { current ->
-        current.copy(brews = current.brews.filterNot { it.id == id }, noteEdits = current.noteEdits.filterNot { it.brewId == id }, sync = current.sync.copy(raw = current.sync.raw - "brews/$id")) to Unit
+        // Claude's tasting notes for a deleted brew have nowhere to go, so they are discarded with it.
+        val resolved = current.resolvingJournalDraft(id)
+        resolved.copy(brews = resolved.brews.filterNot { it.id == id }, noteEdits = resolved.noteEdits.filterNot { it.brewId == id }, sync = resolved.sync.copy(raw = resolved.sync.raw - "brews/$id")) to Unit
     }
 
     fun saveNoteEdit(brewId: String, journal: Journal): Result<Unit> = change { current ->
@@ -359,6 +361,18 @@ class BrewRepository(context: Context) {
         ) to Unit
     }
 
+    /** Saves Claude's tasting notes, as the user reviewed them, as the brew's journal. They replace any unsaved note edits. */
+    fun saveDraftedNotes(brewId: String, journal: Journal): Result<Unit> = change { current ->
+        require(current.brews.any { it.id == brewId }) { "Brew not found." }
+        current.copy(
+            brews = current.brews.map { if (it.id == brewId) it.copy(journal = journal) else it },
+            noteEdits = current.noteEdits.filterNot { it.brewId == brewId },
+        ).resolvingJournalDraft(brewId) to Unit
+    }
+
+    /** Discards Claude's tasting notes for a brew; its own notes stay as they are. */
+    fun discardJournalDraft(brewId: String): Result<Unit> = change { it.resolvingJournalDraft(brewId) to Unit }
+
     /** Starts syncing with a signed-in account. */
     fun syncWith(userId: String): Result<Unit> = change(track = false) { it.syncingWith(userId) to Unit }
 
@@ -372,5 +386,5 @@ class BrewRepository(context: Context) {
 
     fun applyRemote(items: List<RemoteItem>, pulledUpTo: String?): Result<Unit> = change(track = false) { it.withRemote(items, pulledUpTo) to Unit }
 
-    fun applyDrafts(drafts: List<LibraryDraft>): Result<Unit> = change(track = false) { it.withDrafts(drafts) to Unit }
+    fun applyDrafts(drafts: List<LibraryDraft>, journals: List<JournalDraft> = emptyList()): Result<Unit> = change(track = false) { it.withDrafts(drafts, journals) to Unit }
 }

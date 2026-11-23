@@ -1,7 +1,7 @@
-// Brewprint's MCP server: lets Claude read the signed-in user's beans, grinders, recipes and brews, and draft beans and
-// recipes for the user to add in the app. Claude signs in through Supabase Auth's OAuth server; row-level security
-// keeps it to that user's rows, lets it only read records (20261121090000_read_only_oauth_clients.sql) and lets it
-// write drafts (20261121120000_drafts.sql).
+// Brewprint's MCP server: lets Claude read the signed-in user's beans, grinders, recipes and brews, draft beans and
+// recipes for the user to add in the app, and draft tasting notes on a brew for the user to save. Claude signs in
+// through Supabase Auth's OAuth server; row-level security keeps it to that user's rows, lets it only read records
+// (20261121090000_read_only_oauth_clients.sql) and lets it write drafts (20261121120000_drafts.sql).
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -11,14 +11,31 @@ import {
   type Beans,
   brewDetail,
   type BrewFilter,
+  type BrewRecord,
   brewSummary,
   findBrews,
+  type Journal,
   library,
   type Recipe,
   recipeRatio,
   type Row,
+  tasting,
 } from "./brews.ts";
-import { type BeansInput, buildBeans, buildRecipe, type Built, type DraftKind, type RecipeInput } from "./drafts.ts";
+import {
+  type BeansInput,
+  BODIES,
+  buildBeans,
+  buildJournal,
+  buildRecipe,
+  type Built,
+  type DraftKind,
+  FINISH_LENGTHS,
+  FLAVOR_TAGS,
+  type JournalInput,
+  LEVELS,
+  MOUTHFEEL_TAGS,
+  type RecipeInput,
+} from "./drafts.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // Inside the local stack SUPABASE_URL is an internal address, so links handed to clients can come from here instead.
@@ -35,9 +52,11 @@ const CORS = {
 };
 
 const INSTRUCTIONS =
-  `Brewprint is the user's filter coffee journal. These tools read it, and can draft new beans and recipes;
-nothing here can change the user's library or brews. A draft waits in the app's Library until the user adds it,
-after editing it if they like, or discards it. Correct a draft with its id rather than drafting it again.
+  `Brewprint is the user's filter coffee journal. These tools read it, and can draft new beans and recipes, and
+tasting notes for a brew; nothing here can change the user's library or brews. A beans or recipe draft waits in the
+app's Library until the user adds it, after editing it if they like, or discards it. Tasting notes wait on their
+brew until the user saves them, after editing them if they like, or discards them. Correct a draft with its id
+rather than drafting it again; drafting tasting notes again for the same brew corrects them.
 A brew record keeps the beans, grinder, grind setting and recipe as they were on that day, plus the timing,
 scale readings and the user's tasting journal. Grind settings are ticks from each grinder's own reference
 point, so compare them only within one grinder. Times are UTC; the user's app shows their local time. Measured water is the scale's reading after the last pour,
@@ -82,7 +101,7 @@ async function readRows(client: SupabaseClient): Promise<Row[]> {
 interface Draft {
   id: string;
   kind: DraftKind;
-  data: Beans | Recipe;
+  data: Beans | Recipe | Journal;
 }
 
 async function readDrafts(client: SupabaseClient): Promise<Draft[]> {
@@ -91,10 +110,28 @@ async function readDrafts(client: SupabaseClient): Promise<Draft[]> {
   return data;
 }
 
+async function readBrew(client: SupabaseClient, id: string): Promise<BrewRecord | null> {
+  const { data, error } = await client.from("records").select("data").eq("kind", "brews").eq("id", id)
+    .eq("deleted", false).maybeSingle();
+  if (error) throw new Error(`Couldn't read the brew: ${error.message}`);
+  return (data?.data as BrewRecord | undefined) ?? null;
+}
+
+/** Tasting notes drafted for a brew and not yet saved or discarded; null when none wait. */
+async function readJournalDraft(client: SupabaseClient, brewId: string): Promise<Journal | null> {
+  const { data, error } = await client.from("drafts").select("data").eq("id", brewId).eq("kind", "journals")
+    .maybeSingle();
+  if (error) throw new Error(`Couldn't read the drafted tasting notes: ${error.message}`);
+  return (data?.data as Journal | undefined) ?? null;
+}
+
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }] });
 const failure = (message: string) => ({ ...text({ error: message }), isError: true });
 
 const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it.";
+const NOTES_WAITING =
+  "Waiting on the brew in Brewprint. The user saves these notes, after editing them if they like, " +
+  "or discards them; until then the brew keeps its own notes.";
 const GONE = "isn't waiting any more: the user may have added or discarded it. get_library shows what's there.";
 
 /**
@@ -161,6 +198,10 @@ function server(client: SupabaseClient) {
           ...(draft.data as Recipe),
           ratio: `1:${recipeRatio(draft.data as Recipe)}`,
         })),
+        tastingNotes: drafts.filter((draft) => draft.kind === "journals").map((draft) => ({
+          brewId: draft.id,
+          ...tasting(draft.data as Journal),
+        })),
       },
     });
   });
@@ -188,13 +229,14 @@ function server(client: SupabaseClient) {
   mcp.registerTool("get_brew", {
     title: "Get a brew",
     description: "One brew in full: beans, grinder, recipe, each pulse's plan against what happened, " +
-      "scale analysis (flow, drawdown, measured water, a coarse weight curve) and the tasting journal.",
+      "scale analysis (flow, drawdown, measured water, a coarse weight curve), the tasting journal, and any " +
+      "tasting notes drafted for it that the user hasn't saved or discarded yet.",
     inputSchema: { id: z.string().describe("The brew's id from list_brews.") },
     annotations: read,
   }, async ({ id }: { id: string }) => {
-    const brew = library(await readRows(client)).brews.find((item) => item.id === id);
+    const [brew, draft] = await Promise.all([readBrew(client, id), readJournalDraft(client, id)]);
     if (!brew) return { ...text({ error: `No brew with id ${id}.` }), isError: true };
-    return text(brewDetail(brew));
+    return text({ ...brewDetail(brew), tastingNotesDraft: draft && tasting(draft) });
   });
 
   const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
@@ -285,11 +327,61 @@ function server(client: SupabaseClient) {
       saveDraft<Recipe>(client, "recipes", draftId, (id, existing) => buildRecipe(id, input, existing)),
   );
 
+  const words = (description: string) => z.string().nullable().optional().describe(description);
+  const choice = <T extends readonly [string, ...string[]]>(options: T, description: string) =>
+    z.enum(options).nullable().optional().describe(description);
+  const tags = <T extends readonly [string, ...string[]]>(options: T, description: string) =>
+    z.array(z.enum(options)).nullable().optional().describe(description);
+
+  mcp.registerTool(
+    "draft_tasting_notes",
+    {
+      title: "Draft tasting notes",
+      description: "Drafts tasting notes for one brew from what the user told you about the cup, for them to review " +
+        "and save in the app. Fields left out keep what the waiting draft has, or else what the brew's notes " +
+        "already say; null clears one. Drafting again for the same brew corrects the waiting draft. Use the user's " +
+        "own words and only what they told you: never fill a field from the roaster's expected notes or a guess. " +
+        "Choices take only the app's options; put anything else in the matching words field.",
+      inputSchema: {
+        brewId: z.string().describe("The brew's id from list_brews."),
+        impression: words('"How was this cup?": the user\'s overall impression in their own words.'),
+        aroma: words("What they smelled."),
+        flavorTags: tags(FLAVOR_TAGS, "Broad flavor families they noticed. Replaces the list."),
+        flavor: words("Flavor in their words, such as the fruit it reminded them of."),
+        sweetness: choice(LEVELS, "How much sweetness they noticed."),
+        sweetnessNotes: words("Sweetness in their words."),
+        acidity: choice(LEVELS, "How bright or tangy it tasted."),
+        acidityNotes: words('Acidity in their words, such as "like green apple".'),
+        bitterness: choice(LEVELS, "How much bitterness they noticed."),
+        bitternessNotes: words("Bitterness in their words."),
+        body: choice(BODIES, "How light or weighty it felt in the mouth."),
+        mouthfeelTags: tags(MOUTHFEEL_TAGS, "Its texture. Replaces the list."),
+        mouthfeel: words("Texture in their words, apart from its weight."),
+        finish: words("What lingered after swallowing."),
+        finishLength: choice(FINISH_LENGTHS, "How long the finish lasted."),
+        asItCools: words("What changed as the cup cooled."),
+        nextTime: words('One short reminder for the next brew, such as "Two ticks finer, same recipe".'),
+      },
+      annotations: { ...write, idempotentHint: true },
+    },
+    async ({ brewId, ...input }: JournalInput & { brewId: string }) => {
+      const [brew, draft] = await Promise.all([readBrew(client, brewId), readJournalDraft(client, brewId)]);
+      if (!brew) return failure(`No brew with id ${brewId}. list_brews gives each brew's id.`);
+      const built = buildJournal(input, draft ?? brew.journal ?? {}, brew.journal ?? {});
+      if (!built.item) return failure(`Nothing was saved. ${built.errors.join(" ")}`);
+      // One draft per brew, with the brew's id, so drafting again corrects it.
+      const { error } = await client.from("drafts").upsert({ id: brewId, kind: "journals", data: built.item });
+      if (error) throw new Error(`Couldn't save the tasting notes: ${error.message}`);
+      return text({ brewId, status: NOTES_WAITING, tastingNotes: tasting(built.item) });
+    },
+  );
+
   mcp.registerTool("discard_draft", {
     title: "Discard a draft",
-    description: "Removes a draft beans or recipe that the user no longer wants, such as a duplicate. " +
-      "Items already in the library can't be changed here.",
-    inputSchema: { draftId: z.string().describe("The draft's id.") },
+    description: "Removes a draft the user no longer wants: beans or a recipe, such as a duplicate, or tasting " +
+      "notes, whose draft id is their brew's id. Items already in the library and notes already saved can't be " +
+      "changed here.",
+    inputSchema: { draftId: z.string().describe("The draft's id; for tasting notes, the brew's id.") },
     annotations: { ...write, destructiveHint: true },
   }, async ({ draftId }: { draftId: string }) => {
     const { data, error } = await client.from("drafts").delete().eq("id", draftId).select("id");

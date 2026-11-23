@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
-import type { Beans, Recipe } from "./brews.ts";
-import { buildBeans, buildRecipe, recipeErrors, webAddress } from "./drafts.ts";
+import type { Beans, BrewRecord, Journal, Recipe } from "./brews.ts";
+import { buildBeans, buildJournal, buildRecipe, EMPTY_JOURNAL, recipeErrors, webAddress } from "./drafts.ts";
 
 // The app's McpContractTest reads these fixtures as Beans and Recipe, so a draft built here is one the app can add.
 const fixture = async <T>(name: string): Promise<T> =>
@@ -143,4 +143,46 @@ Deno.test("a recipe draft the app would refuse is refused with the app's reasons
     recipeErrors(recipe({ pulses: [{ label: "", water: 240.05, pourSeconds: 0, waitSeconds: 0, notes: "" }] })),
     ["Pulse 1: water must be positive with up to one decimal place.", "Pulse 1: pour duration must be positive."],
   );
+});
+
+Deno.test("tasting notes are drafted onto the brew's own notes, exactly as the app saves a journal", async () => {
+  const brew = await fixture<BrewRecord>("brew-record.json");
+  const built = buildJournal(
+    {
+      aroma: " Like blackcurrant jam ",
+      flavorTags: ["Fruity", "Floral", "Fruity"],
+      flavor: "Blackcurrant, then grapefruit",
+      mouthfeelTags: ["Silky"],
+      finish: "Tea-like",
+      finishLength: "Medium",
+      asItCools: "Sweeter as it cooled",
+    },
+    brew.journal,
+    brew.journal,
+  );
+  assertEquals(built.item, await fixture<Journal>("draft-journal.json"));
+});
+
+Deno.test("drafting tasting notes again keeps the waiting draft's fields, and null clears one", async () => {
+  const brew = await fixture<BrewRecord>("brew-record.json");
+  const waiting = await fixture<Journal>("draft-journal.json");
+  const corrected = buildJournal({ body: "Medium", aroma: null, flavorTags: null }, waiting, brew.journal).item!;
+  assertEquals(corrected, { ...waiting, body: "Medium", aroma: "", flavorTags: [] });
+});
+
+Deno.test("tasting notes that change nothing aren't drafted", async () => {
+  const brew = await fixture<BrewRecord>("brew-record.json");
+  const unchanged = [
+    "These are already the brew's tasting notes. Give the fields that should change, or use discard_draft with the " +
+    "brew's id to drop notes already waiting.",
+  ];
+  assertEquals(buildJournal({}, brew.journal, brew.journal).errors, unchanged);
+  assertEquals(
+    buildJournal({ impression: " Bright but a little thin " }, brew.journal, brew.journal).errors,
+    unchanged,
+  );
+  // A brew saved before a journal field existed lacks it; the draft has every field.
+  const { nextTime: _, ...older } = brew.journal;
+  assertEquals(buildJournal({ nextTime: "Finer" }, older, older).item, { ...brew.journal, nextTime: "Finer" });
+  assertEquals(buildJournal({ impression: "Sweet" }, {}, {}).item, { ...EMPTY_JOURNAL, impression: "Sweet" });
 });

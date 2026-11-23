@@ -10,6 +10,7 @@ import com.brewprint.BuildConfig
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.DRAFTS
 import com.brewprint.data.RemoteItem
+import com.brewprint.data.journalDraft
 import com.brewprint.data.libraryDraft
 import com.brewprint.data.syncData
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -65,7 +66,7 @@ private data class RecordRow(
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 
-/** A library draft Claude wrote to the account. */
+/** A library draft or tasting notes Claude wrote to the account. */
 @Serializable
 private data class DraftRow(val id: String, val kind: String, val data: JsonElement)
 
@@ -168,7 +169,7 @@ object CloudSync {
         repository.applyRemote(rows.map { RemoteItem(it.kind, it.id, if (it.deleted) null else it.data) }, newest).getOrThrow()
         // Drafts are few and short-lived, so every sync fetches them all.
         val drafts = client.from("drafts").select { order("created_at", Order.ASCENDING) }.decodeList<DraftRow>()
-        repository.applyDrafts(drafts.mapNotNull { libraryDraft(it.kind, it.id, it.data) }).getOrThrow()
+        repository.applyDrafts(drafts.mapNotNull { libraryDraft(it.kind, it.id, it.data) }, drafts.mapNotNull { journalDraft(it.kind, it.id, it.data) }).getOrThrow()
     }
 
     /** Shows Google's account picker and signs in. Returns a message for the user, or null on success or cancel. */

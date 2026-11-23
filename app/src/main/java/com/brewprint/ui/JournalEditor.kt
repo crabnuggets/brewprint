@@ -9,10 +9,13 @@ import androidx.compose.ui.unit.dp
 import com.brewprint.data.Journal
 
 @Composable
-fun JournalEditor(journal: Journal, expectedNotes: String, onChange: (Journal) -> Unit) {
-    var explore by rememberSaveable { mutableStateOf(false) }
+fun JournalEditor(journal: Journal, expectedNotes: String, exploring: Boolean = false, onChange: (Journal) -> Unit) {
+    var explore by rememberSaveable { mutableStateOf(exploring) }
     var cooling by rememberSaveable { mutableStateOf(journal.asItCools.isNotBlank()) }
     var roaster by rememberSaveable { mutableStateOf(false) }
+    // A correction from Claude that fills in more fields opens them, so the user sees it before saving.
+    LaunchedEffect(exploring) { if (exploring) explore = true }
+    LaunchedEffect(journal.asItCools.isNotBlank()) { if (journal.asItCools.isNotBlank()) cooling = true }
     SectionTitle("How was this cup?")
     Text("You can taste first and add notes later.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedTextField(journal.impression, { onChange(journal.copy(impression = it)) }, Modifier.fillMaxWidth(), label = { Text("Your notes") }, placeholder = { Text("What did you notice? Everyday words are welcome.") }, minLines = 4, shape = MaterialTheme.shapes.medium, colors = softFieldColors())

@@ -1,9 +1,9 @@
-// Beans and recipes Claude drafts for the user to add in the app. A draft holds the item exactly as the app saves it
-// (Models.kt), so adding it in the app needs no conversion. fixtures/draft-*.json are drafts as built here; a Kotlin
-// test fails when the app can't read them.
-import { type BeanBatch, type Beans, type DrinkStyle, type Pulse, type Recipe } from "./brews.ts";
+// Beans, recipes and tasting notes Claude drafts for the user to add or save in the app. A draft holds the item exactly
+// as the app saves it (Models.kt), so the app needs no conversion. fixtures/draft-*.json are drafts as built here; a
+// Kotlin test fails when the app can't read them.
+import { type BeanBatch, type Beans, type DrinkStyle, type Journal, type Pulse, type Recipe } from "./brews.ts";
 
-export type DraftKind = "beans" | "recipes";
+export type DraftKind = "beans" | "recipes" | "journals";
 
 export interface BeansInput {
   name?: string;
@@ -44,6 +44,16 @@ export interface RecipeInput {
   grindDescription?: string | null;
   sourceUrl?: string | null;
 }
+
+/** The choices the app's journal offers; anything else couldn't be shown or changed there. */
+export const FLAVOR_TAGS = ["Fruity", "Floral", "Chocolatey", "Nutty", "Spicy"] as const;
+export const MOUTHFEEL_TAGS = ["Silky", "Creamy", "Syrupy", "Drying"] as const;
+export const LEVELS = ["Low", "Medium", "High"] as const;
+export const BODIES = ["Light", "Medium", "Full"] as const;
+export const FINISH_LENGTHS = ["Short", "Medium", "Long"] as const;
+
+/** For each field, undefined keeps what the draft or the brew already has, and null clears it. */
+export type JournalInput = { [K in keyof Journal]?: Journal[K] | null };
 
 export type Built<T> = { item: T; errors: [] } | { item: null; errors: string[] };
 
@@ -124,6 +134,58 @@ export function buildRecipe(id: string, input: RecipeInput, existing?: Recipe): 
   ];
   return errors.length ? { item: null, errors } : { item: recipe, errors: [] };
 }
+
+/** An empty journal, as the app saves a brew with no tasting notes. */
+export const EMPTY_JOURNAL: Journal = {
+  impression: "",
+  aroma: "",
+  flavorTags: [],
+  flavor: "",
+  sweetness: null,
+  sweetnessNotes: "",
+  acidity: null,
+  acidityNotes: "",
+  bitterness: null,
+  bitternessNotes: "",
+  body: null,
+  mouthfeelTags: [],
+  mouthfeel: "",
+  finish: "",
+  finishLength: null,
+  asItCools: "",
+  nextTime: "",
+};
+
+/**
+ * Tasting notes for a brew: [base] (the waiting draft, or else the brew's saved journal) with the fields [input] gives
+ * replaced. The user reviews them in the app before they replace the brew's journal, so they must differ from [saved].
+ */
+export function buildJournal(input: JournalInput, base: Partial<Journal>, saved: Partial<Journal>): Built<Journal> {
+  const start = { ...EMPTY_JOURNAL, ...base };
+  const journal = Object.fromEntries(
+    (Object.keys(EMPTY_JOURNAL) as (keyof Journal)[]).map((key) => {
+      const value = input[key];
+      if (value === undefined) return [key, start[key]];
+      const empty = EMPTY_JOURNAL[key];
+      if (value === null) return [key, empty];
+      if (Array.isArray(value)) return [key, [...new Set(value)]];
+      // A choice the app doesn't offer was refused by the schema; free text is kept as written, trimmed.
+      return [key, typeof empty === "string" ? (value as string).trim() : value];
+    }),
+  ) as unknown as Journal;
+  if (same(journal, { ...EMPTY_JOURNAL, ...saved })) {
+    return {
+      item: null,
+      errors: [
+        "These are already the brew's tasting notes. Give the fields that should change, or use discard_draft " +
+        "with the brew's id to drop notes already waiting.",
+      ],
+    };
+  }
+  return { item: journal, errors: [] };
+}
+
+const same = (a: Journal, b: Journal) => JSON.stringify(a) === JSON.stringify(b);
 
 /** The app's Recipe.validationErrors(), so a draft the app would refuse to save is refused here first. */
 export function recipeErrors(recipe: Recipe): string[] {
