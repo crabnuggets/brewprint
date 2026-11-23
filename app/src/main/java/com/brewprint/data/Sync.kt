@@ -140,6 +140,7 @@ fun AppState.withoutAccountData(): AppState = copy(
     libraryDrafts = emptyList(),
     defaultGrinderId = null,
     lastBeansId = null,
+    lastBatchId = null,
     lastRecipeId = null,
     sync = SyncState(),
 )
@@ -167,6 +168,7 @@ fun AppState.withRemote(items: List<RemoteItem>, pulledUpTo: String?): AppState 
         noteEdits = next.noteEdits.filter { edit -> next.brews.any { it.id == edit.brewId } },
         defaultGrinderId = next.defaultGrinderId?.takeIf { id -> activeGrinders.any { it.id == id } } ?: activeGrinders.firstOrNull()?.id,
         lastBeansId = next.lastBeansId?.takeIf { id -> next.beans.any { it.id == id } },
+        lastBatchId = next.lastBatchId?.takeIf { id -> next.beans.any { beans -> beans.id == next.lastBeansId && beans.batches.any { it.id == id } } },
         sync = next.sync.copy(pulledUpTo = pulledUpTo ?: sync.pulledUpTo, raw = raw),
     )
 }

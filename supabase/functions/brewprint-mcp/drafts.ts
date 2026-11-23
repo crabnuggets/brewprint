@@ -1,7 +1,16 @@
 // Beans and recipes Claude drafts for the user to add in the app. A draft holds the item exactly as the app saves it
 // (Models.kt), so adding it in the app needs no conversion. fixtures/draft-*.json are drafts as built here; a Kotlin
 // test fails when the app can't read them.
-import { type Beans, decimal, type DrinkStyle, type Pulse, ratioOf, type Recipe, totalWater } from "./brews.ts";
+import {
+  type BeanBatch,
+  type Beans,
+  decimal,
+  type DrinkStyle,
+  type Pulse,
+  ratioOf,
+  type Recipe,
+  totalWater,
+} from "./brews.ts";
 
 export type DraftKind = "beans" | "recipes";
 
@@ -13,6 +22,14 @@ export interface BeansInput {
   processing?: string;
   expectedNotes?: string;
   notes?: string;
+  /** The bag's roast date, YYYY-MM-DD. Undefined keeps the draft's batches; "" clears them. */
+  roastDate?: string;
+}
+
+/** Fixed values for tests: the new batch's id, and the time it was added. */
+export interface BatchOptions {
+  batchId?: string;
+  now?: number;
 }
 
 export interface PulseInput {
@@ -45,8 +62,20 @@ const text = (value: string | null | undefined, fallback = "") => (value === und
 const given = <T>(value: T | null | undefined, existing: T | null | undefined): T | null =>
   value === undefined ? existing ?? null : value;
 
-/** New beans from [input], or [existing] with the fields [input] gives replaced. The app requires a name and roaster. */
-export function buildBeans(id: string, input: BeansInput, existing?: Beans): Built<Beans> {
+/**
+ * New beans from [input], or [existing] with the fields [input] gives replaced. The app requires a name and roaster.
+ * A roast date gives the beans one batch, or redates the one they have, as the app's beans form does.
+ */
+export function buildBeans(id: string, input: BeansInput, existing?: Beans, options: BatchOptions = {}): Built<Beans> {
+  const roastDate = input.roastDate?.trim();
+  const kept = existing?.batches ?? [];
+  const batches: BeanBatch[] = roastDate === undefined
+    ? kept
+    : roastDate === ""
+    ? []
+    : kept.length === 1
+    ? [{ ...kept[0], roastDate }]
+    : [{ id: options.batchId ?? crypto.randomUUID(), roastDate, notes: "", addedAt: options.now ?? Date.now() }];
   const beans: Beans = {
     id,
     name: text(input.name, existing?.name),
@@ -57,10 +86,12 @@ export function buildBeans(id: string, input: BeansInput, existing?: Beans): Bui
     expectedNotes: text(input.expectedNotes, existing?.expectedNotes),
     notes: text(input.notes, existing?.notes),
     archived: false,
+    batches,
   };
   const errors = [
     !beans.name && "Enter a name.",
     !beans.roaster && "Enter a roaster.",
+    roastDate && !isoDate(roastDate) && "Give the roast date as YYYY-MM-DD.",
   ].filter((error): error is string => !!error);
   return errors.length ? { item: null, errors } : { item: beans, errors: [] };
 }
@@ -155,6 +186,12 @@ export function webAddress(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** A real calendar date written YYYY-MM-DD. */
+function isoDate(value: string): boolean {
+  const date = new Date(`${value}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
 }
 
 const oneDecimal = (value: number) => Number.isFinite(value) && /^-?\d+(\.\d)?$/.test(String(value));

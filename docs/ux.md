@@ -58,6 +58,16 @@ Require a name and roaster. Keep these as text fields rather than separate roast
 
 Offer optional origin, variety / cultivar, processing method, expected tasting notes, and general notes. Origin and variety accept free text so blends and incomplete bag labels do not need special workflows. Prompt "Country, region, or farm if known" for origin. Expected notes might read "Blueberry, cocoa"; the user's experience goes into brew observations instead.
 
+Offer an optional roast date, chosen from a calendar that stops at today, with "Clear".
+
+#### Batches
+
+Buying the same beans again is a new batch, not new beans: "Bought again" on the beans' page asks for the new bag's roast date and adds it. Beans added before batches existed keep their first bag as "Original bag". Buying archived beans again unarchives them; archiving stays one switch for the beans as a whole. The beans' page lists batches newest first, by when they were added, the newest marked "Current", each with how long ago it was roasted, when it was bought and how many brews used it. A batch can be deleted, after asking, while another remains; brews keep the batch they used. With one batch or none, the beans form edits its roast date; with more, each batch keeps its own.
+
+A brew uses the batch chosen last for those beans, or the newest. With one batch there is nothing more to choose; with two or more, setup offers "Change batch", which starts the scale steps again if they had begun. "Repeat" on a brew whose beans were bought again since uses the newest batch and says so: "Using newest batch (Roasted 15 Jan) · Original brew used 10 Nov batch". "Edit brew" can change a record's batch.
+
+Days off roast count calendar days on the phone: the Library and setup count to today, a record to the day it was brewed ("12 days off roast", "1 day off roast"). A roast date after that day shows no count.
+
 Allow edits, archiving and deletion. Archived beans disappear from normal selection but remain readable in History. A repeat using archived beans identifies them and offers "Use anyway" or "Choose other beans".
 
 "Delete beans", in red in the "More actions" menu, asks "Delete these beans?" with "Existing brew records keep their saved details. You can't undo this.", "Delete" and "Keep beans". Brew records keep the beans as they were, and the beans stop being the remembered choice for the next brew. A brew draft using deleted beans, including a repeat and beans deleted on another phone, shows "These beans were deleted." in setup and in Finish brew, with "Choose other beans" and "Discard brew", and can't continue or save until one is chosen. With no other active beans the first action reads "Add beans" and opens the beans form.

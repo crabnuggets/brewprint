@@ -133,7 +133,8 @@ fun LibraryScreen(
     fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
     fun swipeUnarchive(item: Beans) { if (save(repository.unarchiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.UNARCHIVED, item)) }
     fun swipeDelete(item: Beans) {
-        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId, raw = state.sync.raw["beans/${item.id}"])
+        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId, raw = state.sync.raw["beans/${item.id}"],
+            rememberedBatchId = state.lastBatchId.takeIf { state.lastBeansId == item.id })
         if (save(repository.deleteBeans(item.id))) onUndoable(undo)
     }
     LaunchedEffect(editing) { onEditingChanged(editing) }
@@ -141,8 +142,8 @@ fun LibraryScreen(
 
     if (editing) {
         when (editKind) {
-            "beans" -> BeansEditor(libraryDraft?.beans ?: beans, onSave = { item ->
-                save(repository.upsertBeans(item)).also { if (it) saved(item.id) }
+            "beans" -> BeansEditor(libraryDraft?.beans ?: beans, onSave = { item, roastDate ->
+                save(repository.saveBeans(item, roastDate)).also { if (it) saved(item.id) }
             }, onBack = leaveEditor, onDiscardDraft = libraryDraft?.let { draft -> { if (save(repository.discardLibraryDraft(draft.id))) leaveEditor() } })
             "grinders" -> GrinderEditor(grinder, onSave = { item ->
                 save(repository.upsertGrinder(item)).also { if (it) saved(item.id) }
@@ -178,6 +179,7 @@ fun LibraryScreen(
             if (beans != null && kind == "beans") {
                 if (beans.archived) Text("Archived", style = MaterialTheme.typography.labelLarge)
                 DetailLine("Roaster", beans.roaster)
+                roastLine(beans.newestBatch?.roastDate)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge) }
                 // Archived beans are not offered for a new brew.
                 if (onBrewWith != null && !beans.archived) BrewWithAction("Brew with these beans", state.draft != null, onResumeBrew) { onBrewWith(beans.id, null) }
                 DetailLine("Origin", beans.origin)
@@ -185,6 +187,8 @@ fun LibraryScreen(
                 DetailLine("Processing method", beans.processing)
                 DetailLine("Expected tasting notes", beans.expectedNotes)
                 DetailLine("General notes", beans.notes)
+                BatchesSection(beans, state.brews, onAdd = { roastDate -> repository.addBeanBatch(beans.id, roastDate).exceptionOrNull()?.let { onError(it.message ?: "Couldn't add the batch.") } },
+                    onDelete = { batch -> save(repository.deleteBeanBatch(beans.id, batch.id)) })
             }
             if (grinder != null && kind == "grinders") {
                 DetailLine("Last recorded setting", grinder.lastSetting?.let { "$it ticks" } ?: "Not recorded")
@@ -441,6 +445,61 @@ private fun RowScope.BeansRowContent(beans: Beans) {
             Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
+    val roast = beans.newestBatch?.roastDate
+    val days = daysOffRoast(roast, java.time.LocalDate.now())
+    if (roast != null) Column(Modifier.clearAndSetSemantics { contentDescription = roastLine(roast).orEmpty() }, horizontalAlignment = Alignment.End) {
+        if (days != null) Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("$days", style = MaterialTheme.typography.headlineSmall.tabular())
+            Text(if (days == 1) "day" else "days", Modifier.padding(bottom = 3.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        Text(roastedLabel(roast), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/**
+ * The bags bought of these beans, newest first. "Bought again" adds one, and brings archived beans back.
+ * A batch can be deleted while another is left; brews keep the batch they used.
+ */
+@Composable
+private fun BatchesSection(beans: Beans, brews: List<BrewRecord>, onAdd: (String?) -> Unit, onDelete: (BeanBatch) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var deleting by rememberSaveable { mutableStateOf<String?>(null) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        SectionTitle("Batches", Modifier.weight(1f))
+        SoftTextButton(onClick = { adding = true }) { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Bought again") }
+    }
+    val batches = beans.batchesNewestFirst
+    if (batches.isEmpty()) Text("Bought another bag? Add it with its roast date, and brews will note which bag they used.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    else Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        Column {
+            batches.forEachIndexed { index, batch ->
+                if (index > 0) HorizontalDivider(color = colors.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(batchName(batch), Modifier.align(Alignment.CenterVertically), style = MaterialTheme.typography.titleMedium)
+                            if (index == 0 && batches.size > 1) Tag("Current", Modifier.align(Alignment.CenterVertically), strong = true)
+                        }
+                        val used = brews.count { it.batchId == batch.id }
+                        Text(listOfNotNull(
+                            daysAgo(batch.roastDate),
+                            batch.addedAt.takeIf { it > 0 }?.let { "bought " + java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("d MMM")) },
+                            if (used == 1) "1 brew" else "$used brews",
+                        ).joinToString(" · "), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (batches.size > 1) IconButton(onClick = { deleting = batch.id }) { Icon(Icons.Outlined.Delete, "Delete batch, ${batchName(batch)}", tint = colors.error) }
+                }
+            }
+        }
+    }
+    if (batches.isNotEmpty()) Text("Brews keep the batch they used.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    if (adding) RoastDateDialog(null, "Add batch", { onAdd(it); adding = false }) { adding = false }
+    batches.find { it.id == deleting }?.let { batch ->
+        AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Delete this batch?") }, text = { Text("${batchName(batch)}. Brew records keep their saved details.") },
+            confirmButton = { SoftTextButton(onClick = { onDelete(batch); deleting = null }, danger = true) { Text("Delete") } },
+            dismissButton = { SoftTextButton(onClick = { deleting = null }) { Text("Keep batch") } })
+    }
 }
 
 /** A grinder: its name, "Default" or its reference notes, and its last recorded setting large at the end. */
@@ -473,7 +532,9 @@ private const val DELETE_REACH = .65f
 @kotlinx.serialization.Serializable
 data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boolean = false, val account: String? = null, val shownUntil: Long? = null,
     /** The deleted beans' fields a newer version added, restored with them. */
-    val raw: kotlinx.serialization.json.JsonObject? = null) {
+    val raw: kotlinx.serialization.json.JsonObject? = null,
+    /** The batch remembered for the next brew, remembered again on Undo. */
+    val rememberedBatchId: String? = null) {
     enum class Action(val message: String) { ARCHIVED("Beans archived"), UNARCHIVED("Beans unarchived"), DELETED("Beans deleted") }
 
     /** Reverses only what the swipe did: the archive flag on beans still in the Library, or deleted beans while the phone is in the same account. */
@@ -482,7 +543,7 @@ data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boole
         return when (action) {
             Action.ARCHIVED -> if (present) repository.unarchiveBeans(beans.id) else Result.success(Unit)
             Action.UNARCHIVED -> if (present) repository.archiveBeans(beans.id) else Result.success(Unit)
-            Action.DELETED -> repository.restoreBeans(beans, remembered, account, raw)
+            Action.DELETED -> repository.restoreBeans(beans, remembered, account, raw, rememberedBatchId)
         }
     }
 }
@@ -559,7 +620,7 @@ internal fun DiscardDraftAction(onDiscard: () -> Unit) {
 
 /** Adds or edits beans, or with [onDiscardDraft], reviews a library draft before adding it. */
 @Composable
-private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
+private fun BeansEditor(initial: Beans?, onSave: (Beans, String?) -> Boolean, onBack: () -> Unit, onDiscardDraft: (() -> Unit)? = null) {
     var original by remember(initial?.id) { mutableStateOf(initial ?: Beans()) }
     val id = rememberSaveable { original.id }
     var name by rememberSaveable { mutableStateOf(original.name) }
@@ -569,14 +630,16 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     var processing by rememberSaveable { mutableStateOf(original.processing) }
     var expectedNotes by rememberSaveable { mutableStateOf(original.expectedNotes) }
     var notes by rememberSaveable { mutableStateOf(original.notes) }
+    val originalRoast = original.batches.singleOrNull()?.roastDate
+    var roastDate by rememberSaveable { mutableStateOf(originalRoast) }
     var discard by rememberSaveable { mutableStateOf(false) }
-    val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes)
+    val dirty = listOf(name, roaster, origin, variety, processing, expectedNotes, notes, roastDate) != listOf(original.name, original.roaster, original.origin, original.variety, original.processing, original.expectedNotes, original.notes, originalRoast)
     // A draft Claude corrects while it's open shows the correction, unless the user has started editing.
     LaunchedEffect(initial) {
         if (initial != null && initial != original && !dirty) {
             original = initial
             name = initial.name; roaster = initial.roaster; origin = initial.origin; variety = initial.variety
-            processing = initial.processing; expectedNotes = initial.expectedNotes; notes = initial.notes
+            processing = initial.processing; expectedNotes = initial.expectedNotes; notes = initial.notes; roastDate = initial.batches.singleOrNull()?.roastDate
         }
     }
     val back = { if (dirty) discard = true else onBack() }
@@ -584,13 +647,14 @@ private fun BeansEditor(initial: Beans?, onSave: (Beans) -> Boolean, onBack: () 
     LibraryPage(if (onDiscardDraft != null) "Review beans" else if (initial == null) "Add beans" else "Edit beans", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a name." else null, required = true)
         LibraryField(roaster, { roaster = it }, "Roaster", error = if (roaster.isBlank()) "Enter a roaster." else null, required = true)
+        if (original.batches.size <= 1) RoastDateField(roastDate) { roastDate = it }
         LibraryField(origin, { origin = it }, "Origin, optional", helper = "Country, region, or farm if known")
         LibraryField(variety, { variety = it }, "Variety / cultivar, optional")
         LibraryField(processing, { processing = it }, "Processing method, optional")
         LibraryField(expectedNotes, { expectedNotes = it }, "Expected tasting notes, optional", multiline = true)
         LibraryField(notes, { notes = it }, "General notes, optional", multiline = true)
         PrimaryAction(if (onDiscardDraft != null) "Add to Library" else "Save beans", enabled = name.isNotBlank() && roaster.isNotBlank(), icon = Icons.Outlined.Check) {
-            if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes))) onBack()
+            if (onSave(original.copy(id = id, name = name.trim(), roaster = roaster.trim(), origin = origin, variety = variety, processing = processing, expectedNotes = expectedNotes, notes = notes), roastDate)) onBack()
         }
     }
     DiscardLibraryDialog(discard, { discard = false }, onBack)

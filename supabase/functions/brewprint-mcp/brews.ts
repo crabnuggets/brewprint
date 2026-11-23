@@ -1,6 +1,14 @@
 // The app's synced JSON (app/src/main/java/com/brewprint/data/Models.kt), and the views Claude reads.
 // fixtures/brew-record.json is a brew as the app writes it; a Kotlin test fails when the two drift apart.
 
+/** One bag of beans bought. roastDate is an ISO date; addedAt orders bags by purchase, 0 for the first bag. */
+export interface BeanBatch {
+  id: string;
+  roastDate: string | null;
+  notes: string;
+  addedAt: number;
+}
+
 export interface Beans {
   id: string;
   name: string;
@@ -11,6 +19,8 @@ export interface Beans {
   expectedNotes: string;
   notes: string;
   archived: boolean;
+  /** Missing on beans saved before batches; a brew record keeps none, only its own batchId and roastDate. */
+  batches?: BeanBatch[];
 }
 
 export interface Grinder {
@@ -95,6 +105,9 @@ export interface BrewRecord {
   journal: Journal;
   timing: BrewTiming | null;
   scale: ScaleData | null;
+  // Missing on brews saved before batches.
+  batchId?: string | null;
+  roastDate?: string | null;
 }
 
 export interface Library {
@@ -214,6 +227,8 @@ export function brewSummary(brew: BrewRecord) {
     id: brew.id,
     brewedAt: new Date(brew.startedAt).toISOString(),
     beans: [brew.beans.name, brew.beans.roaster].filter(Boolean).join(" · "),
+    // Days off roast depend on the user's own calendar day, so only the date is given.
+    roastDate: brew.roastDate ?? null,
     grinder: brew.grinder.name,
     grindSetting: brew.setting,
     recipe: brew.recipe.name,

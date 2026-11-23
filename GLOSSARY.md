@@ -15,6 +15,17 @@ _Avoid_: Recipe
 **Beans**:
 A named coffee with a roaster, origin, variety, and expected tasting notes. A blend may have multiple origins or varieties.
 
+**Batch**:
+One bag of the same beans, bought at one time, with its own roast date. Beans keep their batches; a brew record keeps the batch it used.
+_Avoid_: Bag (in the app's words), lot
+
+**Roast date**:
+The day a batch was roasted, as its bag gives it.
+
+**Days off roast**:
+Whole calendar days from a batch's roast date to a day: today in the Library and setup, the day of the brew on a record.
+_Avoid_: Age, freshness
+
 **Library draft**:
 Beans or a recipe Claude proposes, waiting in the Library until the user adds it, after any edits, or discards it. Shown in the app as a draft from Claude.
 _Avoid_: Brew draft, suggestion

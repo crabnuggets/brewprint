@@ -24,6 +24,8 @@ data class Beans(
     val expectedNotes: String = "",
     val notes: String = "",
     val archived: Boolean = false,
+    /** Each bag bought, kept in the Library only; a brew records the one it used. */
+    val batches: List<BeanBatch> = emptyList(),
 )
 
 @Serializable enum class DialFinish { METAL, MATTE, GLASS }
@@ -198,6 +200,9 @@ data class BrewRecord(
     val journal: Journal = Journal(),
     val timing: BrewTiming? = null,
     val scale: ScaleData? = null,
+    /** The batch of the beans used, and its roast date as it was. */
+    val batchId: String? = null,
+    val roastDate: String? = null,
 )
 
 @Serializable
@@ -217,6 +222,10 @@ data class BrewDraft(
     val scaleStep: ScaleStep = ScaleStep.BREWER,
     /** "Brew without the scale" was chosen for this brew. */
     val withoutScale: Boolean = false,
+    val batchId: String? = null,
+    val roastDate: String? = null,
+    /** For a repeat that moved to the newest batch, the roast date of the batch the original brew used; empty when it had none. */
+    val repeatedFromRoastDate: String? = null,
 )
 
 @Serializable
@@ -246,6 +255,8 @@ data class AppState(
     val libraryDrafts: List<LibraryDraft> = emptyList(),
     val defaultGrinderId: String? = null,
     val lastBeansId: String? = null,
+    /** The batch of [lastBeansId] used last, chosen again for the next brew with those beans. */
+    val lastBatchId: String? = null,
     val lastRecipeId: String? = null,
     val appearance: Appearance = Appearance.SYSTEM,
     val experiments: Experiments = Experiments(),
