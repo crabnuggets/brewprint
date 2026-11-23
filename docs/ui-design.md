@@ -16,7 +16,7 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - Follow the device appearance by default, with an in-app override for light or dark appearance.
 - Use softly rounded rectangles for controls and containers.
 - Use softly filled form fields with subtle rounded borders. Show required indicators in a neutral tone, and show errors after the user edits or leaves a field. Untouched empty fields stay neutral; invalid required values still block saving.
-- Use a custom monochrome floating bottom navigation with a softly rounded selected state and no inner rectangular fill or shadow. Keep it compact: the selected destination shows its icon and label side by side in a soft pill, and the other destinations show icons only, with their names kept for screen readers.
+- Use a custom monochrome floating bottom navigation with a softly rounded selected state and no inner rectangular fill or shadow. Keep it compact: the selected destination shows its icon and label side by side in a soft pill, and the other destinations show icons only, with their names kept for screen readers. When a sync fails, Settings carries a small dark dot, never red, that screen readers hear as "Sync failed".
 - Place an icon Back action beside the title on create, edit, detail, and picker screens.
 - Use the understated typography of option A from the generated comparison.
 - Reduce unnecessary subtext. Every line should help the user understand information or take an action.
@@ -30,6 +30,7 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 
 - **Header.** A screen's header, with its title, Back action, and header actions, slides away as the content scrolls down and returns as soon as it scrolls up. Android Back keeps working while it is hidden. On the brew sheet the header stays while a timer runs, so the scale status is always in view.
 - **Bottom navigation.** The floating navigation hides as the content scrolls down and returns when it scrolls up or reaches the end.
+- **Floating action.** "New brew", or "Resume brew" while a brew is in progress, floats at the bottom right of Brew, above the navigation. It is a filled primary button with the small corners, and it drops to the corner while the navigation is hidden. It stays in view while TalkBack is on, and screen readers reach it after the screen's content.
 - **Footer actions.** Actions pinned to the bottom of a screen, such as Pause, the skip action, and "Save brew", never hide. On the running brew sheet they take one row of buttons with "Finish brew" as a smaller action beneath.
 
 ## Lists and gestures
@@ -66,17 +67,17 @@ The following details interpret the confirmed direction and remain open for revi
 - Start with concise summaries and reveal secondary details when requested. Keep units, required choices, and validation messages visible where needed.
 - Apply restrained translucency, blur, fine borders, and soft highlights to selected floating controls or overlays. Keep reading and form areas clear and legible.
 - Keep text contrast reliable over glass effects. Provide an opaque treatment where transparency makes content harder to read.
-- Use consistent custom typography, controls, and navigation styling across Brew, History, and Library.
+- Use consistent custom typography, controls, and navigation styling across Brew, History, Library, and Settings.
 
 Exact palette values, any limited accent colors, typefaces, corner radii, and the specific placement of selective glass effects are undecided. Offer System, Light, and Dark appearance choices, with System as the default.
 
 ## Experimental: blueprint theme
 
-Settings → Experimental → Theme offers "Blueprint" beside the default "Monochrome". It follows the [revised Redline board](design/mockups/v3-blueprint/b2.png), and is an opt-in experiment: the confirmed direction above, including "Avoid a coffee or cafe theme" and the monochrome palette, still describes the default theme. Both themes keep the same behavior, content, and accessibility; a theme may change color, type, shape, decoration, and motion.
+Settings → Experimental → Theme offers "Blueprint" beside the default "Monochrome". It follows the [revised Redline board](design/mockups/v3-blueprint/b2.png), and is an opt-in experiment: the confirmed direction above, including "Avoid a coffee or cafe theme" and the monochrome palette, still describes the default theme. Both themes keep the same behavior, content, order, and accessibility; a theme may change color, type, shape, decoration, and motion. A screen never shows a value, a line, or an action in one theme that it leaves out in the other, and never in a different order.
 
 - **Paper and type.** Graphite on vellum with an 8 dp grid, heavier every 40 dp. App text is set in Overpass. The user's own words (tasting notes, "Next time") are set in Kalam, like pencil. Cards have 6 dp corners and buttons 10 dp.
 - **Red pencil.** One accent, used only for what to act on now or what to change next time: the grams to pour to, the target line on the live curve, and "Next time". Late starts in the timing table stay graphite; they are a record, not a task.
-- **Title blocks.** The brew record shows its setup as a title block: ruled cells, each value under its label, with "Next time" in a revision row beneath a double rule. The timing table is ruled to match. The latest brew on Brew ends in a four-cell strip: recipe, dose, ratio, and grind. Cells halve, then stack, on narrow screens or with large text.
+- **Title blocks.** Setup values sit in labelled cells in both themes; the blueprint draws them as a title block with ruled cells and drafting lines, where Monochrome uses a soft card with hairlines. On the brew record, Preparation is one such block, and "Next time" closes the tasting journal beneath a double rule. The timing table is ruled to match, inside the same card as the rest of "Timing and water". The latest brew on Brew has a four-cell strip of recipe, dose, ratio, and grind under a double rule. Cells halve, then stack, on narrow screens or with large text.
 - **Drafting lines.** A heavy border whose lines run a few dp past each corner, light rules between cells, and a double rule under headings and before the revision row.
 - **Cafe touch.** A strip of drafting tape on the latest brew and on the record's tasting notes. Decorative only.
 

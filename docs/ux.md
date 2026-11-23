@@ -16,11 +16,12 @@ Recipes describe the brewing plan. Beans, grinder, and tick setting belong to an
 
 ## Navigation
 
-Use three bottom navigation destinations:
+Use four bottom navigation destinations:
 
-- Brew: the everyday starting point, with "New brew", the last recorded grinder setting, and the most recent brew's "Repeat" action.
+- Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress and another the drafts from Claude waiting. The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
 - History: completed brew records, newest first. Open a record to inspect, edit, or repeat it.
 - Library: recipes, beans, and grinders, grouped into three plainly labeled lists.
+- Settings: account, appearance, the brew timer, the coffee scale, and experiments. It has no Back arrow; Android Back on History, Library, or Settings returns to Brew.
 
 Create and edit screens open above these destinations. Android Back returns to the previous screen. A brew setup with nothing chosen, or a new one left as it opened from "New brew" or "Repeat", is discarded on Back, so it neither blocks "Repeat" nor keeps a stale start time. Unsaved form edits prompt "Discard changes?" with "Keep editing" and "Discard". An active brew draft saves automatically and offers "Resume brew" on the Brew screen after navigation or an app restart. Support one active draft at a time for this version.
 
@@ -94,7 +95,7 @@ Allow editing, duplicating, and archiving recipes. On a Library item's screen th
 
 With Brewprint connected to Claude, Claude can draft beans or a recipe from a product page, a photo of a bag, or a recipe link. Drafts reach the phone when it syncs, so they need a signed-in account.
 
-The Library lists them first, under "Drafts from Claude", each as its name with "Beans · [roaster]" or "Recipe · [dose] g · 1:[ratio] · [water] g". While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") under "New brew", which opens the Library.
+The Library lists them first, under "Drafts from Claude", each as its name with "Beans · [roaster]" or "Recipe · [dose] g · 1:[ratio] · [water] g". While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") above the most recent brew, with the drafts' names beneath, which opens the Library.
 
 Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync, including on an open review the user hasn't edited. A review whose draft was added on another phone or discarded closes.
 

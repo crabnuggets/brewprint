@@ -9,6 +9,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.brewprint.data.*
@@ -95,31 +96,61 @@ class BlueprintThemeTest {
         assertEquals(Theme.MONOCHROME, repository().state.value.experiments.theme)
     }
 
-    @Test fun `the blueprint record keeps every value, with the setup in a title block`() {
+    @Test fun `the record keeps every value in both themes, with the setup in labelled cells`() {
         val repository = seeded(Theme.BLUEPRINT)
         open(repository)
         tap("View brew")
-        compose.onNodeWithContentDescription("Grind setting, 24 ticks").assertExists()
-        compose.onNodeWithContentDescription("Coffee dose 20.1 grams, weighed").assertExists()
-        // "Next time" moves to the title block's revision row rather than appearing twice.
-        assertEquals(1, compose.onAllNodesWithText("Try one tick finer").fetchSemanticsNodes().size)
-        compose.onNodeWithText("Bright and sweet, a little thin. Sweeter as it cooled.").assertExists()
-        // The record's actions are the same in both themes.
-        listOf("Edit tasting notes", "Repeat", "Edit brew", "Delete brew").forEach { compose.onNodeWithText(it).assertExists() }
-        compose.runOnIdle { repository.setExperiments(Experiments(Theme.MONOCHROME)).getOrThrow() }
-        compose.onNodeWithContentDescription("Grind setting, 24 ticks").assertDoesNotExist()
-        assertEquals(1, compose.onAllNodesWithText("Try one tick finer").fetchSemanticsNodes().size)
+        for (theme in listOf(Theme.BLUEPRINT, Theme.MONOCHROME)) {
+            compose.runOnIdle { repository.setExperiments(Experiments(theme)).getOrThrow() }
+            compose.onNodeWithContentDescription("Grind setting, 24 ticks").assertExists()
+            compose.onNodeWithContentDescription("Coffee dose 20.1 grams, weighed").assertExists()
+            // "Next time" stays in the tasting journal, once.
+            assertEquals(1, compose.onAllNodesWithText("Try one tick finer").fetchSemanticsNodes().size)
+            compose.onNodeWithText("Bright and sweet, a little thin. Sweeter as it cooled.").assertExists()
+            // The record's actions are the same in both themes.
+            listOf("Edit tasting notes", "Repeat", "Edit brew", "Delete brew").forEach { compose.onNodeWithText(it).assertExists() }
+        }
     }
 
-    @Test fun `a scale brew without a final reading says so in the title block`() {
+    @Test fun `a scale brew without a final reading says so once, in the timing section`() {
         val repository = seeded(Theme.BLUEPRINT)
         val brew = repository.state.value.brews.single()
         repository.updateBrew(brew.copy(scale = brew.scale!!.copy(water = null))).getOrThrow()
         open(repository)
         tap("View brew")
-        // The title block words it as the timing section does.
-        compose.onAllNodesWithContentDescription("Water not recorded, planned 301.5 grams").assertCountEquals(2)
-        compose.onNodeWithContentDescription("Brew ratio not recorded, planned 1 to 15").assertExists()
+        // Preparation shows the plan; what the scale measured, or didn't, is in "Timing and water" alone.
+        compose.onAllNodesWithContentDescription("Water not recorded, planned 301.5 grams").assertCountEquals(1)
+        compose.onNodeWithContentDescription("Total brew water 301.5 grams").assertExists()
+    }
+
+    /** Every word on screen in reading order: text and spoken names, from the unmerged semantics tree. */
+    private fun words(): List<String> {
+        val words = mutableListOf<String>()
+        fun walk(node: androidx.compose.ui.semantics.SemanticsNode) {
+            node.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.forEach { words += it.text }
+            node.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.forEach { words += it }
+            node.children.forEach(::walk)
+        }
+        walk(compose.onRoot(useUnmergedTree = true).fetchSemanticsNode())
+        return words
+    }
+
+    @Test fun `both themes show the same words and actions in the same order on Brew and the record`() {
+        val repository = seeded(Theme.MONOCHROME)
+        open(repository)
+        fun screens(): Pair<List<String>, List<String>> {
+            val home = words()
+            tap("View brew")
+            val record = words()
+            back()
+            return home to record
+        }
+        val monochrome = screens()
+        compose.runOnIdle { repository.setExperiments(Experiments(Theme.BLUEPRINT)).getOrThrow() }
+        val blueprint = screens()
+        assertTrue("Brew shows its recent brew", "Try one tick finer" in monochrome.first && "Grind setting, 24 ticks" in monochrome.first)
+        assertEquals(monochrome.first, blueprint.first)
+        assertEquals(monochrome.second, blueprint.second)
     }
 
     @Test

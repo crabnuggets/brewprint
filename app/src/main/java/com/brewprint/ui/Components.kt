@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -264,8 +266,12 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
     }
 }
 
+/** The bottom navigation's destinations, in order. */
+internal val Destinations = listOf("Brew", "History", "Library", "Settings")
+
+/** [syncFailed] marks Settings with a dot, since the sync status lives there. */
 @Composable
-internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
+internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: Modifier = Modifier, syncFailed: Boolean = false, onSelect: (String) -> Unit) {
     AnimatedVisibility(shown, modifier, enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)), exit = slideOutVertically(tween(260)) { it } + fadeOut(tween(200))) {
         Surface(
             modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).testTag("bottom-navigation"),
@@ -275,26 +281,36 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
             shadowElevation = 6.dp,
         ) {
             Row(Modifier.fillMaxWidth().height(60.dp).selectableGroup().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                listOf("Brew", "History", "Library").forEach { destination ->
+                Destinations.forEach { destination ->
                     val selected = destination == selectedTab
+                    val alert = syncFailed && destination == "Settings"
                     // The selected destination shows its name beside its icon; the others keep their names for screen readers.
+                    // The selected pill takes only the room it needs, and gives way before the other tabs drop under 48 dp.
                     Row(
-                        Modifier.clip(RoundedCornerShape(LocalLook.current.pillRadius))
+                        (if (selected) Modifier.weight(1f, fill = false) else Modifier)
+                            .clip(RoundedCornerShape(LocalLook.current.pillRadius))
                             .background(if (selected) MaterialTheme.colorScheme.soft else Color.Transparent)
                             .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(destination) })
-                            .semantics { if (!selected) text = AnnotatedString(destination) }
-                            .heightIn(min = 48.dp).widthIn(min = 76.dp)
+                            .semantics { if (!selected) text = AnnotatedString(destination); if (alert) stateDescription = "Sync failed" }
+                            .heightIn(min = 48.dp).widthIn(min = 48.dp)
                             .animateContentSize(tween(280))
-                            .padding(start = if (selected) 14.dp else 0.dp, end = if (selected) 18.dp else 0.dp),
+                            .padding(start = if (selected) 12.dp else 0.dp, end = if (selected) 14.dp else 0.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(when (destination) {
-                            "Brew" -> if (selected) Icons.Filled.Coffee else Icons.Outlined.Coffee
-                            "History" -> if (selected) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.AutoMirrored.Outlined.FormatListBulleted
-                            else -> if (selected) Icons.AutoMirrored.Filled.LibraryBooks else Icons.AutoMirrored.Outlined.LibraryBooks
-                        }, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (selected) Text(destination, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Box {
+                            Icon(when (destination) {
+                                "Brew" -> if (selected) Icons.Filled.Coffee else Icons.Outlined.Coffee
+                                "History" -> if (selected) Icons.AutoMirrored.Filled.FormatListBulleted else Icons.AutoMirrored.Outlined.FormatListBulleted
+                                "Library" -> if (selected) Icons.AutoMirrored.Filled.LibraryBooks else Icons.AutoMirrored.Outlined.LibraryBooks
+                                else -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
+                            }, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                            // Monochrome like the rest of the bar: a dark dot ringed in the color behind it, never red.
+                            if (alert) Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-2).dp).size(10.dp)
+                                .background(if (selected) MaterialTheme.colorScheme.soft else MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape).padding(2.dp)
+                                .background(MaterialTheme.colorScheme.onSurface, androidx.compose.foundation.shape.CircleShape).testTag("sync-failed-dot"))
+                        }
+                        if (selected) Text(destination, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -319,9 +335,7 @@ internal fun softFieldColors(): TextFieldColors {
 }
 
 @Composable
-fun Panel(modifier: Modifier = Modifier, ruled: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    // A [ruled] panel holds a table; the blueprint draws it in drafting lines instead of a soft card.
-    if (ruled && LocalLook.current.blueprint) return Column(modifier.fillMaxWidth().ruled().animateContentSize(tween(300)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.animateContentSize(tween(300)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }

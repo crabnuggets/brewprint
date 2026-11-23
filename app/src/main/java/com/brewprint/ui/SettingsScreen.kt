@@ -50,7 +50,7 @@ private fun openNotificationSettings(context: Context, action: String = Settings
 }
 
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: () -> Unit, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, liveUpdatesCheck: (Context) -> Boolean = ::liveUpdatesAllowed, scale: @Composable () -> Unit = {}) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: (() -> Unit)? = null, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, liveUpdatesCheck: (Context) -> Boolean = ::liveUpdatesAllowed, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
@@ -61,7 +61,8 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
         // A timer may already be running; show it now that Android allows it.
         BrewTimerService.sync(context)
     }
-    BackHandler(LocalScreenActive.current) { onClose() }
+    // As a bottom navigation destination Settings has no Back arrow; the app's Back returns to Brew.
+    if (onClose != null) BackHandler(LocalScreenActive.current) { onClose() }
     Page("Settings", onClose) {
         account()
         SectionTitle("Appearance")

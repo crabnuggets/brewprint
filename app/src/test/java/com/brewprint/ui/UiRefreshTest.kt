@@ -71,18 +71,17 @@ class UiRefreshTest {
         }
     }
 
-    @Test fun `navigation has exactly three named tabs with one selected after every selection`() {
+    @Test fun `navigation has exactly four named tabs with one selected after every selection`() {
         val tab = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
-        compose.onAllNodes(tab).assertCountEquals(3)
-        for (destination in listOf("Brew", "History", "Library", "Brew")) {
+        compose.onAllNodes(tab).assertCountEquals(4)
+        for (destination in listOf("Brew", "History", "Library", "Settings", "Brew")) {
             compose.onNode(tab and hasText(destination)).performClick().assertIsSelected()
             compose.onAllNodes(tab and isSelected()).assertCountEquals(1)
-            listOf("Brew", "History", "Library").filter { it != destination }.forEach {
+            listOf("Brew", "History", "Library", "Settings").filter { it != destination }.forEach {
                 compose.onNode(tab and hasText(it)).assertIsNotSelected().assertHasClickAction()
             }
         }
     }
-
     @Test fun `tasting notes keep a named input and visible save action during exploration`() {
         seedSavedBrew()
         tap("Add tasting notes")
