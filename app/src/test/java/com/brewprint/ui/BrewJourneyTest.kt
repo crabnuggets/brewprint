@@ -106,7 +106,7 @@ class BrewJourneyTest {
             repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
                 pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))).getOrThrow()
         }
-        tap("Library")
+        compose.openLibrarySection("recipes")
         tap("Filter")
         tap("Edit recipe")
         compose.onNodeWithText("Coffee dose, g").performScrollTo().performTextReplacement("16")
@@ -120,7 +120,7 @@ class BrewJourneyTest {
             repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
                 pulses = List(10) { Pulse(water = 24.0, pourSeconds = 5, waitSeconds = if (it < 9) 10 else 0) })).getOrThrow()
         }
-        tap("Library")
+        compose.openLibrarySection("recipes")
         tap("Filter")
         // Reachable without scrolling past ten pulses.
         compose.onNodeWithContentDescription("Edit recipe").assertIsDisplayed()

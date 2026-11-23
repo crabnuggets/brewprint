@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.brewprint.ui
 
 import androidx.activity.compose.BackHandler
@@ -7,6 +9,18 @@ import androidx.compose.foundation.background
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Grain
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ChevronRight
@@ -37,6 +51,24 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
 
+/**
+ * Where the Library is: its hub ([section] null), one section's list ("recipes", "beans", "grinders" or "archived"),
+ * or one item ([detailId]) in that section. The Library tab keeps it above the screen, so starting a brew from an
+ * item and coming back lands on that item again.
+ */
+@Stable
+class LibraryNav(section: String? = null, detailId: String? = null) {
+    var section by mutableStateOf(section)
+    var detailId by mutableStateOf(detailId)
+
+    /** Back to the hub. */
+    fun reset() { section = null; detailId = null }
+
+    companion object {
+        val Saver = androidx.compose.runtime.saveable.listSaver<LibraryNav, String?>({ listOf(it.section, it.detailId) }, { LibraryNav(it[0], it[1]) })
+    }
+}
+
 @Composable
 fun LibraryScreen(
     state: AppState,
@@ -48,9 +80,17 @@ fun LibraryScreen(
     onEditingChanged: (Boolean) -> Unit = {},
     /** Shows Undo for an action a swipe has just taken. */
     onUndoable: (BeansUndo) -> Unit = {},
+    /** The Library tab's place, kept by the app; a picker keeps its own. */
+    nav: LibraryNav? = null,
+    /** Starts a brew with these beans or this recipe; null where the Library picks for a brew already open. */
+    onBrewWith: ((beansId: String?, recipeId: String?) -> Unit)? = null,
+    onResumeBrew: () -> Unit = {},
 ) {
-    var kind by rememberSaveable(requestedKind) { mutableStateOf(requestedKind ?: "") }
-    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    val local = rememberSaveable(requestedKind, saver = LibraryNav.Saver) { LibraryNav(requestedKind) }
+    val place = nav ?: local
+    // The kind of item the open list or item holds; the archived list holds beans.
+    val kind = when (val section = place.section) { null -> ""; "archived" -> "beans"; else -> section }
+    val detailId = place.detailId
     // A library draft open for review: its editor adds it to the Library.
     var draftId by rememberSaveable { mutableStateOf<String?>(null) }
     // Picking from an empty list can only mean adding one, so the form opens directly and Back returns to the caller.
@@ -64,7 +104,6 @@ fun LibraryScreen(
     val leaveEditor = { editing = false; draftId = null; if (pickingFromEmpty) onClose?.invoke(); Unit }
     var archive by rememberSaveable { mutableStateOf(false) }
     var delete by rememberSaveable { mutableStateOf(false) }
-    var archivedList by rememberSaveable { mutableStateOf(false) }
     var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var settingDialog by rememberSaveable { mutableStateOf(false) }
     var settingText by rememberSaveable { mutableStateOf("") }
@@ -72,9 +111,11 @@ fun LibraryScreen(
     val grinder = state.grinders.find { it.id == detailId }
     val recipe = state.recipes.find { it.id == detailId }
     val libraryDraft = state.libraryDrafts.find { it.id == draftId }
+    // A draft under review is beans or a recipe, whichever list is open.
+    val editKind = libraryDraft?.let { if (it.beans != null) "beans" else "recipes" } ?: kind
     // Added on another phone or discarded by Claude while under review: there is nothing left to add.
     if (draftId != null && libraryDraft == null) LaunchedEffect(Unit) { leaveEditor() }
-    val closeDetail = { detailId = null; editing = false; archive = false; delete = false; Unit }
+    val closeDetail = { place.detailId = null; editing = false; archive = false; delete = false; Unit }
     // Beans deleted on another phone while open here: there is nothing left to show or edit.
     if (kind == "beans" && detailId != null && beans == null) LaunchedEffect(Unit) { closeDetail() }
     fun save(result: Result<Unit>): Boolean {
@@ -82,9 +123,10 @@ fun LibraryScreen(
         return result.isSuccess
     }
     fun saved(id: String) {
+        val savedKind = editKind
         editing = false
         draftId = null
-        if (onPicked != null) onPicked(kind, id) else detailId = id
+        if (onPicked != null) onPicked(savedKind, id) else { place.section = savedKind; place.detailId = id }
     }
     // A swipe acts at once and offers Undo.
     fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
@@ -97,7 +139,7 @@ fun LibraryScreen(
     DisposableEffect(Unit) { onDispose { onEditingChanged(false) } }
 
     if (editing) {
-        when (kind) {
+        when (editKind) {
             "beans" -> BeansEditor(libraryDraft?.beans ?: beans, onSave = { item ->
                 save(repository.upsertBeans(item)).also { if (it) saved(item.id) }
             }, onBack = leaveEditor, onDiscardDraft = libraryDraft?.let { draft -> { if (save(repository.discardLibraryDraft(draft.id))) leaveEditor() } })
@@ -123,7 +165,7 @@ fun LibraryScreen(
                     if (recipe != null && kind == "recipes") DropdownMenuItem(text = { Text("Duplicate recipe") }, leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) }, onClick = {
                         menu = false
                         val duplicate = recipe.copy(id = newId(), name = "${recipe.name} copy", archived = false)
-                        if (save(repository.upsertRecipe(duplicate))) { detailId = duplicate.id; editing = true }
+                        if (save(repository.upsertRecipe(duplicate))) { place.detailId = duplicate.id; editing = true }
                     })
                     if (beans != null && beans.archived) DropdownMenuItem(text = { Text("Unarchive beans") }, leadingIcon = { Icon(Icons.Outlined.Unarchive, null) }, onClick = { menu = false; save(repository.unarchiveBeans(beans.id)) })
                     else DropdownMenuItem(text = { Text("Archive ${kindLabel(kind)}") }, leadingIcon = { Icon(Icons.Outlined.Archive, null) }, onClick = { menu = false; replacementId = null; archive = true })
@@ -135,6 +177,8 @@ fun LibraryScreen(
             if (beans != null && kind == "beans") {
                 if (beans.archived) Text("Archived", style = MaterialTheme.typography.labelLarge)
                 DetailLine("Roaster", beans.roaster)
+                // Archived beans are not offered for a new brew.
+                if (onBrewWith != null && !beans.archived) BrewWithAction("Brew with these beans", state.draft != null, onResumeBrew) { onBrewWith(beans.id, null) }
                 DetailLine("Origin", beans.origin)
                 DetailLine("Variety / cultivar", beans.variety)
                 DetailLine("Processing method", beans.processing)
@@ -151,6 +195,7 @@ fun LibraryScreen(
             }
             if (recipe != null && kind == "recipes") {
                 Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleLarge)
+                if (onBrewWith != null && !recipe.archived) BrewWithAction("Brew with this recipe", state.draft != null, onResumeBrew) { onBrewWith(null, recipe.id) }
                 recipe.schedule().forEachIndexed { index, scheduled ->
                     OutlinedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -165,55 +210,53 @@ fun LibraryScreen(
                 DetailLine("Preparation notes", recipe.notes)
             }
         }
-    } else if (archivedList) {
-        val back = { archivedList = false }
+    } else if (place.section == "archived") {
+        val back = { place.section = "beans" }
         BackHandler(LocalScreenActive.current, back)
         LibraryPage("Archived beans", back) {
             val archived = state.beans.filter { it.archived }
             if (archived.isEmpty()) Text("No archived beans.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            archived.forEach { item -> key(item.id) { SwipeRow(item.name, item.roaster, { kind = "beans"; detailId = item.id }, SwipeAction("Unarchive", Icons.Outlined.Unarchive) { swipeUnarchive(item) }, onDelete = { swipeDelete(item) }) } }
+            archived.forEach { item -> key(item.id) { SwipeRow({ place.detailId = item.id }, SwipeAction("Unarchive", Icons.Outlined.Unarchive) { swipeUnarchive(item) }, onDelete = { swipeDelete(item) }) { BeansRowContent(item) } } }
+        }
+    } else if (place.section != null) {
+        // One kind's list, from the hub or, while picking for a brew, opened directly.
+        val back = onClose ?: { place.section = null }
+        BackHandler(LocalScreenActive.current, back)
+        LibraryPage(if (onPicked == null) kind.replaceFirstChar { it.uppercase() } else "Choose ${kindLabel(kind)}", back, actions = {
+            SoftTextButton(onClick = { place.detailId = null; editing = true }) { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Add ${kindLabel(kind)}") }
+        }) {
+            val open: (String) -> Unit = { id -> if (onPicked != null) onPicked(kind, id) else place.detailId = id }
+            when (kind) {
+                "beans" -> {
+                    val active = state.beans.filterNot { it.archived }
+                    if (active.isEmpty()) Text("No beans yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    active.forEach { item ->
+                        // Beans swipe to archive or delete in the Library, not while picking for a brew.
+                        if (onPicked == null) key(item.id) { SwipeRow({ open(item.id) }, SwipeAction("Archive", Icons.Outlined.Archive) { swipeArchive(item) }, onDelete = { swipeDelete(item) }) { BeansRowContent(item) } }
+                        else LibraryCard({ open(item.id) }) { BeansRowContent(item) }
+                    }
+                    val archived = state.beans.count { it.archived }
+                    if (onPicked == null && archived > 0) SoftButton(onClick = { place.section = "archived" }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                        Text("Archived beans", Modifier.weight(1f))
+                        Text("$archived", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Outlined.ChevronRight, null, Modifier.padding(start = 8.dp))
+                    }
+                }
+                "grinders" -> {
+                    val active = state.grinders.filterNot { it.archived }
+                    if (active.isEmpty()) Text("No grinders yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    active.forEach { item -> LibraryCard({ open(item.id) }) { GrinderRowContent(item, item.id == state.defaultGrinderId) } }
+                }
+                else -> {
+                    val active = state.recipes.filterNot { it.archived }
+                    if (active.isEmpty()) Text("No recipes yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    active.forEach { item -> LibraryCard({ open(item.id) }) { RecipeRowContent(item) } }
+                }
+            }
         }
     } else {
-        if (onClose != null) BackHandler(LocalScreenActive.current, onClose)
-        LibraryPage(if (requestedKind == null) "Library" else "Choose ${kindLabel(requestedKind)}", onClose) {
-            if (onPicked == null && state.libraryDrafts.isNotEmpty()) {
-                SectionTitle("Drafts from Claude")
-                state.libraryDrafts.forEach { draft ->
-                    val (draftKind, title, detail) = draft.beans?.let { Triple("beans", it.name, "Beans · ${it.roaster}") }
-                        ?: draft.recipe!!.let { Triple("recipes", it.name, "Recipe · ${recipeSummary(it)}") }
-                    LibraryRow(title, detail) { kind = draftKind; detailId = null; draftId = draft.id; editing = true }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-            val kinds = requestedKind?.let(::listOf) ?: listOf("recipes", "beans", "grinders")
-            kinds.forEach { currentKind ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    SectionTitle(currentKind.replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
-                    SoftTextButton(onClick = { kind = currentKind; detailId = null; editing = true }) { Text("Add ${kindLabel(currentKind)}") }
-                }
-                val items: List<Pair<String, Pair<String, String>>> = when (currentKind) {
-                    "beans" -> state.beans.filterNot { it.archived }.map { it.id to (it.name to it.roaster) }
-                    "grinders" -> state.grinders.filterNot { it.archived }.map { it.id to (it.name to buildString {
-                        if (it.id == state.defaultGrinderId) append("Default · ")
-                        append(it.lastSetting?.let { setting -> "Last recorded: $setting ticks" } ?: "No recorded setting")
-                    }) }
-                    else -> state.recipes.filterNot { it.archived }.map { it.id to (it.name to recipeSummary(it)) }
-                }
-                if (items.isEmpty()) Text("No $currentKind yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                items.forEach { (id, content) ->
-                    val open: () -> Unit = {
-                        kind = currentKind
-                        if (onPicked != null) onPicked(currentKind, id) else detailId = id
-                    }
-                    // Beans swipe to archive or delete in the Library, not while picking for a brew.
-                    val swipeable = state.beans.find { it.id == id }?.takeIf { currentKind == "beans" && onPicked == null }
-                    if (swipeable != null) key(id) { SwipeRow(content.first, content.second, open, SwipeAction("Archive", Icons.Outlined.Archive) { swipeArchive(swipeable) }, onDelete = { swipeDelete(swipeable) }) }
-                    else LibraryRow(content.first, content.second, onClick = open)
-                    if (currentKind == "grinders" && id != state.defaultGrinderId && onPicked == null) SoftTextButton(onClick = { save(repository.setDefaultGrinder(id)) }) { Text("Make ${content.first} default") }
-                }
-                if (currentKind == "beans" && onPicked == null && state.beans.any { it.archived }) SoftTextButton(onClick = { archivedList = true }) { Text("Archived beans") }
-                Spacer(Modifier.height(12.dp))
-            }
+        LibraryPage("Library", null) {
+            LibraryHub(state, onDraft = { draft -> draftId = draft.id; place.detailId = null; editing = true }, onSection = { place.section = it })
         }
     }
     if (archive) {
@@ -238,13 +281,13 @@ fun LibraryScreen(
                     "grinders" -> repository.archiveGrinder(detailId!!, replacementId)
                     else -> repository.archiveRecipe(detailId!!)
                 }
-                if (save(result)) { archive = false; detailId = null }
+                if (save(result)) { archive = false; place.detailId = null }
             }) { Text("Archive") }
         }, dismissButton = { SoftTextButton(onClick = { archive = false }) { Text("Keep ${kindLabel(kind)}") } })
     }
     if (delete && beans != null) AlertDialog(onDismissRequest = { delete = false }, title = { Text("Delete these beans?") },
         text = { Text("Existing brew records keep their saved details. You can't undo this.") },
-        confirmButton = { SoftTextButton(onClick = { if (save(repository.deleteBeans(beans.id))) { delete = false; detailId = null } }, danger = true) { Text("Delete") } },
+        confirmButton = { SoftTextButton(onClick = { if (save(repository.deleteBeans(beans.id))) { delete = false; place.detailId = null } }, danger = true) { Text("Delete") } },
         dismissButton = { SoftTextButton(onClick = { delete = false }) { Text("Keep beans") } })
     if (settingDialog && grinder != null) AlertDialog(onDismissRequest = { settingDialog = false }, title = { Text("Update last recorded setting") }, text = {
         LibraryField(settingText, { settingText = it }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
@@ -253,15 +296,157 @@ fun LibraryScreen(
     }) { Text("Update setting") } }, dismissButton = { SoftTextButton(onClick = { settingDialog = false }) { Text("Cancel") } })
 }
 
+/** "Brew with this recipe" or "Brew with these beans"; while a brew is in progress, the way back to it instead. */
 @Composable
-private fun LibraryRow(title: String, detail: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+private fun BrewWithAction(label: String, inProgress: Boolean, onResume: () -> Unit, onStart: () -> Unit) {
+    PrimaryAction(label, enabled = !inProgress, icon = Icons.Outlined.PlayArrow, onClick = onStart)
+    if (inProgress) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("A brew is already in progress.", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        SoftTextButton(onClick = onResume) { Text("Resume brew") }
+    }
+}
+
+/** The Library's front page: drafts from Claude waiting, then one card for each kind of item. */
+@Composable
+private fun LibraryHub(state: AppState, onDraft: (LibraryDraft) -> Unit, onSection: (String) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val drafts = state.libraryDrafts
+    if (drafts.isNotEmpty()) Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.5.dp, colors.onSurface)) {
+        Column {
+            Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(Icons.Outlined.Inbox, null, Modifier.size(40.dp).background(colors.primary, MaterialTheme.shapes.small).padding(10.dp), tint = colors.onPrimary)
+                Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
+                    Text("Drafts from Claude", style = MaterialTheme.typography.titleMedium)
+                    Text(if (drafts.size == 1) "1 draft waiting" else "${drafts.size} drafts waiting", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
             }
-            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            drafts.forEach { draft ->
+                HorizontalDivider(color = colors.outlineVariant)
+                val (tag, title, detail) = draft.beans?.let { Triple("Beans", it.name, it.roaster) } ?: draft.recipe!!.let { Triple("Recipe", it.name, recipeSummary(it)) }
+                Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Review draft") { onDraft(draft) }.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(title, Modifier.align(Alignment.CenterVertically), style = MaterialTheme.typography.titleMedium)
+                            Tag(tag, Modifier.align(Alignment.CenterVertically))
+                        }
+                        Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Icon(Icons.Outlined.ChevronRight, null, tint = colors.onSurfaceVariant)
+                }
+            }
+        }
+    }
+    val activeRecipes = state.recipes.filterNot { it.archived }
+    // The active recipe brewed most often, with the most recent brew breaking a tie.
+    val mostUsed = state.brews.sortedByDescending { it.startedAt }.groupingBy { it.recipe.id }.eachCount().entries
+        .sortedByDescending { it.value }.firstNotNullOfOrNull { (id, _) -> activeRecipes.find { it.id == id } }
+    SectionCard(Icons.AutoMirrored.Outlined.MenuBook, "Recipes", count(activeRecipes.size, "recipe", "recipes"), { onSection("recipes") }, mostUsed?.let { recipe -> {
+        Text("Most used", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text(recipe.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    } })
+    val activeBeans = state.beans.filterNot { it.archived }
+    val archived = state.beans.size - activeBeans.size
+    val lastBrewed = state.brews.sortedByDescending { it.startedAt }.firstNotNullOfOrNull { brew -> activeBeans.find { it.id == brew.beans.id } }
+    SectionCard(Icons.Outlined.Grain, "Beans", count(activeBeans.size, "active", "active") + if (archived > 0) " · $archived archived" else "", { onSection("beans") }, lastBrewed?.let { beans -> {
+        Text("Last brewed", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text("${beans.name} · ${beans.roaster}", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    } })
+    val activeGrinders = state.grinders.filterNot { it.archived }
+    val default = activeGrinders.find { it.id == state.defaultGrinderId }
+    SectionCard(Icons.Outlined.Album, "Grinders", count(activeGrinders.size, "grinder", "grinders"), { onSection("grinders") }, default?.let { grinder -> {
+        Row(verticalAlignment = Alignment.CenterVertically) { GrinderRowContent(grinder, isDefault = true) }
+    } })
+}
+
+private fun count(size: Int, one: String, many: String) = if (size == 0) "None yet" else if (size == 1) "1 $one" else "$size $many"
+
+/** A hub card for one kind of item: its icon, name and count, and at most one useful value beneath. */
+@Composable
+private fun SectionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, summary: String, onClick: () -> Unit, preview: (@Composable ColumnScope.() -> Unit)?) {
+    val colors = MaterialTheme.colorScheme
+    LibraryCard(onClick, Modifier.testTag("library-${title.lowercase()}")) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(icon, null, Modifier.size(44.dp).background(colors.soft, MaterialTheme.shapes.small).padding(11.dp), tint = colors.onSecondaryContainer)
+                Column(Modifier.weight(1f)) {
+                    Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                    Text(summary, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
+                Icon(Icons.Outlined.ChevronRight, null, tint = colors.onSurfaceVariant)
+            }
+            if (preview != null) {
+                HorizontalDivider(color = colors.outlineVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp), content = preview)
+            }
+        }
+    }
+}
+
+/** A tappable card in the Library's lists. */
+@Composable
+private fun LibraryCard(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    Surface(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+}
+
+/** A small label such as "Beans" or "Default": soft, or [strong] in the primary fill. */
+@Composable
+private fun Tag(text: String, modifier: Modifier = Modifier, strong: Boolean = false) {
+    val colors = MaterialTheme.colorScheme
+    Text(text, modifier.background(if (strong) colors.primary else colors.soft, MaterialTheme.shapes.extraSmall).padding(horizontal = 8.dp, vertical = 2.dp),
+        color = if (strong) colors.onPrimary else colors.onSecondaryContainer, style = MaterialTheme.typography.labelMedium)
+}
+
+/** A recipe in a list: its name, its dose, ratio and water, and how its pours run. */
+@Composable
+private fun RowScope.RecipeRowContent(recipe: Recipe) {
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(recipe.name, style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf(Triple("Dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Ratio", "1:${formatAmount(recipe.ratio)}", "Brew ratio 1 to ${formatAmount(recipe.ratio)}"),
+                Triple("Water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams")).forEach { (label, value, spoken) ->
+                Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = spoken }) {
+                    Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(value, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+                }
+            }
+        }
+        val pours = recipe.pulses.size
+        val end = recipe.schedule().lastOrNull()?.let { it.startSeconds + it.pulse.pourSeconds } ?: 0
+        Text("${if (pours == 1) "1 pour" else "$pours pours"} · ends ${formatDuration(end)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Beans in a list: name, roaster, and where they're from. */
+@Composable
+private fun RowScope.BeansRowContent(beans: Beans) {
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(beans.name, style = MaterialTheme.typography.titleMedium)
+        Text(beans.roaster, style = MaterialTheme.typography.bodyMedium)
+        listOf(beans.origin, beans.processing).filter { it.isNotBlank() }.joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
+            Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** A grinder: its name, "Default" or its reference notes, and its last recorded setting large at the end. */
+@Composable
+private fun RowScope.GrinderRowContent(grinder: Grinder, isDefault: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(grinder.name, style = MaterialTheme.typography.titleMedium)
+        if (isDefault) Tag("Default", strong = true)
+        else if (grinder.referenceNotes.isNotBlank()) Text(grinder.referenceNotes, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+    val setting = grinder.lastSetting
+    Column(Modifier.clearAndSetSemantics { contentDescription = "Last recorded setting, " + (setting?.let { "$it ticks" } ?: "not recorded") }, horizontalAlignment = Alignment.End) {
+        Text("Last recorded", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        if (setting == null) Text("Not recorded", style = MaterialTheme.typography.bodyLarge)
+        else Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("$setting", style = MaterialTheme.typography.headlineLarge.copy(letterSpacing = (-1).sp).tabular())
+            Text("ticks", Modifier.padding(bottom = 5.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -296,7 +481,7 @@ private class SwipeAction(val label: String, val icon: androidx.compose.ui.graph
  * Crossing each point gives a haptic, and screen readers get both actions on the row.
  */
 @Composable
-private fun SwipeRow(title: String, detail: String, onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Unit) {
+private fun SwipeRow(onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Unit, content: @Composable RowScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
     val view = LocalView.current
     var width by remember { mutableIntStateOf(0) }
@@ -332,7 +517,7 @@ private fun SwipeRow(title: String, detail: String, onOpen: () -> Unit, short: S
                 Icon(if (deleting) Icons.Outlined.Delete else short.icon, null, tint = ink)
             }
         }
-        LibraryRow(title, detail, Modifier
+        LibraryCard(onOpen, Modifier
             .offset { IntOffset(offset.roundToInt(), 0) }
             // Only letting go acts; a cancelled drag, such as one the system's back gesture takes over, springs back.
             .pointerInput(Unit) {
@@ -343,7 +528,7 @@ private fun SwipeRow(title: String, detail: String, onOpen: () -> Unit, short: S
                 ) { change, delta -> change.consume(); offset = (offset + delta).coerceIn(-width.toFloat(), 0f) }
             }
             .semantics { customActions = listOf(CustomAccessibilityAction(short.label) { short.act(); true }, CustomAccessibilityAction("Delete") { onDelete(); true }) },
-            onClick = onOpen)
+            content = content)
     }
 }
 

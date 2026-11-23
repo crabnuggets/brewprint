@@ -34,6 +34,35 @@ class BrewRepositoryTest {
         repository.upsertRecipe(recipe).getOrThrow()
     }
 
+    @Test fun `a brew started from a Library item uses it, and the remembered choices for the rest`() {
+        val other = Recipe(name = "Iced", dose = 16.0, ratio = 9.375, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
+        repository.upsertRecipe(other).getOrThrow()
+        saveBrewWith(beans, recipe)
+        val draft = repository.startDraftWith(recipeId = other.id).getOrThrow()
+        assertEquals(other, draft.recipe)
+        assertEquals(beans, draft.beans)
+        assertEquals(grinder.id, draft.grinder?.id)
+        assertEquals(24, draft.setting)
+        assertEquals(draft, repository.state.value.draft)
+    }
+
+    @Test fun `a brew can't start from a Library item while another is in progress, or from archived items`() {
+        repository.startDraft().getOrThrow()
+        assertTrue(repository.startDraftWith(beansId = beans.id).isFailure)
+        repository.discardDraft().getOrThrow()
+        repository.archiveBeans(beans.id).getOrThrow()
+        assertTrue(repository.startDraftWith(beansId = beans.id).isFailure)
+        repository.archiveRecipe(recipe.id).getOrThrow()
+        assertTrue(repository.startDraftWith(recipeId = recipe.id).isFailure)
+        assertNull(repository.state.value.draft)
+    }
+
+    private fun saveBrewWith(beans: Beans, recipe: Recipe) {
+        val draft = repository.startDraft().getOrThrow().copy(beans = beans, recipe = recipe, grinder = grinder, setting = 24, stage = DraftStage.REVIEW)
+        repository.updateDraft(draft).getOrThrow()
+        repository.saveBrew(draft.id).getOrThrow()
+    }
+
     private fun preparedDraft(journal: Journal = Journal()): BrewDraft {
         val draft = repository.startDraft().getOrThrow().copy(
             beans = beans, recipe = recipe, grinder = grinder, setting = 24,

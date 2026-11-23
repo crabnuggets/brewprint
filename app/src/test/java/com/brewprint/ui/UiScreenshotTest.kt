@@ -80,6 +80,14 @@ class UiScreenshotTest {
         pair("history")
         compose.onNode(hasText("Library") and isSelectable()).performClick()
         pair("library")
+        for (section in listOf("recipes", "beans", "grinders")) {
+            compose.openLibrarySection(section)
+            pair("library-$section")
+        }
+        compose.openLibrarySection("recipes")
+        tap("Three-pulse filter")
+        pair("library-recipe-detail")
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNode(hasText("Brew") and isSelectable()).performClick()
         tap("New brew")
         pair("setup")
@@ -126,7 +134,7 @@ class UiScreenshotTest {
         pair("swipe-repeat-armed")
         row.performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(-width * .55f, 0f)); up() }
         compose.runOnIdle { assertTrue(repository.state.value.draft == null && repository.state.value.brews.size == 3) }
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("recipes")
         tap("Three-pulse filter")
         pair("recipe-header")
         // The menu opens in its own window, which this capture does not draw.

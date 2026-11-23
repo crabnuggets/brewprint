@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
 import java.io.File
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -75,6 +77,59 @@ class NavigationTest {
         compose.onNodeWithText("Kii").assertIsDisplayed()
         compose.onNodeWithText("Brew in progress").performClick()
         compose.onNodeWithText("Use this plan").assertExists()
+    }
+
+    @Test fun `the Library opens on a hub, and a brew started from a recipe returns to it on Back`() {
+        val repository = repository()
+        val recipe = Recipe(name = "Kurasu Iced", dose = 16.0, ratio = 9.375, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
+        compose.runOnIdle {
+            repository.upsertRecipe(recipe).getOrThrow()
+            repository.upsertGrinder(Grinder(name = "Comandante C40", lastSetting = 22)).getOrThrow()
+        }
+        open(repository)
+        compose.onNode(tab and hasText("Library")).performClick()
+        compose.onNodeWithTag("library-recipes").assertIsDisplayed()
+        compose.onNodeWithTag("library-beans").assertExists()
+        compose.onNodeWithTag("library-grinders").assertExists()
+        compose.openLibrarySection("recipes")
+        compose.onNodeWithText("Kurasu Iced").performClick()
+        // An item's own screen hides the navigation.
+        compose.onNodeWithTag("bottom-navigation").assertDoesNotExist()
+        compose.onNodeWithText("Brew with this recipe").performClick()
+        compose.onNodeWithText("Use this plan").assertExists()
+        compose.runOnIdle { assertEquals(recipe.id, repository.state.value.draft?.recipe?.id) }
+        // Untouched, Back discards the new brew and returns to the recipe.
+        back()
+        compose.onNodeWithText("Brew with this recipe").assertIsDisplayed()
+        compose.runOnIdle { assertNull(repository.state.value.draft) }
+        back()
+        back()
+        compose.onNodeWithTag("library-recipes").assertIsDisplayed()
+    }
+
+    @Test fun `with a brew in progress an item offers Resume brew instead, and archived beans offer no brew`() {
+        val repository = repository()
+        val kii = Beans(name = "Kii", roaster = "Sample")
+        val old = Beans(name = "Old bag", roaster = "Sample", archived = true)
+        compose.runOnIdle {
+            repository.upsertBeans(kii).getOrThrow()
+            repository.upsertBeans(old).getOrThrow()
+            repository.startDraft().getOrThrow()
+        }
+        open(repository)
+        compose.openLibrarySection("beans")
+        compose.onNodeWithText("Kii").performClick()
+        compose.onNodeWithText("Brew with these beans").assertIsNotEnabled()
+        compose.onNodeWithText("A brew is already in progress.").assertExists()
+        back()
+        compose.onNodeWithText("Archived beans").performScrollTo().performClick()
+        compose.onNodeWithText("Old bag").performClick()
+        compose.onNodeWithText("Brew with these beans").assertDoesNotExist()
+        // Tapping Library again goes back to the hub.
+        back()
+        back()
+        compose.onNode(tab and hasText("Library")).performClick()
+        compose.onNodeWithTag("library-beans").assertIsDisplayed()
     }
 
     @Test fun `a failed sync marks Settings with a dot that screen readers hear`() {

@@ -45,8 +45,8 @@ class LibraryDraftJourneyTest {
         show(repository)
         compose.onNodeWithText("Review 2 drafts from Claude").performClick()
         compose.onNodeWithText("Drafts from Claude").assertIsDisplayed()
-        compose.onNodeWithText("Beans · Tim Wendelboe").assertIsDisplayed()
-        compose.onNodeWithText("Recipe · 15 g · 1:16 · 240 g").assertIsDisplayed()
+        compose.onNode(hasText("Kii") and hasText("Beans") and hasText("Tim Wendelboe")).assertIsDisplayed()
+        compose.onNode(hasText("Three pours") and hasText("Recipe") and hasText("15 g · 1:16 · 240 g")).assertIsDisplayed()
 
         compose.onNodeWithText("Kii").performClick()
         compose.onNodeWithText("Review beans").assertIsDisplayed()
@@ -101,6 +101,8 @@ class LibraryDraftJourneyTest {
         assertEquals(listOf(corrected), repository.state.value.recipes)
 
         compose.onNodeWithText("Two pours").assertIsDisplayed()
+        // Back to the recipes, then to the hub, where the beans draft still waits.
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Kii").performClick()
         compose.onNode(hasText("Processing method, optional") and hasSetTextAction()).performTextInput("Washed")

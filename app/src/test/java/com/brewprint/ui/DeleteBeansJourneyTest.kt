@@ -57,7 +57,7 @@ class DeleteBeansJourneyTest {
     @Test fun `beans are deleted from their Library page after asking`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performClick()
         compose.onNodeWithContentDescription("More actions").performClick()
         compose.onNodeWithText("Delete beans").performClick()
@@ -76,7 +76,7 @@ class DeleteBeansJourneyTest {
     @Test fun `a short swipe archives beans and a long one deletes them, each with Undo`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         compose.onNodeWithText("Beans archived").assertExists()
         compose.onNodeWithText("Kii").assertDoesNotExist()
@@ -101,7 +101,7 @@ class DeleteBeansJourneyTest {
     @Test fun `a swipe the system cancels springs back without acting`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { down(Offset(width - 4f, centerY)); moveBy(Offset(-width * .9f, 0f)); cancel() }
         compose.onNodeWithText("Beans deleted").assertDoesNotExist()
         compose.runOnIdle { assertEquals(listOf(kii, gesha), repository.state.value.beans) }
@@ -110,7 +110,7 @@ class DeleteBeansJourneyTest {
     @Test fun `a newer swipe takes over the Undo bar`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         compose.mainClock.advanceTimeBy(1_000)
         compose.onNodeWithText("Gesha").performTouchInput { swipeLeft(startX = right - 1f, endX = left) }
@@ -127,7 +127,7 @@ class DeleteBeansJourneyTest {
         draftWith(repository, kii)
         repository.saveBrew(repository.state.value.draft!!.copy(stage = DraftStage.REVIEW).also { repository.updateDraft(it).getOrThrow() }.id).getOrThrow()
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Gesha").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         compose.runOnIdle { repository.deleteBeans(gesha.id).getOrThrow() }
         compose.onNodeWithText("Undo").performClick()
@@ -147,7 +147,7 @@ class DeleteBeansJourneyTest {
         show(repository)
         compose.onNode(hasText("History") and isSelectable()).performClick()
         compose.onNodeWithText("Gesha").performTouchInput { swipeLeft() }
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         // The History Undo keeps its bar and its time.
         compose.onNodeWithText("Brew deleted").assertExists()
@@ -168,7 +168,7 @@ class DeleteBeansJourneyTest {
             val state by repository.state.collectAsState()
             BrewprintTheme(Appearance.LIGHT) { BrewprintApp(state, repository) }
         }
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = left) }
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("Beans deleted").assertExists()
@@ -186,7 +186,7 @@ class DeleteBeansJourneyTest {
     @Test fun `Undo of a delete does nothing once the account has changed`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = left) }
         compose.runOnIdle { repository.syncWith("user-1").getOrThrow() }
         compose.onNodeWithText("Undo").performClick()
@@ -196,7 +196,7 @@ class DeleteBeansJourneyTest {
     @Test fun `beans deleted elsewhere close their page and its dialogs`() {
         val repository = repository(kii, gesha)
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performClick()
         compose.onNodeWithContentDescription("More actions").performClick()
         compose.onNodeWithText("Archive beans").performClick()
@@ -228,7 +228,7 @@ class DeleteBeansJourneyTest {
         val repository = repository(kii, gesha)
         repository.archiveBeans(kii.id).getOrThrow()
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").assertDoesNotExist()
         compose.onNodeWithText("Archived beans").performScrollTo().performClick()
         compose.onNodeWithText("Kii").performClick()
@@ -247,7 +247,7 @@ class DeleteBeansJourneyTest {
         repository.archiveBeans(kii.id).getOrThrow()
         repository.archiveBeans(gesha.id).getOrThrow()
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Archived beans").performScrollTo().performClick()
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         compose.onNodeWithText("Beans unarchived").assertExists()
@@ -267,7 +267,7 @@ class DeleteBeansJourneyTest {
         val repository = repository(kii, gesha)
         repository.archiveBeans(kii.id).getOrThrow()
         show(repository)
-        compose.onNode(hasText("Library") and isSelectable()).performClick()
+        compose.openLibrarySection("beans")
         compose.onNodeWithText("Archived beans").performScrollTo().performClick()
         compose.onNodeWithText("Kii").performClick()
         compose.onNodeWithContentDescription("More actions").performClick()
