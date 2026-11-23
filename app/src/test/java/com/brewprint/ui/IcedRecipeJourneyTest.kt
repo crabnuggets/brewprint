@@ -97,6 +97,27 @@ class IcedRecipeJourneyTest {
         capture("editor-details")
     }
 
+    @Test fun `capture the recipe list with an iced recipe`() = captureRecipeList("recipe-list-dark")
+
+    @Config(qualifiers = "w360dp-h780dp-xxhdpi")
+    @Test fun `capture the recipe list with an iced recipe on a narrow phone`() = captureRecipeList("recipe-list-narrow-dark")
+
+    private fun captureRecipeList(name: String) {
+        val data = temporary.newFolder("data")
+        val repository = BrewRepository(object : ContextWrapper(RuntimeEnvironment.getApplication()) { override fun getFilesDir(): File = data })
+        repository.upsertRecipe(Recipe(name = "Ten-pulse", dose = 20.0, waterTempC = 95, pulses = List(10) { Pulse(water = 30.0, pourSeconds = 6, waitSeconds = if (it < 9) 10 else 0) })).getOrThrow()
+        repository.upsertRecipe(kurasu).getOrThrow()
+        repository.upsertRecipe(Recipe(name = "Three-pulse filter", dose = 15.0, pulses = List(3) { Pulse(water = 80.0, pourSeconds = 15, waitSeconds = if (it < 2) 30 else 0) })).getOrThrow()
+        compose.setContent {
+            val state by repository.state.collectAsState()
+            BrewprintTheme(Appearance.DARK) { BrewprintApp(state, repository) }
+        }
+        compose.onNode(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Tab) and hasText("Library")).performClick()
+        compose.onNodeWithTag("library-recipes").performClick()
+        compose.onNodeWithContentDescription("Total brew water 150 grams, plus 70 grams of ice").assertIsDisplayed()
+        capture(name)
+    }
+
     @Test fun `an iced brew asks for the ice before the brewer goes on the scale`() {
         compose.setContent {
             BrewprintTheme(Appearance.LIGHT) {

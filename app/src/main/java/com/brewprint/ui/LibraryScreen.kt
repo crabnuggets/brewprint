@@ -435,6 +435,7 @@ private fun Tag(text: String, modifier: Modifier = Modifier, strong: Boolean = f
 }
 
 /** A recipe in a list: its name, its dose, ratio and water, and how its pours run. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RowScope.RecipeRowContent(recipe: Recipe) {
     val colors = MaterialTheme.colorScheme
@@ -446,11 +447,15 @@ private fun RowScope.RecipeRowContent(recipe: Recipe) {
         }
         val water = waterCell(recipe)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf(Triple("Dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Ratio", "1:${formatRatio(recipe.computedRatio)}", "Brew ratio 1 to ${formatRatio(recipe.computedRatio)}"),
-                Triple("Water", recipe.iceGrams?.takeIf { iced }?.let { "${water.value} + ${formatAmount(it)} ice" } ?: "${water.value} g", water.spoken)).forEach { (label, value, spoken) ->
-                Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = spoken }) {
-                    Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    Text(value, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+            listOf(Cell("Dose", formatAmount(recipe.dose), "g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Cell("Ratio", "1:${formatRatio(recipe.computedRatio)}", spoken = "Brew ratio 1 to ${formatRatio(recipe.computedRatio)}"),
+                Cell("Water", water.value, recipe.iceGrams?.takeIf { iced }?.let { "+ ${formatAmount(it)} ice" } ?: "g", water.spoken)).forEach { cell ->
+                Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = cell.spoken }) {
+                    Text(cell.label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    // The unit, or an iced recipe's ice, sits small beside its value, and wraps under it only when it does not fit.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(cell.value, Modifier.alignByBaseline(), style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+                        if (cell.unit.isNotEmpty()) Text(cell.unit, Modifier.alignByBaseline(), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
