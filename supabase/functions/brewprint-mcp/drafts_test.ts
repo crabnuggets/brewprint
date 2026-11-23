@@ -73,8 +73,8 @@ Deno.test("correcting a recipe draft keeps the pulses unless new ones are given"
   assertEquals(buildRecipe(existing.id, { name: "Renamed" }, existing).item, { ...existing, name: "Renamed" });
   const halved = buildRecipe(existing.id, { dose: 7.5, pulses: [{ water: 120, pourSeconds: 30 }] }, existing);
   assertEquals(halved.item?.pulses, [{ label: "", water: 120, pourSeconds: 30, waitSeconds: 0, notes: "" }]);
-  // The stored ratio follows the new dose and pours.
-  assertEquals(halved.item?.ratio, 16);
+  // A draft stores no ratio: the app works it out from the dose and the pours.
+  assertEquals("ratio" in halved.item!, false);
 });
 
 Deno.test("a correction keeps details it doesn't mention and clears ones given as null", async () => {
@@ -87,7 +87,7 @@ Deno.test("a correction keeps details it doesn't mention and clears ones given a
   assertEquals(cleared.targetFinishSeconds, 210);
 });
 
-Deno.test("the stored ratio comes from the dose and the pours, to 6 decimals like the app", () => {
+Deno.test("an iced recipe keeps its ice, and a hot one has none", () => {
   const iced = buildRecipe("x", {
     name: "Kurasu Iced",
     dose: 16,
@@ -98,11 +98,7 @@ Deno.test("the stored ratio comes from the dose and the pours, to 6 decimals lik
       pourSeconds: 15,
     }],
   }).item!;
-  assertEquals([iced.ratio, iced.iceGrams], [9.375, 70]);
-  assertEquals(
-    buildRecipe("x", { name: "15 to 250", dose: 15, pulses: [{ water: 250, pourSeconds: 50 }] }).item?.ratio,
-    16.666667,
-  );
+  assertEquals(iced.iceGrams, 70);
   // A hot recipe keeps no ice, and ice given for one is a mistake to fix.
   assertEquals(buildRecipe(iced.id, { drinkStyle: "HOT" }, iced).item?.iceGrams, null);
   assertEquals(buildRecipe(iced.id, { drinkStyle: "HOT", iceGrams: 70 }, iced).errors, [
@@ -125,7 +121,6 @@ Deno.test("a recipe draft the app would refuse is refused with the app's reasons
     id: "x",
     name: "Plan",
     dose: 15,
-    ratio: 16,
     pulses: [{ label: "", water: 240, pourSeconds: 10, waitSeconds: 0, notes: "" }],
     notes: "",
     archived: false,

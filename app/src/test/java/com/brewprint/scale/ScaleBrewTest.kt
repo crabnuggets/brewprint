@@ -25,7 +25,7 @@ class ScaleBrewTest {
     /** The scale's own flow, which trails the stream. */
     private var reported = 0.0
     // Pours at 0:00 and 0:30, to 40 g and 100 g.
-    private val recipe = Recipe(name = "Two-pulse", dose = 10.0, ratio = 10.0, pulses = listOf(Pulse("Bloom", 40.0, 10, 20), Pulse(water = 60.0, pourSeconds = 10)))
+    private val recipe = Recipe(name = "Two-pulse", dose = 10.0, pulses = listOf(Pulse("Bloom", 40.0, 10, 20), Pulse(water = 60.0, pourSeconds = 10)))
 
     @Before fun setUp() {
         val directory = temporary.newFolder("data")
@@ -74,7 +74,7 @@ class ScaleBrewTest {
 
     /** Pours of 30 g planned at 10 s each, with [waitSeconds] between them; armed at a steady zero. */
     private fun armPulses(waitSeconds: Int): Recipe {
-        val pulses = Recipe(name = "Pulses", dose = 9.0, ratio = 10.0, pulses = List(3) { Pulse(water = 30.0, pourSeconds = 10, waitSeconds = if (it < 2) waitSeconds else 0) })
+        val pulses = Recipe(name = "Pulses", dose = 9.0, pulses = List(3) { Pulse(water = 30.0, pourSeconds = 10, waitSeconds = if (it < 2) waitSeconds else 0) })
         repository.updateDraft(draft.copy(recipe = pulses)).getOrThrow()
         feed(1200)
         return pulses

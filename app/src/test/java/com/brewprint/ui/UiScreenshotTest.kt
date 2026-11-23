@@ -47,7 +47,7 @@ class UiScreenshotTest {
         })
         val beans = Beans(name = "Ethiopia natural", roaster = "Sample Roaster", expectedNotes = "Blueberry, cocoa")
         val grinder = Grinder(name = "Hand grinder", lastSetting = 24)
-        val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+        val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, pulses = listOf(
             Pulse("Bloom", 60.0, 10, 30), Pulse(water = 90.0, pourSeconds = 20, waitSeconds = 20), Pulse(water = 90.0, pourSeconds = 20)))
         repository.upsertBeans(beans).getOrThrow()
         repository.upsertGrinder(grinder).getOrThrow()
@@ -192,7 +192,7 @@ class UiScreenshotTest {
         var appearance by mutableStateOf(Appearance.LIGHT)
         val repository = seededRepository()
         val beans = Beans(name = "Kii", roaster = "Tim Wendelboe", origin = "Kenya", variety = "SL28, SL34", processing = "Washed", expectedNotes = "Blackcurrant, hibiscus", notes = "https://timwendelboe.no/product/kii")
-        val recipe = Recipe(name = "Three pours", dose = 15.0, ratio = 16.0, notes = "Swirl after the bloom.",
+        val recipe = Recipe(name = "Three pours", dose = 15.0, notes = "Swirl after the bloom.",
             pulses = listOf(Pulse("Bloom", 45.0, 10, 35), Pulse(water = 100.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 95.0, pourSeconds = 15)))
         repository.applyDrafts(listOf(LibraryDraft(beans.id, beans = beans), LibraryDraft(recipe.id, recipe = recipe))).getOrThrow()
         compose.setContent {
@@ -216,6 +216,26 @@ class UiScreenshotTest {
         tap("Back")
         tap("Three pours")
         pair("drafts-review-recipe")
+    }
+
+    // Match Robolectric's floating-window width to avoid its dialog layout loop: robolectric/robolectric#8460.
+    @Config(qualifiers = "w320dp-h891dp-xxhdpi")
+    @Test fun `capture typing the coffee weight light and dark`() {
+        var appearance by mutableStateOf(Appearance.LIGHT)
+        val live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        compose.setContent {
+            BrewprintTheme(appearance) {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    ScalePrep(ScaleStep.COFFEE, live, 15.0, 16.0, null, false, onTare = {}, onUse = {}, onSkip = {}, onWithout = {})
+                }
+            }
+        }
+        capture("coffee-weight-card-light")
+        tap("Add your coffee, 0.0 grams, plan 15 grams")
+        compose.onNode(hasSetTextAction()).performTextReplacement("16")
+        capture("coffee-weight-dialog-light", dialog = true)
+        compose.runOnIdle { appearance = Appearance.DARK }
+        capture("coffee-weight-dialog-dark", dialog = true)
     }
 
     @Test fun `capture untouched new recipe light and dark`() {
@@ -266,7 +286,7 @@ class UiScreenshotTest {
             override fun getFilesDir(): File = data
         })
         val beans = Beans(name = "Ethiopia natural", roaster = "Sample Roaster")
-        val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+        val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, pulses = listOf(
             Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),
             Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 45.0, pourSeconds = 15)))
         repository.upsertBeans(beans).getOrThrow()

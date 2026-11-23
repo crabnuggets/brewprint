@@ -22,13 +22,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BluetoothDisabled
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,12 +45,14 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brewprint.data.*
@@ -167,16 +172,19 @@ internal fun ScaleChip(name: String, connected: Boolean, reading: Boolean = true
 }
 
 @Composable
-private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false) {
+private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false, onType: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     val note = plan?.let { "plan ${formatAmount(it)} g" }
     val spoken = "$label, " + (value?.let { "${tenths(it)} grams" } ?: "no reading") + (plan?.let { ", plan ${formatAmount(it)} grams" } ?: "")
+    // [onType] lets the weight be typed instead, for coffee the scale can't weigh.
+    val tap = if (onType != null) Modifier.clickable(onClickLabel = "Type the coffee weight", role = Role.Button, onClick = onType) else Modifier
     // [announce] makes a steady reading a polite live region, so TalkBack says when it becomes ready; a moving one stays quiet.
-    Column(Modifier.clearAndSetSemantics { contentDescription = spoken; if (announce) liveRegion = LiveRegionMode.Polite }) {
+    Column(tap.clearAndSetSemantics { contentDescription = spoken; if (announce) liveRegion = LiveRegionMode.Polite }) {
         Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tenths(value), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.SemiBold))
             Text("g", Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+            if (onType != null) Icon(Icons.Outlined.Edit, null, Modifier.padding(bottom = 10.dp).size(18.dp), tint = colors.onSurfaceVariant)
             if (note != null) Text(note, Modifier.padding(bottom = 8.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -192,6 +200,9 @@ internal fun ScaleLive.needsTare(): Boolean = !zeroed && !taring && (grams?.let 
 @Composable
 internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ratio: Double, weighedDose: Double?, reconnected: Boolean, ice: Double? = null, onTare: () -> Unit, onUse: (Double) -> Unit, onSkip: () -> Unit, onWithout: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    // The coffee weight being typed, while its dialog is open.
+    var typing by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(step) { if (step != ScaleStep.COFFEE) typing = null }
     Panel {
         // With no readings, any weight would be stale and waiting would not help, so the card says so and offers the clock.
         if (live.silent) {
@@ -230,7 +241,8 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 HorizontalDivider(color = colors.outlineVariant)
                 // A reading that still counts as zero is not coffee.
                 val coffee = live.grams?.takeIf { live.steady && it > ZERO_GRAMS }?.let(::roundedAmount)
-                Reading(if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null)
+                // Coffee added before the tare reads as 0 g, so tapping the weight lets it be typed instead.
+                Reading(if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null, onType = { typing = formatAmount(coffee ?: plannedDose) })
                 // The weighed dose rescales this brew's pours; say so before the choice, not after.
                 if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatRatio(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -250,6 +262,17 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
             }
         }
         SoftTextButton(onClick = onWithout, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Brew without the scale") }
+    }
+    typing?.let { text ->
+        val weight = positiveDecimal(text)
+        AlertDialog(onDismissRequest = { typing = null }, title = { Text("Coffee weight") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("For coffee the scale can't weigh, such as grounds added before the tare.", style = MaterialTheme.typography.bodyMedium)
+                LibraryField(text, { typing = it }, "Coffee, g", KeyboardType.Decimal, error = if (weight == null) "Enter a positive amount with up to one decimal place." else null, required = true)
+                if (weight != null && weight != plannedDose) Text("Using ${formatAmount(weight)} g adjusts the pours to keep 1:${formatRatio(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+        }, confirmButton = { SoftTextButton(enabled = weight != null, onClick = { typing = null; weight?.let(onUse) }) { Text("Use weight") } },
+            dismissButton = { SoftTextButton(onClick = { typing = null }) { Text("Cancel") } })
     }
 }
 

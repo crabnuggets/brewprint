@@ -38,7 +38,7 @@ class BrewStartCaptureTest {
 
     private val beans = Beans(name = "Ethiopia natural", roaster = "Sample Roaster", expectedNotes = "Blueberry, cocoa")
     private val grinder = Grinder(name = "Hand grinder", lastSetting = 24)
-    private val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+    private val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, pulses = listOf(
         Pulse("Bloom", 60.0, 10, 30), Pulse(water = 90.0, pourSeconds = 20, waitSeconds = 20), Pulse(water = 90.0, pourSeconds = 20)))
 
     private fun repository(): BrewRepository {

@@ -71,7 +71,7 @@ A Bluetooth scale that reports weight and flow to the app during a brew. Optiona
 _Avoid_: Smart scale
 
 **Weighed dose**:
-The dose read from the coffee scale before a brew. Using it rescales that brew's pulses to keep the recipe's brew ratio; the recipe itself is unchanged.
+The dose read from the coffee scale before a brew, or typed on the scale card when the scale can't weigh the coffee. Using it rescales that brew's pulses to keep the recipe's brew ratio; the recipe itself is unchanged.
 
 **Measured water**:
 The scale's steady reading once flow stops after the last pour. It sits beside the planned total brew water and is never beverage weight.

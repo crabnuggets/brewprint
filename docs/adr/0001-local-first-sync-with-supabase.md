@@ -12,4 +12,5 @@ The device's `brewprint.json` stays the source of truth, so the app keeps workin
 - A phone holds one account's data at a time. Signing out removes it after a full upload, and signing in to a different account replaces it, so accounts never merge. Either step is refused while the account still has changes to upload. Data made while signed out joins the next account signed in to.
 - Deleting a brew record uploads a tombstone (`deleted = true`, `data = null`); a hard delete would let another phone bring it back.
 - The server stamps `updated_at`, so device clocks never decide which change is newer. Pulls overlap by a minute to catch changes that committed late.
+- A field this version doesn't know survives an edit made here: the app keeps the item's JSON as the account sent it and lays its own fields over it on upload. Phones update at different times, so this stops a phone on an older version from dropping fields a newer one added. It stays as standing protection for every update, not only the one that introduced it.
 - supabase-kt is pinned to 3.1.x, the newest line built with Kotlin 2.1. Upgrading it means upgrading Kotlin first.

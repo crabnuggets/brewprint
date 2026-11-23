@@ -24,7 +24,7 @@ class ScaleTest {
     }
 
     // Pours at 0:00, 0:45, 1:20, 1:55 and 2:30; scheduled pours end at 2:45.
-    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, pulses = listOf(
         Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),
         Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 45.0, pourSeconds = 15)))
     private val start = 1_000_000L

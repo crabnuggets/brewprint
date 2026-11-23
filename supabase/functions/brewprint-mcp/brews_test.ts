@@ -108,7 +108,6 @@ Deno.test("the ratio comes from the dose and pours, to one decimal, with the ice
     recipe: {
       ...brew.recipe,
       dose: 16,
-      ratio: 9.375,
       drinkStyle: "ICED" as const,
       iceGrams: 70,
       pulses: [40, 60, 50].map((water) => ({ label: "", water, pourSeconds: 10, waitSeconds: 0, notes: "" })),

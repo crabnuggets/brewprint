@@ -21,7 +21,7 @@ class BrewRepositoryTest {
     private lateinit var repository: BrewRepository
     private val beans = Beans(name = "Ethiopia", roaster = "Sample", expectedNotes = "Blueberry")
     private val grinder = Grinder(name = "Hand grinder", lastSetting = 24)
-    private val recipe = Recipe(name = "Filter", dose = 15.0, ratio = 16.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
+    private val recipe = Recipe(name = "Filter", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
 
     @Before fun setUp() {
         val directory = temporary.newFolder("data")
@@ -35,7 +35,7 @@ class BrewRepositoryTest {
     }
 
     @Test fun `a brew started from a Library item uses it, and the remembered choices for the rest`() {
-        val other = Recipe(name = "Iced", dose = 16.0, ratio = 9.375, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
+        val other = Recipe(name = "Iced", dose = 16.0, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
         repository.upsertRecipe(other).getOrThrow()
         saveBrewWith(beans, recipe)
         val draft = repository.startDraftWith(recipeId = other.id).getOrThrow()

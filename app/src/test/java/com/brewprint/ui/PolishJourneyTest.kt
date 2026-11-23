@@ -44,7 +44,7 @@ class PolishJourneyTest {
     private lateinit var repository: BrewRepository
 
     // The owner's ten-pulse brew: 20 g at 1:15, 30 g a pulse, pulses 6 to 10 started late.
-    private val recipe = Recipe(name = "Ten-pulse", dose = 20.0, ratio = 15.0, pulses = listOf(Pulse("Bloom", 30.0, 5, 25)) +
+    private val recipe = Recipe(name = "Ten-pulse", dose = 20.0, pulses = listOf(Pulse("Bloom", 30.0, 5, 25)) +
         List(8) { Pulse(water = 30.0, pourSeconds = 5, waitSeconds = 10) } + Pulse(water = 30.0, pourSeconds = 5))
     private val starts = listOf(0, 30, 45, 60, 75, 99, 128, 159, 186, 216)
     private val reached = listOf(30.8, 61.2, 91.0, 121.1, 151.6, 182.0, 211.7, 242.3, null, 304.2)

@@ -28,7 +28,7 @@ class ScaleJourneyTest {
     private lateinit var repository: BrewRepository
     private var live by mutableStateOf(ScaleLive(connected = true, grams = 0.0, steady = true))
     private var tares = 0
-    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, pulses = listOf(
         Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),
         Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 45.0, pourSeconds = 15)))
 
@@ -91,6 +91,32 @@ class ScaleJourneyTest {
         shows("Start timer now")
     }
 
+    // Match Robolectric's floating-window width to avoid its dialog layout loop: robolectric/robolectric#8460.
+    @Config(qualifiers = "w320dp-h891dp")
+    @Test fun `coffee added before the tare can have its weight typed`() {
+        open(paired = true)
+        tap("Tare")
+        // The grounds went in with the brewer, so the tared scale reads 0 g and offers no dose to use.
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        compose.onNodeWithText("Use dose").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Add your coffee, 0.0 grams, plan 15 grams").assertHasClickAction().performClick()
+        shows("Coffee weight")
+        val field = compose.onNode(hasSetTextAction())
+        field.assert(hasText("15"))
+        field.performTextReplacement("0")
+        compose.onNodeWithText("Use weight").assertIsNotEnabled()
+        field.performTextReplacement("16")
+        shows("Using 16 g adjusts the pours to keep 1:16.")
+        tap("Use weight")
+        compose.onNodeWithText("Coffee weight").assertDoesNotExist()
+        assertEquals(2, tares)
+        val draft = repository.state.value.draft!!
+        assertEquals(16.0, draft.recipe!!.dose, 0.0)
+        assertEquals(256.0, draft.recipe.totalWater, 0.0)
+        assertEquals(16.0, draft.scale!!.weighedDose!!, 0.0)
+        assertEquals(ScaleStep.ARMED, draft.scaleStep)
+    }
+
     @Test fun `a reading at zero is not coffee and a dropped scale tares the brewer again`() {
         open(paired = true)
         tap("Tare")
@@ -150,7 +176,7 @@ class ScaleJourneyTest {
 
     @Test fun `choosing another recipe after weighing starts the scale steps again`() {
         open(paired = true)
-        repository.upsertRecipe(Recipe(name = "One pour", dose = 12.0, ratio = 15.0, pulses = listOf(Pulse(water = 180.0, pourSeconds = 30)))).getOrThrow()
+        repository.upsertRecipe(Recipe(name = "One pour", dose = 12.0, pulses = listOf(Pulse(water = 180.0, pourSeconds = 30)))).getOrThrow()
         tap("Tare")
         live = ScaleLive(connected = true, grams = 15.23, steady = true)
         tap("Use 15.2 g")

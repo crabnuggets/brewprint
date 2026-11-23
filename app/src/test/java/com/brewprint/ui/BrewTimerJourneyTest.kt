@@ -26,7 +26,7 @@ class BrewTimerJourneyTest {
     private lateinit var repository: BrewRepository
     private var now = 1_000_000L
     // Pours at 0:00, 0:40 and 1:20; scheduled pours end at 1:40.
-    private val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+    private val recipe = Recipe(name = "Three-pulse filter", dose = 15.0, pulses = listOf(
         Pulse("Bloom", 60.0, 10, 30), Pulse(water = 90.0, pourSeconds = 20, waitSeconds = 20), Pulse(water = 90.0, pourSeconds = 20)))
 
     @Before fun setUp() {

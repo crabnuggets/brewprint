@@ -26,7 +26,6 @@
     "id": "recipe-1",
     "name": "Three pours",
     "dose": 15.0,
-    "ratio": 16.0,
     "pulses": [
       {
         "label": "Bloom",

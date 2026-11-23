@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28], qualifiers = "w411dp-h891dp")
 class RecipeEditorTest {
     @get:Rule val compose = createComposeRule()
-    private val recipe = Recipe(name = "Three pulses", dose = 15.0, ratio = 16.0,
+    private val recipe = Recipe(name = "Three pulses", dose = 15.0,
         pulses = listOf(Pulse("Bloom", 60.0, 10, 30), Pulse("Middle", 90.0, 20, 20), Pulse("Finish", 90.0, 25)))
 
     private fun tap(description: String) = compose.onNodeWithContentDescription(description).performScrollTo().performClick()
@@ -113,7 +113,7 @@ class RecipeEditorTest {
         val result = save()
         assertEquals(listOf(45.0, 67.5, 56.3), result.pulses.map { it.water })
         assertEquals(78.8, result.iceGrams!!, 0.0)
-        assertEquals(9.377778, result.ratio, 0.0)
+        assertEquals(9.377778, result.computedRatio, 0.0)
         assertEquals("Stir gently 3 times", result.pulses.first().notes)
     }
 

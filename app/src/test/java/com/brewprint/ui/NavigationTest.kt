@@ -81,7 +81,7 @@ class NavigationTest {
 
     @Test fun `the Library opens on a hub, and a brew started from a recipe returns to it on Back`() {
         val repository = repository()
-        val recipe = Recipe(name = "Kurasu Iced", dose = 16.0, ratio = 9.375, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
+        val recipe = Recipe(name = "Kurasu Iced", dose = 16.0, pulses = listOf(Pulse(water = 150.0, pourSeconds = 30)))
         compose.runOnIdle {
             repository.upsertRecipe(recipe).getOrThrow()
             repository.upsertGrinder(Grinder(name = "Comandante C40", lastSetting = 22)).getOrThrow()

@@ -150,7 +150,7 @@ function server(client: SupabaseClient) {
       grinders: shown(grinders),
       recipes: shown(recipes).map((item) => ({
         ...item,
-        // The stored ratio is for older app versions; this is the one the app shows.
+        // The ratio as the app shows it, from the dose and the pours.
         ratio: `1:${recipeRatio(item)}`,
         brews: brews.filter((brew) => brew.recipe.id === item.id).length,
       })),

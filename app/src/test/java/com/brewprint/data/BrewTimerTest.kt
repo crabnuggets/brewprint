@@ -11,7 +11,7 @@ import org.junit.Test
 
 class BrewTimerTest {
     // Pours at 0:00, 0:45, 1:20, 1:55 and 2:30; scheduled pours end at 2:45.
-    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, ratio = 16.0, pulses = listOf(
+    private val recipe = Recipe(name = "Five-pulse filter", dose = 15.0, pulses = listOf(
         Pulse("Bloom", 45.0, 10, 35), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20),
         Pulse(water = 50.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 45.0, pourSeconds = 15)))
     private val start = 1_000_000L
@@ -51,7 +51,7 @@ class BrewTimerTest {
     }
 
     @Test fun `undo still works after a step changes on its own`() {
-        val short = Recipe(name = "Short waits", dose = 10.0, ratio = 10.0, pulses = listOf(
+        val short = Recipe(name = "Short waits", dose = 10.0, pulses = listOf(
             Pulse(water = 40.0, pourSeconds = 10, waitSeconds = 3), Pulse(water = 30.0, pourSeconds = 10, waitSeconds = 3), Pulse(water = 30.0, pourSeconds = 10)))
         // Pour done at 0:05 starts a 3 s wait, so pulse 2 begins by itself at 0:08, inside the Undo window.
         val skipped = timer.skip(short, at(5))
@@ -128,7 +128,7 @@ class BrewTimerTest {
     }
 
     @Test fun `a zero wait starts the next pour immediately`() {
-        val quick = Recipe(name = "Quick", dose = 10.0, ratio = 10.0, pulses = listOf(Pulse(water = 50.0, pourSeconds = 10), Pulse(water = 50.0, pourSeconds = 10)))
+        val quick = Recipe(name = "Quick", dose = 10.0, pulses = listOf(Pulse(water = 50.0, pourSeconds = 10), Pulse(water = 50.0, pourSeconds = 10)))
         val view = TimerNow(quick, timer, at(12))
         assertEquals(TimerPhase.POUR, view.phase)
         assertEquals(1, view.pulse)

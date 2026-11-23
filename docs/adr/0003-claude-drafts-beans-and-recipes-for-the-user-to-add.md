@@ -18,5 +18,5 @@ Each draft holds the item's JSON exactly as the app saves it. The server checks 
 
 ## Amendment: the ratio comes from the pours
 
-Recipes no longer take a ratio: the app and `drafts.ts` work it out from the dose and the pulses, so pulses no longer have to add up to dose × ratio. The synced `ratio` field stays, set on every save to the pours' ratio to 6 decimals, because app versions before this change check dose × ratio against the pours and would refuse the recipe otherwise. `draft_recipe` takes no ratio: Claude gives the pours, and the server works the ratio out as the app does.
+Recipes no longer take a ratio: the app and `drafts.ts` work it out from the dose and the pulses, so pulses no longer have to add up to dose × ratio. Recipes no longer store a `ratio` field. Rows saved while older app versions were still in use keep one, which every reader ignores. `draft_recipe` takes no ratio: Claude gives the pours, and the server works the ratio out as the app does.
 

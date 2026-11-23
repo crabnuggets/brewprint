@@ -1,7 +1,7 @@
 // Beans and recipes Claude drafts for the user to add in the app. A draft holds the item exactly as the app saves it
 // (Models.kt), so adding it in the app needs no conversion. fixtures/draft-*.json are drafts as built here; a Kotlin
 // test fails when the app can't read them.
-import { type BeanBatch, type Beans, type DrinkStyle, type Pulse, ratioOf, type Recipe, totalWater } from "./brews.ts";
+import { type BeanBatch, type Beans, type DrinkStyle, type Pulse, type Recipe } from "./brews.ts";
 
 export type DraftKind = "beans" | "recipes";
 
@@ -87,7 +87,6 @@ export function buildBeans(id: string, input: BeansInput, existing?: Beans, opti
 
 /**
  * A new recipe from [input], or [existing] with the fields [input] gives replaced; pulses are replaced as a whole.
- * The stored ratio always comes from the dose and the pours, as the app's Recipe.normalized() does.
  */
 export function buildRecipe(id: string, input: RecipeInput, existing?: Recipe): Built<Recipe> {
   const pulses: Pulse[] = input.pulses
@@ -106,7 +105,6 @@ export function buildRecipe(id: string, input: RecipeInput, existing?: Recipe): 
     id,
     name: text(input.name, existing?.name),
     dose,
-    ratio: ratioOf(dose, totalWater(pulses), 6),
     pulses,
     notes: text(input.notes, existing?.notes),
     archived: false,
