@@ -61,7 +61,8 @@ class ScaleUi(val live: ScaleLive = ScaleLive(), val tare: () -> Unit = {})
 
 val LocalScale = compositionLocalOf { ScaleUi() }
 
-internal fun tenths(value: Double?): String = value?.let { "%.1f".format(it) } ?: "–"
+/** Grams to one decimal, the same in every locale. */
+internal fun tenths(value: Double?): String = value?.let { java.math.BigDecimal.valueOf(it).setScale(1, java.math.RoundingMode.HALF_UP).toPlainString() } ?: "–"
 
 /**
  * What to tell the user when pairing fails, or null to stay quiet. Declining or cancelling is the user's own choice;
@@ -189,7 +190,7 @@ internal fun ScaleLive.needsTare(): Boolean = !zeroed && !taring && (grams?.let 
 
 /** The scale card before the first pour: tare the brewer, weigh the coffee, then wait at 0 g for the pour. */
 @Composable
-internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ratio: Double, weighedDose: Double?, reconnected: Boolean, onTare: () -> Unit, onUse: (Double) -> Unit, onSkip: () -> Unit, onWithout: () -> Unit) {
+internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ratio: Double, weighedDose: Double?, reconnected: Boolean, ice: Double? = null, onTare: () -> Unit, onUse: (Double) -> Unit, onSkip: () -> Unit, onWithout: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Panel {
         // With no readings, any weight would be stale and waiting would not help, so the card says so and offers the clock.
@@ -204,6 +205,11 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
             PrimaryButton(onClick = onTare, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Tare") }
         } else when (step) {
             ScaleStep.BREWER -> {
+                // An iced recipe's ice goes in the server before the brewer sits on it; the scale is tared with both.
+                if (ice != null) {
+                    Text("Put ${formatAmount(ice)} g ice in the server first", style = MaterialTheme.typography.titleMedium)
+                    HorizontalDivider(color = colors.outlineVariant)
+                }
                 Text("Put the brewer on the scale", style = MaterialTheme.typography.titleMedium)
                 // Back here after the scale dropped mid-weighing: its tare is unknown, and grounds may already be in the brewer.
                 if (reconnected) Text("Tare the brewer again. Take the coffee out first if you've added it.", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = colors.onSurface, style = MaterialTheme.typography.bodyMedium)
@@ -226,7 +232,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 val coffee = live.grams?.takeIf { live.steady && it > ZERO_GRAMS }?.let(::roundedAmount)
                 Reading(if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null)
                 // The weighed dose rescales this brew's pours; say so before the choice, not after.
-                if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatAmount(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatRatio(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SoftTextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
                     PrimaryButton(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)) {
@@ -297,11 +303,11 @@ internal fun LiveCurveCard(view: TimerNow, live: ScaleLive) {
     // During a pour, its own target; during a wait, the next pour's: the same number as "Pour to" or "Then pour to".
     val target = view.schedule.getOrNull(if (view.phase == TimerPhase.POUR) view.pulse else view.pulse + 1)?.cumulativeWater
     Panel {
-        val ratio = live.grams?.takeIf { live.following == null }?.let { "1:" + "%.1f".format(it / view.recipe.dose) } ?: "–"
+        val ratio = live.grams?.takeIf { live.following == null }?.let { "1:" + formatRatio(it / view.recipe.dose) } ?: "–"
         Text(androidx.compose.ui.text.buildAnnotatedString {
             append("Ratio ")
             withStyle(androidx.compose.ui.text.SpanStyle(color = colors.onSurface, fontWeight = FontWeight.SemiBold)) { append(ratio) }
-            append(" → 1:${formatAmount(view.recipe.ratio)}")
+            append(" → 1:${formatRatio(view.recipe.computedRatio)}")
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         // Read on focus, not announced: the step changes are announced by the focus card.
         // While the sheet follows the clock, the last reading is not current and is not read out as if it were.
@@ -416,7 +422,7 @@ internal fun MeasuredTrio(recipe: Recipe, data: ScaleData?) {
     val water = data?.water
     val cells = listOf(
         Triple("Water", if (data == null) "${formatAmount(recipe.totalWater)} g" else water?.let { "${tenths(it)} g" } ?: "—", if (data == null) "planned" else "planned ${formatAmount(recipe.totalWater)} g"),
-        Triple("Ratio", if (data == null) "1:${formatAmount(recipe.ratio)}" else water?.let { "1:" + "%.1f".format(it / recipe.dose) } ?: "—", if (data == null) "planned" else "planned 1:${formatAmount(recipe.ratio)}"),
+        Triple("Ratio", if (data == null) "1:${formatRatio(recipe.computedRatio)}" else water?.let { "1:" + formatRatio(it / recipe.dose) } ?: "—", if (data == null) "planned" else "planned 1:${formatRatio(recipe.computedRatio)}"),
         Triple("Dose", "${formatAmount(recipe.dose)} g", if (data?.weighedDose != null) "weighed" else if (data == null) "planned" else "recipe"),
     )
     @Composable fun cell(cell: Triple<String, String, String>, modifier: Modifier) {

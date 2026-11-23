@@ -77,9 +77,8 @@ class BrewJourneyTest {
         tap("Add recipe")
         enter("Name", "One pour")
         enter("Coffee dose, g", "15")
-        enter("Brew ratio", "16")
-        enter("Water to add, g", "240")
-        enter("Pour duration, seconds", "30")
+        enter("Water, g", "240")
+        enter("Pour, s", "30")
         tap("Save recipe")
         tap("Use this plan")
         compose.onNodeWithContentDescription("Pulse 1, starts at the first pour. Add 240 grams. Pour for 30 seconds.").assertExists()
@@ -101,7 +100,7 @@ class BrewJourneyTest {
         }
     }
 
-    @Test fun `edited recipe target blocks save without silently scaling pulses`() {
+    @Test fun `a new dose keeps the pours until the user scales them back to the ratio`() {
         compose.runOnIdle {
             repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
                 pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))).getOrThrow()
@@ -110,9 +109,16 @@ class BrewJourneyTest {
         tap("Filter")
         tap("Edit recipe")
         compose.onNodeWithText("Coffee dose, g").performScrollTo().performTextReplacement("16")
-        compose.onNodeWithText("Save recipe").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("Add 16 g across your pulses to reach 256 g.").assertExists()
-        compose.runOnIdle { assertEquals(240.0, repository.state.value.recipes.single().plannedWater, 0.0) }
+        compose.onNodeWithText("Pours become 256 g, total 256 g.").performScrollTo().assertExists()
+        // Nothing is scaled silently: the Library recipe keeps its pours until saved.
+        compose.runOnIdle { assertEquals(240.0, repository.state.value.recipes.single().totalWater, 0.0) }
+        tap("Scale pours to keep 1:16")
+        tap("Save recipe")
+        compose.runOnIdle {
+            val saved = repository.state.value.recipes.single()
+            assertEquals(256.0, saved.totalWater, 0.0)
+            assertEquals(16.0, saved.ratio, 0.0)
+        }
     }
 
     @Test fun `recipe actions sit in the header`() {

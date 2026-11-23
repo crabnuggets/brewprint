@@ -5,7 +5,7 @@ Language for describing reusable filter coffee recipes and the individual brews 
 ## Language
 
 **Recipe**:
-A reusable plan specifying coffee dose, brew ratio, pulses, and preparation notes.
+A reusable plan specifying coffee dose, pulses, and preparation notes, hot or iced, with optional water temperature, target finish time, grind size and source. Its brew ratio follows from the dose and the pulses.
 _Avoid_: Brew record, brew session
 
 **Brew record**:
@@ -24,14 +24,20 @@ The mass of dry coffee used for a brew, measured in grams.
 _Avoid_: Serving size
 
 **Brew ratio**:
-The ratio of dry coffee mass to brew water mass, written as 1:N. A ratio of 1:16 means 16 grams of water per gram of coffee.
+The ratio of dry coffee mass to brew water mass, written as 1:N. A ratio of 1:16 means 16 grams of water per gram of coffee. A recipe's ratio is its total brew water over its dose, shown to one decimal.
+
+**Ice**:
+For an iced recipe, the grams of ice put in the server before brewing. It is never a scale target and is not part of total brew water; "with ice" ratios add it.
 
 **Total brew water**:
 The total mass of water poured onto the coffee, measured in grams.
 _Avoid_: Beverage yield, final cup amount
 
 **Pulse**:
-One pour in a recipe, with a specified water amount and pour duration. A wait separates it from the next pulse.
+One pour in a recipe, with a specified water amount and pour duration, and an optional step note such as "Stir gently". A wait separates it from the next pulse.
+
+**Target finish time**:
+When a recipe expects the drawdown to end, counted from the first pour. A guide shown beside the total brew time, never a timer stop.
 
 **Pour duration**:
 The planned time from starting a pulse to finishing its pour.

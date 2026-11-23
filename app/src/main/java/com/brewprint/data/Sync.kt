@@ -4,6 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * What this device knows about syncing with a signed-in account. Beans, grinders, recipes and
@@ -18,6 +19,11 @@ data class SyncState(
     val pending: Set<String> = emptySet(),
     /** The server time of the newest change already merged; null to fetch everything. */
     val pulledUpTo: String? = null,
+    /**
+     * An item's JSON as the account last sent it, by "kind/id", kept only when it holds fields this version doesn't
+     * know. Uploads lay this version's fields over it, so a newer version's fields survive an edit made here.
+     */
+    val raw: Map<String, JsonObject> = emptyMap(),
 )
 
 /** One synced item as the server holds it. A null [data] means the item was deleted. */
@@ -45,18 +51,35 @@ const val DRAFTS = "drafts"
  * Takes the library draft with [id] out of the Library, if it is there, and queues its deletion from the account.
  * Adding a draft saves it as beans or a recipe with the same id; discarding it saves nothing else.
  */
-fun AppState.resolvingDraft(id: String): AppState =
-    if (libraryDrafts.none { it.id == id }) this
-    else copy(libraryDrafts = libraryDrafts.filterNot { it.id == id }, sync = sync.copy(pending = sync.pending + key(DRAFTS, id)))
+fun AppState.resolvingDraft(id: String): AppState {
+    val draft = libraryDrafts.find { it.id == id } ?: return this
+    // A draft that was added becomes beans or a recipe with its id, keeping any fields this version can't show.
+    val added = draft.raw?.let { raw -> listOfNotNull(key("beans", id).takeIf { draft.beans != null && beans.any { it.id == id } }, key("recipes", id).takeIf { draft.recipe != null && recipes.any { it.id == id } }).firstOrNull()?.let { it to raw } }
+    return copy(libraryDrafts = libraryDrafts.filterNot { it.id == id }, sync = sync.copy(pending = sync.pending + key(DRAFTS, id), raw = sync.raw + listOfNotNull(added)))
+}
 
 /** A draft as the account holds it, or null when this version can't read it. */
 fun libraryDraft(kind: String, id: String, data: JsonElement): LibraryDraft? = runCatching {
     when (kind) {
-        "beans" -> LibraryDraft(id, beans = syncJson.decodeFromJsonElement(Beans.serializer(), data).copy(id = id))
-        "recipes" -> LibraryDraft(id, recipe = syncJson.decodeFromJsonElement(Recipe.serializer(), data).copy(id = id))
+        "beans" -> syncJson.decodeFromJsonElement(Beans.serializer(), data).copy(id = id).let { LibraryDraft(id, beans = it, raw = unknownKeysOf(data, syncJson.encodeToJsonElement(Beans.serializer(), it))) }
+        "recipes" -> syncJson.decodeFromJsonElement(Recipe.serializer(), data).copy(id = id).let { LibraryDraft(id, recipe = it, raw = unknownKeysOf(data, syncJson.encodeToJsonElement(Recipe.serializer(), it))) }
         else -> null
     }
 }.getOrNull()
+
+/** [remote] when it has a field, at any depth of nested objects, that [known] lacks; null otherwise. */
+private fun unknownKeysOf(remote: JsonElement, known: JsonElement): JsonObject? = (remote as? JsonObject)?.takeIf { hasUnknownKeys(it, known) }
+
+private fun hasUnknownKeys(remote: JsonObject, known: JsonElement): Boolean {
+    if (known !is JsonObject) return false
+    return remote.any { (name, value) -> name !in known || (value is JsonObject && hasUnknownKeys(value, known.getValue(name))) }
+}
+
+/** This version's [known] fields laid over [raw]: nested objects merge, anything else, arrays included, is replaced. */
+private fun overlay(raw: JsonObject, known: JsonObject): JsonObject = JsonObject(raw + known.mapValues { (name, value) ->
+    val under = raw[name]
+    if (under is JsonObject && value is JsonObject) overlay(under, value) else value
+})
 
 /** Replaces the Library's drafts with the account's, leaving out ones this phone already added or discarded. */
 fun AppState.withDrafts(drafts: List<LibraryDraft>): AppState = copy(libraryDrafts = drafts.filter { draft ->
@@ -85,7 +108,9 @@ fun AppState.syncKeys(): Set<String> = buildSet {
 /** The item's current content for upload, or null when it no longer exists here. */
 fun AppState.syncData(key: String): JsonElement? {
     val (name, id) = key.split('/', limit = 2)
-    return kinds.firstOrNull { it.name == name }?.encode(this, id)
+    val known = kinds.firstOrNull { it.name == name }?.encode(this, id) ?: return null
+    val raw = sync.raw[key]
+    return if (raw != null && known is JsonObject) overlay(raw, known) else known
 }
 
 private fun <T> SyncKind<T>.encode(state: AppState, id: String): JsonElement? =
@@ -126,14 +151,23 @@ fun AppState.afterPush(pushed: Map<String, JsonElement?>): AppState =
 /** Merges items from the server. A local change not yet uploaded wins over the server's copy. */
 fun AppState.withRemote(items: List<RemoteItem>, pulledUpTo: String?): AppState {
     var next = this
-    kinds.forEach { kind -> next = kind.merge(next, items.filter { it.kind == kind.name && key(kind.name, it.id) !in sync.pending }) }
+    val merging = items.filter { item -> kinds.any { it.name == item.kind } && key(item.kind, item.id) !in sync.pending }
+    kinds.forEach { kind -> next = kind.merge(next, merging.filter { it.kind == kind.name }) }
+    // Keep what the account sent where it holds fields this version doesn't know; forget it once deleted or caught up.
+    var raw = next.sync.raw
+    merging.forEach { item ->
+        val itemKey = key(item.kind, item.id)
+        val known = kinds.first { it.name == item.kind }.encode(next, item.id)
+        val unknown = if (item.data != null && known != null) unknownKeysOf(item.data, known) else null
+        raw = if (unknown != null) raw + (itemKey to unknown) else raw - itemKey
+    }
     val activeGrinders = next.grinders.filter { !it.archived }
     return next.copy(
         brews = next.brews.sortedByDescending { it.startedAt },
         noteEdits = next.noteEdits.filter { edit -> next.brews.any { it.id == edit.brewId } },
         defaultGrinderId = next.defaultGrinderId?.takeIf { id -> activeGrinders.any { it.id == id } } ?: activeGrinders.firstOrNull()?.id,
         lastBeansId = next.lastBeansId?.takeIf { id -> next.beans.any { it.id == id } },
-        sync = next.sync.copy(pulledUpTo = pulledUpTo ?: sync.pulledUpTo),
+        sync = next.sync.copy(pulledUpTo = pulledUpTo ?: sync.pulledUpTo, raw = raw),
     )
 }
 

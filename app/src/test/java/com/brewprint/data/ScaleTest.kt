@@ -67,6 +67,17 @@ class ScaleTest {
         assertEquals(recipe.pulses.map { it.pourSeconds }, scaled.pulses.map { it.pourSeconds })
     }
 
+    @Test fun `scaling never leaves a pulse at 0 g, and a weighed dose leaves the ice alone`() {
+        // Halved, 0.5 g pulses round up to 0.3 g each, which would leave the last at 0 g; it borrows from the largest.
+        val tiny = Recipe(name = "Tiny last", dose = 10.0, drinkStyle = DrinkStyle.ICED, iceGrams = 70.0,
+            pulses = listOf(Pulse(water = 0.5, pourSeconds = 5, waitSeconds = 5), Pulse(water = 0.5, pourSeconds = 5, waitSeconds = 5), Pulse(water = 0.1, pourSeconds = 5)))
+        val down = tiny.scaledTo(5.0)
+        assertEquals(listOf(0.2, 0.3, 0.1), down.pulses.map { it.water })
+        assertEquals(emptyList<String>(), down.validationErrors())
+        assertEquals(70.0, down.iceGrams!!, 0.0)
+        assertEquals(140.0, tiny.scaledTo(20.0, scaleIce = true).iceGrams!!, 0.0)
+    }
+
     @Test fun `a pour held for the scale does not end on the clock`() {
         val view = TimerNow(recipe, guided, at(20))
         assertEquals(TimerPhase.POUR, view.phase)

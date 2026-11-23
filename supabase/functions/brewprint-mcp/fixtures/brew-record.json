@@ -31,23 +31,32 @@
         "label": "Bloom",
         "water": 45.0,
         "pourSeconds": 10,
-        "waitSeconds": 35
+        "waitSeconds": 35,
+        "notes": "Stir gently"
       },
       {
         "label": "",
         "water": 100.0,
         "pourSeconds": 15,
-        "waitSeconds": 20
+        "waitSeconds": 20,
+        "notes": ""
       },
       {
         "label": "",
         "water": 95.0,
         "pourSeconds": 15,
-        "waitSeconds": 0
+        "waitSeconds": 0,
+        "notes": ""
       }
     ],
     "notes": "Swirl after the bloom.",
-    "archived": false
+    "archived": false,
+    "drinkStyle": "HOT",
+    "iceGrams": null,
+    "waterTempC": 93,
+    "targetFinishSeconds": 210,
+    "grindDescription": "Medium-fine",
+    "sourceUrl": "https://example.com/three-pours"
   },
   "journal": {
     "impression": "Bright but a little thin",

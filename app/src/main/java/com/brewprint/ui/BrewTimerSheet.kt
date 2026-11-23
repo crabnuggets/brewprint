@@ -69,7 +69,8 @@ private fun grams(value: Double) = "${formatAmount(value)} g"
 private fun pulseDetail(view: TimerNow, index: Int): String {
     val scheduled = view.schedule[index]
     val wait = scheduled.pulse.waitSeconds.takeIf { index < view.pulseCount - 1 && it > 0 }
-    return "To ${grams(scheduled.cumulativeWater)} total. Pour ${scheduled.pulse.pourSeconds} s" + (wait?.let { ", wait $it s" } ?: "")
+    return "To ${grams(scheduled.cumulativeWater)} total. Pour ${scheduled.pulse.pourSeconds} s" + (wait?.let { ", wait $it s" } ?: "") +
+        scheduled.pulse.notes.takeIf { it.isNotBlank() }?.let { ". $it" }.orEmpty()
 }
 
 /**
@@ -191,11 +192,19 @@ private fun FocusCard(view: TimerNow, scale: ScaleLive?, data: ScaleData?) {
                     }
                     Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
+                // What to do during this pour or the wait after it, such as a stir.
+                pulse.notes.takeIf { it.isNotBlank() }?.let { StepNote(it, strong = true) }
             } else if (view.phase == TimerPhase.DRAWDOWN) {
-                Text("Scheduled pours ended at ${formatDuration(view.poursEndSeconds)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Text("Scheduled pours ended at ${formatDuration(view.poursEndSeconds)}" + (view.recipe.targetFinishSeconds?.let { ". Target finish ~${formatDuration(it)}" } ?: ""), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 if (data != null) {
                     HorizontalDivider(color = colors.outlineVariant)
                     MeasuredTrio(view.recipe, data)
+                }
+                view.recipe.pulses.lastOrNull()?.notes?.takeIf { it.isNotBlank() }?.let { StepNote(it, strong = true) }
+                if (view.recipe.notes.isNotBlank()) {
+                    var open by rememberSaveable { mutableStateOf(false) }
+                    DisclosureRow("Preparation notes", open) { open = !open }
+                    if (open) Text(view.recipe.notes, style = MaterialTheme.typography.bodyLarge)
                 }
             } else {
                 Text(stoppedText(view) + ".", style = MaterialTheme.typography.bodyLarge)

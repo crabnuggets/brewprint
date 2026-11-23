@@ -79,7 +79,9 @@ class BrewRepository(context: Context) {
 
     fun upsertRecipe(recipe: Recipe): Result<Unit> = change { current ->
         require(recipe.validationErrors().isEmpty()) { recipe.validationErrors().first() }
-        current.copy(recipes = current.recipes.filterNot { it.id == recipe.id } + recipe).resolvingDraft(recipe.id) to Unit
+        // Every saved recipe carries the ratio its pours give, which older versions of the app check.
+        val saved = recipe.normalized()
+        current.copy(recipes = current.recipes.filterNot { it.id == recipe.id } + saved).resolvingDraft(recipe.id) to Unit
     }
 
     /** Discards a library draft without adding it. */
@@ -98,18 +100,19 @@ class BrewRepository(context: Context) {
     /** Removes beans from the Library. Brew records keep their own copy; a brew draft using them must choose other beans. */
     fun deleteBeans(id: String): Result<Unit> = change { current ->
         require(current.beans.any { it.id == id }) { "Beans not found." }
-        current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id }) to Unit
+        current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id }, sync = current.sync.copy(raw = current.sync.raw - "beans/$id")) to Unit
     }
 
     /**
      * Undoes [deleteBeans]: the beans return, and are remembered for the next brew again if they were and nothing has been since.
      * Nothing changes once the phone has left [account], whose beans these are.
      */
-    fun restoreBeans(beans: Beans, remembered: Boolean, account: String?): Result<Unit> = change { current ->
+    fun restoreBeans(beans: Beans, remembered: Boolean, account: String?, raw: kotlinx.serialization.json.JsonObject? = null): Result<Unit> = change { current ->
         if (current.sync.userId != account) return@change current to Unit
         current.copy(
             beans = current.beans.filterNot { it.id == beans.id } + beans,
             lastBeansId = if (remembered && current.lastBeansId == null) beans.id else current.lastBeansId,
+            sync = if (raw != null) current.sync.copy(raw = current.sync.raw + ("beans/${beans.id}" to raw)) else current.sync,
         ) to Unit
     }
 
@@ -237,7 +240,7 @@ class BrewRepository(context: Context) {
         val grinder = requireNotNull(draft.grinder) { "Choose a grinder." }
         val setting = requireNotNull(draft.setting) { "Enter a grind setting." }
         require(setting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
-        val recipe = requireNotNull(draft.recipe) { "Choose a recipe." }
+        val recipe = requireNotNull(draft.recipe) { "Choose a recipe." }.normalized()
         require(recipe.validationErrors().isEmpty()) { "Check the recipe plan." }
         require(current.grinders.any { it.id == grinder.id && !it.archived }) { "Choose an active grinder." }
         val library = requireNotNull(current.beans.firstOrNull { it.id == beans.id }) { "These beans were deleted. Choose other beans." }
@@ -268,7 +271,8 @@ class BrewRepository(context: Context) {
         require(brew.beans.name.isNotBlank() && brew.beans.roaster.isNotBlank()) { "Enter beans and roaster." }
         require(brew.grinder.name.isNotBlank()) { "Enter a grinder name." }
         require(brew.recipe.validationErrors().isEmpty()) { "Check the recipe plan." }
-        current.copy(brews = current.brews.map { if (it.id == brew.id) brew else it }.sortedByDescending { it.startedAt }) to Unit
+        val saved = brew.copy(recipe = brew.recipe.normalized())
+        current.copy(brews = current.brews.map { if (it.id == brew.id) saved else it }.sortedByDescending { it.startedAt }) to Unit
     }
 
     fun deleteBrew(id: String): Result<Unit> = change { current ->

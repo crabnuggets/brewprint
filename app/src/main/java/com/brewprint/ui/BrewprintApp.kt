@@ -603,7 +603,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 if (scaleOn || scaleLost) {
                     val data = draft.scale ?: ScaleData()
                     ScalePrep(
-                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, if (scaleLost) scale.live.copy(silent = true) else scale.live, draft.recipe.dose, draft.recipe.ratio, data.weighedDose, reconnected,
+                        if (draft.scale == null) ScaleStep.BREWER else draft.scaleStep, if (scaleLost) scale.live.copy(silent = true) else scale.live, draft.recipe.dose, draft.recipe.computedRatio, data.weighedDose, reconnected, ice = draft.recipe.iceGrams,
                         onTare = { scale.tare(); if (draft.scale == null || draft.scaleStep == ScaleStep.BREWER) change(draft.copy(scale = data, scaleStep = ScaleStep.COFFEE)) },
                         // The weighed dose sets this brew's plan; the recipe in the Library keeps its own.
                         onUse = { dose -> change(draft.copy(recipe = draft.recipe.scaledTo(dose), scale = data.copy(weighedDose = dose), scaleStep = ScaleStep.ARMED)); scale.tare() },
@@ -629,6 +629,7 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
                 if (timer != null || data != null) Panel {
                     if (timer != null) {
                         TotalBrewTime(timer, { validTotal = it }) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
+                        draft.recipe?.targetFinishSeconds?.let { Text("Target finish ${formatDuration(it)}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
                         if (data != null) LiftOffer(timer, data) { change(draft.copy(timer = timer.copy(totalOverride = it))) }
                         HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     }
@@ -689,6 +690,7 @@ private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> U
             Text(draft.setting?.toString() ?: "Not set", Modifier.weight(1f).clearAndSetSemantics { contentDescription = "Grind setting, " + (draft.setting?.let { "$it ticks" } ?: "not set") }, style = MaterialTheme.typography.headlineLarge)
             SoftButton(onClick = onDial) { Text("Adjust") }
         }
+        draft.recipe?.grindDescription?.takeIf { it.isNotBlank() }?.let { Text("Grind size: $it", style = MaterialTheme.typography.bodyMedium) }
         val recorded = activeGrinder?.lastSetting
         // A repeated brew can carry an older setting; compare the two once and offer the recorded one in a tap.
         if (draft.setting != null && recorded != null && draft.setting != recorded) FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -729,7 +731,12 @@ private fun RecipeNumbers(recipe: Recipe) {
     Panel {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Each metric is one spoken node, with the ratio read as "1 to 16".
-            listOf(Triple("Coffee dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Brew ratio", "1:${formatAmount(recipe.ratio)}", "Brew ratio 1 to ${formatAmount(recipe.ratio)}"), Triple("Total brew water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams")).forEach { (label, value, spoken) -> Column(Modifier.clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleLarge) } }
+            val ratio = ratioCell(recipe)
+            val iced = recipe.drinkStyle == DrinkStyle.ICED
+            listOfNotNull(Triple("Coffee dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Brew ratio", ratio.value + ratio.unit.takeIf { it.isNotEmpty() }?.let { " · $it" }.orEmpty(), ratio.spoken),
+                Triple("Total brew water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams"),
+                if (iced) Triple("Iced", recipe.iceGrams?.let { "${formatAmount(it)} g ice" } ?: "Iced", "Iced" + (recipe.iceGrams?.let { ", ${formatAmount(it)} grams of ice" } ?: "")) else null,
+                recipe.waterTempC?.let { Triple("Water temp", "$it °C", "Water temperature $it degrees Celsius") }).forEach { (label, value, spoken) -> Column(Modifier.clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleLarge) } }
         }
     }
 }
@@ -742,7 +749,7 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             val dose = formatAmount(recipe.dose)
-            val ratio = formatAmount(recipe.ratio)
+            val ratio = formatRatio(recipe.computedRatio)
             val water = formatAmount(recipe.totalWater)
             val spoken = "Coffee dose $dose grams, brew ratio 1 to $ratio, total brew water $water grams. ${grinder.name}, $setting ticks."
             Column(Modifier.align(Alignment.CenterVertically).clearAndSetSemantics { contentDescription = spoken }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -756,9 +763,14 @@ private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Re
 
 /** The planned pours in the same row format as the running timer: start time, then what to pour, then the detail. */
 @Composable
-private fun PlanSchedule(recipe: Recipe) {
+private fun PlanSchedule(recipe: Recipe, facts: Boolean = true) {
     val colors = MaterialTheme.colorScheme
-    if (recipe.notes.isNotBlank()) Panel { Text("Preparation notes", style = MaterialTheme.typography.titleMedium); Text(recipe.notes) }
+    val details = recipeFacts(recipe).takeIf { facts && it.isNotEmpty() }
+    if (details != null || recipe.notes.isNotBlank()) Panel {
+        if (details != null) Text(details.joinToString(" · "), style = MaterialTheme.typography.bodyLarge)
+        if (details != null && recipe.notes.isNotBlank()) HorizontalDivider(color = colors.outlineVariant)
+        if (recipe.notes.isNotBlank()) { Text("Preparation notes", style = MaterialTheme.typography.titleMedium); Text(recipe.notes) }
+    }
     SectionTitle("Planned pours")
     // The time and dot sit on the title's first line at any text size.
     val line = with(androidx.compose.ui.platform.LocalDensity.current) { MaterialTheme.typography.titleMedium.lineHeight.toDp() }
@@ -770,8 +782,9 @@ private fun PlanSchedule(recipe: Recipe) {
             val wait = scheduled.pulse.waitSeconds.takeIf { index < recipe.pulses.lastIndex }
             // The first pulse's total is its own amount, so it is not repeated.
             val detail = listOfNotNull("To $total g total".takeIf { index > 0 }, "Pour ${scheduled.pulse.pourSeconds} s" + (wait?.let { ", wait $it s" } ?: "")).joinToString(". ")
+            val note = scheduled.pulse.notes.takeIf { it.isNotBlank() }
             val spoken = "$name, ${spokenStart(scheduled.startSeconds)}. Add $added grams" + (if (index > 0) ", pour to $total grams total" else "") +
-                ". Pour for ${scheduled.pulse.pourSeconds} seconds" + (wait?.let { ", then wait $it seconds" } ?: "") + "."
+                ". Pour for ${scheduled.pulse.pourSeconds} seconds" + (wait?.let { ", then wait $it seconds" } ?: "") + "." + (note?.let { " $it." } ?: "")
             Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = spoken }, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Box(Modifier.widthIn(min = 44.dp).height(line), contentAlignment = Alignment.CenterStart) {
                     Text(formatDuration(scheduled.startSeconds), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
@@ -780,6 +793,7 @@ private fun PlanSchedule(recipe: Recipe) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("$name, add $added g", style = MaterialTheme.typography.titleMedium)
                     Text(detail, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    if (note != null) StepNote(note, Modifier.padding(top = 2.dp))
                 }
             }
         }
@@ -820,7 +834,7 @@ private fun DateEntry(text: String, onTextChange: (String) -> Unit, onValidity: 
 private fun stripCells(recipe: Recipe, setting: Int): List<Cell> = listOf(
     Cell("Recipe", recipe.name),
     Cell("Dose", formatAmount(recipe.dose), "g", "Coffee dose ${formatAmount(recipe.dose)} grams"),
-    Cell("Ratio", "1:${formatAmount(recipe.ratio)}", spoken = "Brew ratio 1 to ${formatAmount(recipe.ratio)}"),
+    Cell("Ratio", "1:${formatRatio(recipe.computedRatio)}", spoken = "Brew ratio 1 to ${formatRatio(recipe.computedRatio)}"),
     Cell("Grind", "$setting", "ticks", "Grind setting, $setting ticks"),
 )
 
@@ -830,17 +844,15 @@ private fun stripCells(recipe: Recipe, setting: Int): List<Cell> = listOf(
 private fun recordCells(brew: BrewRecord): List<Cell> {
     val recipe = brew.recipe
     val dose = formatAmount(recipe.dose)
-    val planned = formatAmount(recipe.totalWater)
-    val ratio = formatAmount(recipe.ratio)
     val weighed = brew.scale?.weighedDose != null
     return listOf(
         Cell("Recipe", recipe.name, wide = true),
         Cell("Grinder", brew.grinder.name),
         Cell("Grind setting", "${brew.setting}", "ticks", "Grind setting, ${brew.setting} ticks"),
         Cell("Dose", dose, if (weighed) "g, weighed" else "g", "Coffee dose $dose grams" + if (weighed) ", weighed" else ""),
-        Cell("Water", planned, "g", "Total brew water $planned grams"),
-        Cell("Ratio", "1:$ratio", spoken = "Brew ratio 1 to $ratio"),
-    )
+        waterCell(recipe),
+        ratioCell(recipe),
+    ) + recipeDetailCells(recipe)
 }
 
 @Composable
@@ -857,8 +869,9 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         SecondaryAction("Repeat", icon = Icons.Outlined.Repeat, onClick = onRepeat)
         SectionTitle("Preparation")
         SetupBlock(recordCells(brew))
+        SourceLink(brew.recipe.sourceUrl)
         brew.timing?.let { TimingPanel(brew.recipe, it, brew.scale) }
-        PlanSchedule(brew.recipe)
+        PlanSchedule(brew.recipe, facts = false)
         Panel {
             Text("Beans", style = MaterialTheme.typography.titleMedium)
             Text(brew.beans.roaster)
