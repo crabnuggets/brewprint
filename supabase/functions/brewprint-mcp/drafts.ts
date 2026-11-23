@@ -1,16 +1,7 @@
 // Beans and recipes Claude drafts for the user to add in the app. A draft holds the item exactly as the app saves it
 // (Models.kt), so adding it in the app needs no conversion. fixtures/draft-*.json are drafts as built here; a Kotlin
 // test fails when the app can't read them.
-import {
-  type BeanBatch,
-  type Beans,
-  decimal,
-  type DrinkStyle,
-  type Pulse,
-  ratioOf,
-  type Recipe,
-  totalWater,
-} from "./brews.ts";
+import { type BeanBatch, type Beans, type DrinkStyle, type Pulse, ratioOf, type Recipe, totalWater } from "./brews.ts";
 
 export type DraftKind = "beans" | "recipes";
 
@@ -44,8 +35,6 @@ export interface PulseInput {
 export interface RecipeInput {
   name?: string;
   dose?: number;
-  /** Only checked against the pours, for prompts that still send it; the stored ratio comes from the pours. */
-  ratio?: number;
   pulses?: PulseInput[];
   notes?: string;
   drinkStyle?: DrinkStyle;
@@ -129,7 +118,7 @@ export function buildRecipe(id: string, input: RecipeInput, existing?: Recipe): 
     grindDescription: text(input.grindDescription, existing?.grindDescription),
     sourceUrl: text(input.sourceUrl, existing?.sourceUrl),
   };
-  const errors = [...recipeErrors(recipe), ...(input.ratio === undefined ? [] : ratioErrors(recipe, input.ratio))];
+  const errors = recipeErrors(recipe);
   return errors.length ? { item: null, errors } : { item: recipe, errors: [] };
 }
 
@@ -164,20 +153,6 @@ export function recipeErrors(recipe: Recipe): string[] {
   return errors;
 }
 
-/** A ratio a prompt gave, which the pours must still match: dose × ratio, rounded half up to 0.1 g. */
-function ratioErrors(recipe: Recipe, ratio: number): string[] {
-  const total = totalBrewWater(recipe.dose, ratio);
-  if (!(ratio > 0) || total == null || total <= 0) return ["Enter a positive brew ratio."];
-  const planned = recipe.pulses.every((pulse) => oneDecimal(pulse.water)) ? totalWater(recipe.pulses) : null;
-  if (planned == null || planned === total) return [];
-  const difference = Math.round((total - planned) * 10) / 10;
-  return [
-    difference > 0
-      ? `Add ${difference} g across your pulses to reach ${total} g.`
-      : `Remove ${-difference} g across your pulses to reach ${total} g.`,
-  ];
-}
-
 /** An http or https address with a host, the only kind the app opens. */
 export function webAddress(value: string): boolean {
   try {
@@ -195,16 +170,3 @@ function isoDate(value: string): boolean {
 }
 
 const oneDecimal = (value: number) => Number.isFinite(value) && /^-?\d+(\.\d)?$/.test(String(value));
-
-/** Dose × ratio rounded half up to 0.1 g, in decimal arithmetic, so a given ratio is checked as the app once did. */
-export function totalBrewWater(dose: number, ratio: number): number | null {
-  const a = decimal(dose);
-  const b = decimal(ratio);
-  if (!a || !b || dose <= 0 || ratio <= 0) return null;
-  const product = a[0] * b[0];
-  const scale = a[1] + b[1];
-  if (scale <= 1) return Number(product) / 10 ** scale;
-  const divisor = 10n ** BigInt(scale - 1);
-  const tenths = product / divisor + (2n * (product % divisor) >= divisor ? 1n : 0n);
-  return Number(tenths) / 10;
-}

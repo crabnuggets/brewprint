@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import type { Beans, Recipe } from "./brews.ts";
-import { buildBeans, buildRecipe, recipeErrors, totalBrewWater, webAddress } from "./drafts.ts";
+import { buildBeans, buildRecipe, recipeErrors, webAddress } from "./drafts.ts";
 
 // The app's McpContractTest reads these fixtures as Beans and Recipe, so a draft built here is one the app can add.
 const fixture = async <T>(name: string): Promise<T> =>
@@ -54,7 +54,6 @@ Deno.test("recipe drafts are built exactly as the app saves recipes, with no wai
   const built = buildRecipe("draft-recipe-1", {
     name: "Three pours",
     dose: 15,
-    ratio: 16,
     pulses: [
       { label: "Bloom", water: 45, pourSeconds: 10, waitSeconds: 35, notes: "Stir gently 3 times" },
       { water: 100, pourSeconds: 15, waitSeconds: 20 },
@@ -141,26 +140,8 @@ Deno.test("a recipe draft the app would refuse is refused with the app's reasons
   assertEquals(recipeErrors(recipe({ sourceUrl: "ftp://example.com" })), [
     "Enter a web address starting with http:// or https://.",
   ]);
-  // A ratio a prompt still sends must match the pours.
-  const plan = { name: "Plan", dose: 16, pulses: [{ water: 240, pourSeconds: 10 }] };
-  assertEquals(buildRecipe("x", { ...plan, ratio: 16 }).errors, ["Add 16 g across your pulses to reach 256 g."]);
-  assertEquals(buildRecipe("x", { ...plan, ratio: 0 }).errors, ["Enter a positive brew ratio."]);
-  assertEquals(buildRecipe("x", { ...plan, ratio: 15 }).errors, []);
   assertEquals(
     recipeErrors(recipe({ pulses: [{ label: "", water: 240.05, pourSeconds: 0, waitSeconds: 0, notes: "" }] })),
     ["Pulse 1: water must be positive with up to one decimal place.", "Pulse 1: pour duration must be positive."],
-  );
-});
-
-Deno.test("total brew water rounds half up in decimal, as the app does", () => {
-  // From the app's RecipeTest: binary multiplication would round these the other way.
-  assertEquals(totalBrewWater(15.1, 16.5), 249.2);
-  assertEquals(totalBrewWater(15.1, 15.5), 234.1);
-  assertEquals(totalBrewWater(15, 16.667), 250);
-  assertEquals(totalBrewWater(15, 16), 240);
-  assertEquals(
-    buildRecipe("x", { name: "15 to 250", dose: 15, ratio: 16.667, pulses: [{ water: 250, pourSeconds: 50 }] })
-      .errors,
-    [],
   );
 });
