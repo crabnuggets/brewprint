@@ -36,6 +36,7 @@ Deno.test("a summary keeps only the tasting notes the user filled in", () => {
   assertEquals(summary.ratio, "1:16");
   assertEquals(summary.totalBrewWaterGrams, 240);
   assertEquals([summary.style, summary.iceGrams], ["hot", null]);
+  assertEquals(summary.roastDate, "2025-11-10");
   assertEquals(summary.measuredWaterGrams, 238.6);
   assertEquals(summary.tasting, {
     impression: "Bright but a little thin",

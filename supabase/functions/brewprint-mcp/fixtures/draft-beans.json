@@ -7,5 +7,13 @@
   "processing": "Washed",
   "expectedNotes": "Blackcurrant, hibiscus",
   "notes": "https://timwendelboe.no/product/kii",
-  "archived": false
+  "archived": false,
+  "batches": [
+    {
+      "id": "draft-batch-1",
+      "roastDate": "2026-11-10",
+      "notes": "",
+      "addedAt": 1795400000000
+    }
+  ]
 }

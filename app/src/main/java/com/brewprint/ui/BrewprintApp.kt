@@ -277,7 +277,10 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                     }
                     SoftTextButton(onClick = { onRecord(recent.id) }) { Text("View brew"); Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp)) }
                 }
-                Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(recent.beans.name, style = MaterialTheme.typography.titleLarge)
+                    roastLine(recent.roastDate)?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium) }
+                }
                 SetupStrip(stripCells(recent.recipe, recent.setting), weights = listOf(1.35f, .9f, .8f, 1f))
                 val journal = recent.journal
                 if (journal.impression.isNotBlank()) Text(journal.impression, maxLines = 3, overflow = TextOverflow.Ellipsis, style = LocalLook.current.hand(MaterialTheme.typography.bodyLarge))
@@ -655,7 +658,7 @@ private fun selectItem(draft: BrewDraft, state: AppState, kind: String, id: Stri
         // so the steps start again and the plan goes back to the recipe's own dose.
         val restart = beans.id != draft.beans?.id && draft.timer == null && draft.scale != null
         val recipe = if (restart && draft.scale?.weighedDose != null) state.recipes.firstOrNull { it.id == draft.recipe?.id } ?: draft.recipe else draft.recipe
-        draft.copy(beans = beans, allowArchivedBeans = false, recipe = recipe).let { if (restart) it.copy(scale = null, scaleStep = ScaleStep.BREWER) else it }
+        draft.withBeans(beans, state.lastBatchId).copy(allowArchivedBeans = false, recipe = recipe).let { if (restart) it.copy(scale = null, scaleStep = ScaleStep.BREWER) else it }
     }
     "grinders" -> state.grinders.first { it.id == id }.let { draft.copy(grinder = it, setting = it.lastSetting) }
     // The timer and any weighed dose follow one recipe; choosing another clears them and starts the scale steps again.
@@ -671,7 +674,8 @@ internal fun ready(draft: BrewDraft, state: AppState): Boolean = draft.beans != 
 
 @Composable
 private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> Unit, onDial: () -> Unit, onDiscard: () -> Unit, onChange: (BrewDraft) -> Unit) {
-    SelectionCard("Beans", draft.beans?.name ?: if (state.beans.none { !it.archived }) "Add beans" else "Choose beans", draft.beans?.roaster, { onPick("beans") })
+    SelectionCard("Beans", draft.beans?.name ?: if (state.beans.none { !it.archived }) "Add beans" else "Choose beans", listOfNotNull(draft.beans?.roaster, roastLine(draft.roastDate)).joinToString(" · "), { onPick("beans") })
+    BatchChoice(draft, state, onChange)
     if (beansDeleted(draft, state)) DeletedBeansPanel(state, { onPick("beans") }, onDiscard)
     val archivedBeans = draft.beans != null && state.beans.any { it.id == draft.beans.id && it.archived }
     if (archivedBeans && !draft.allowArchivedBeans) Panel {
@@ -699,6 +703,27 @@ private fun SetupFields(draft: BrewDraft, state: AppState, onPick: (String) -> U
         } else Text("Last recorded setting: ${recorded?.let { "$it ticks" } ?: "Not recorded"}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
     draft.recipe?.let { recipe -> RecipeNumbers(recipe) }
+}
+
+/**
+ * With two or more bags of the chosen beans, "Change batch". After a repeat moved to the newest bag, says so.
+ * Changing bag before the timer starts begins the scale steps again, as other beans would.
+ */
+@Composable
+private fun BatchChoice(draft: BrewDraft, state: AppState, onChange: (BrewDraft) -> Unit) {
+    val live = state.beans.find { it.id == draft.beans?.id } ?: return
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    draft.repeatedFromRoastDate?.let { original ->
+        Text("Using newest batch" + (draft.roastDate?.let { " (${roastedLabel(it)})" } ?: "") + (original.takeIf { it.isNotEmpty() }?.let { " · Original brew used ${roastedLabel(it).removePrefix("Roasted ")} batch" } ?: ""),
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    }
+    if (live.batches.size >= 2) SoftTextButton(onClick = { choosing = true }) { Text("Change batch") }
+    if (choosing) BatchPickerDialog(live, draft.batchId, { id ->
+        choosing = false
+        if (id != draft.batchId) onChange(draft.withBeans(live, batchId = id).copy(beans = draft.beans, allowArchivedBeans = draft.allowArchivedBeans).let {
+            if (it.timer == null && it.scale != null) it.copy(scale = null, scaleStep = ScaleStep.BREWER) else it
+        })
+    }) { choosing = false }
 }
 
 /** Choose other beans, or add some when none are left, or discard the brew. */
@@ -861,7 +886,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
     Page("Brew record", onClose) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(brew.beans.name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
-            Text(dateTime(brew.startedAt), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Text(listOfNotNull(dateTime(brew.startedAt), offRoast(brew.roastDate, brew.startedAt)).joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
         // The tasting journal comes first, "Next time" included, in every theme.
         if (!brew.journal.isEmpty) Taped { Panel { JournalSummary(brew.journal) } }
@@ -875,7 +900,7 @@ private fun RecordDetail(brew: BrewRecord, hasNoteEdit: Boolean, onClose: () -> 
         Panel {
             Text("Beans", style = MaterialTheme.typography.titleMedium)
             Text(brew.beans.roaster)
-            listOf("Origin" to brew.beans.origin, "Variety / cultivar" to brew.beans.variety, "Processing method" to brew.beans.processing, "Expected tasting notes" to brew.beans.expectedNotes, "Bean notes" to brew.beans.notes, "Grinder reference" to brew.grinder.referenceNotes).filter { it.second.isNotBlank() }.forEach { (label, value) ->
+            listOf("Roast date" to brew.roastDate?.let { roastedLabel(it).removePrefix("Roasted ") }.orEmpty(), "Origin" to brew.beans.origin, "Variety / cultivar" to brew.beans.variety, "Processing method" to brew.beans.processing, "Expected tasting notes" to brew.beans.expectedNotes, "Bean notes" to brew.beans.notes, "Grinder reference" to brew.grinder.referenceNotes).filter { it.second.isNotBlank() }.forEach { (label, value) ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Text(value, style = MaterialTheme.typography.bodyLarge)
@@ -911,14 +936,14 @@ private fun NotesScreen(brew: BrewRecord, pending: Journal?, repository: BrewRep
 
 @Composable
 private fun EditRecord(brew: BrewRecord, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit) {
-    var encoded by rememberSaveable(brew.id) { mutableStateOf(Json.encodeToString(BrewDraft(id = brew.id, startedAt = brew.startedAt, beans = brew.beans, grinder = brew.grinder, setting = brew.setting, recipe = brew.recipe, journal = brew.journal, allowArchivedBeans = true))) }
+    var encoded by rememberSaveable(brew.id) { mutableStateOf(Json.encodeToString(BrewDraft(id = brew.id, startedAt = brew.startedAt, beans = brew.beans, grinder = brew.grinder, setting = brew.setting, recipe = brew.recipe, journal = brew.journal, allowArchivedBeans = true, batchId = brew.batchId, roastDate = brew.roastDate))) }
     val draft = remember(encoded) { Json.decodeFromString<BrewDraft>(encoded) }
     var picker by rememberSaveable { mutableStateOf<String?>(null) }
     var discard by remember { mutableStateOf(false) }
     var settingText by rememberSaveable { mutableStateOf(brew.setting.toString()) }
     var validDate by rememberSaveable { mutableStateOf(true) }
     var dateText by rememberSaveable(brew.id) { mutableStateOf(dateInput(brew.startedAt)) }
-    val original = BrewDraft(id = brew.id, startedAt = brew.startedAt, beans = brew.beans, grinder = brew.grinder, setting = brew.setting, recipe = brew.recipe, journal = brew.journal, allowArchivedBeans = true)
+    val original = BrewDraft(id = brew.id, startedAt = brew.startedAt, beans = brew.beans, grinder = brew.grinder, setting = brew.setting, recipe = brew.recipe, journal = brew.journal, allowArchivedBeans = true, batchId = brew.batchId, roastDate = brew.roastDate)
     fun back() { if (draft != original || settingText != brew.setting.toString() || dateText != dateInput(brew.startedAt)) discard = true else onClose() }
     BackHandler(enabled = LocalScreenActive.current && picker == null) { back() }
     if (picker != null) LibraryScreen(state, repository, onError, requestedKind = picker, onPicked = { kind, id ->
@@ -928,13 +953,14 @@ private fun EditRecord(brew: BrewRecord, state: AppState, repository: BrewReposi
         picker = null
     }, onClose = { picker = null }) else Page("Edit brew", ::back) {
         Text("Corrections apply to this record.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        SelectionCard("Beans", draft.beans!!.name, draft.beans.roaster) { picker = "beans" }
+        SelectionCard("Beans", draft.beans!!.name, listOfNotNull(draft.beans.roaster, draft.roastDate?.let { roastedLabel(it) }).joinToString(" · ")) { picker = "beans" }
+        BatchChoice(draft, state) { encoded = Json.encodeToString(it) }
         SelectionCard("Recipe", draft.recipe!!.name, null) { picker = "recipes" }
         SelectionCard("Grinder", draft.grinder!!.name, null) { picker = "grinders" }
         LibraryField(settingText, { settingText = it; encoded = Json.encodeToString(draft.copy(setting = parseGrindSetting(it))) }, "Grind setting, ticks", KeyboardType.Number, error = if (parseGrindSetting(settingText) == null) "Enter whole ticks from $MIN_GRIND_SETTING to $MAX_GRIND_SETTING." else null, helper = "$MIN_GRIND_SETTING-$MAX_GRIND_SETTING ticks", required = true)
         DateEntry(dateText, { dateText = it }, { validDate = it }) { encoded = Json.encodeToString(draft.copy(startedAt = it)) }
         PrimaryAction("Save brew", enabled = parseGrindSetting(settingText) != null && validDate, icon = Icons.Outlined.Check) {
-            repository.updateBrew(brew.copy(startedAt = draft.startedAt, beans = draft.beans, grinder = draft.grinder, setting = draft.setting!!, recipe = draft.recipe)).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't save brew. Try again.") }
+            repository.updateBrew(brew.copy(startedAt = draft.startedAt, beans = draft.beans, grinder = draft.grinder, setting = draft.setting!!, recipe = draft.recipe, batchId = draft.batchId, roastDate = draft.roastDate)).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't save brew. Try again.") }
         }
     }
     if (discard) DiscardDialog({ discard = false }, onClose)

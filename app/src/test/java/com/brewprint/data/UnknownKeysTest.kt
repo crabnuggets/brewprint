@@ -18,10 +18,11 @@ import org.robolectric.RuntimeEnvironment
 class UnknownKeysTest {
     private val context get() = RuntimeEnvironment.getApplication()
     private val beans = Beans(name = "Kii", roaster = "Tim Wendelboe")
-    private val batches = JsonArray(listOf(JsonObject(mapOf("id" to JsonPrimitive("batch-1"), "roastDate" to JsonPrimitive("2026-11-10")))))
+    // A field this version doesn't have, standing in for whatever a later version adds.
+    private val batches = JsonArray(listOf(JsonObject(mapOf("score" to JsonPrimitive(4), "by" to JsonPrimitive("Alvin")))))
 
     /** The beans as a newer version uploads them: this version's fields, a new top-level field, and one in a nested object. */
-    private fun newer(name: String = beans.name) = JsonObject(syncJson.encodeToJsonElement(Beans.serializer(), beans.copy(name = name)).jsonObject + ("batches" to batches))
+    private fun newer(name: String = beans.name) = JsonObject(syncJson.encodeToJsonElement(Beans.serializer(), beans.copy(name = name)).jsonObject + ("ratings" to batches))
 
     @Before fun clean() { File(context.filesDir, "brewprint.json").delete() }
 
@@ -32,7 +33,7 @@ class UnknownKeysTest {
         repository.upsertBeans(beans.copy(name = "Kii AA")).getOrThrow()
         val upload = repository.state.value.syncData("beans/${beans.id}")!!.jsonObject
         assertEquals(JsonPrimitive("Kii AA"), upload["name"])
-        assertEquals(batches, upload["batches"])
+        assertEquals(batches, upload["ratings"])
         // Uploading it settles the change, as before.
         repository.markPushed(mapOf("beans/${beans.id}" to upload)).getOrThrow()
         assertEquals(emptySet<String>(), repository.state.value.sync.pending)
@@ -55,13 +56,13 @@ class UnknownKeysTest {
         repository.deleteBeans(beans.id).getOrThrow()
         assertNull(repository.state.value.sync.raw["beans/${beans.id}"])
         repository.restoreBeans(beans, remembered = false, account = null, raw = raw).getOrThrow()
-        assertEquals(batches, repository.state.value.syncData("beans/${beans.id}")!!.jsonObject["batches"])
+        assertEquals(batches, repository.state.value.syncData("beans/${beans.id}")!!.jsonObject["ratings"])
     }
 
     @Test fun `a draft's new fields reach the item it becomes once added`() {
         val repository = BrewRepository(context)
         repository.applyDrafts(listOfNotNull(libraryDraft("beans", beans.id, newer()))).getOrThrow()
         repository.upsertBeans(beans).getOrThrow()
-        assertEquals(batches, repository.state.value.syncData("beans/${beans.id}")!!.jsonObject["batches"])
+        assertEquals(batches, repository.state.value.syncData("beans/${beans.id}")!!.jsonObject["ratings"])
     }
 }

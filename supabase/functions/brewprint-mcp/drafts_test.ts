@@ -7,15 +7,21 @@ const fixture = async <T>(name: string): Promise<T> =>
   JSON.parse(await Deno.readTextFile(new URL(`./fixtures/${name}`, import.meta.url)));
 
 Deno.test("beans drafts are built exactly as the app saves beans", async () => {
-  const built = buildBeans("draft-beans-1", {
-    name: " Kii ",
-    roaster: "Tim Wendelboe",
-    origin: "Kenya",
-    variety: "SL28, SL34",
-    processing: "Washed",
-    expectedNotes: "Blackcurrant, hibiscus",
-    notes: "https://timwendelboe.no/product/kii",
-  });
+  const built = buildBeans(
+    "draft-beans-1",
+    {
+      name: " Kii ",
+      roaster: "Tim Wendelboe",
+      origin: "Kenya",
+      variety: "SL28, SL34",
+      processing: "Washed",
+      expectedNotes: "Blackcurrant, hibiscus",
+      notes: "https://timwendelboe.no/product/kii",
+      roastDate: "2026-11-10",
+    },
+    undefined,
+    { batchId: "draft-batch-1", now: 1795400000000 },
+  );
   assertEquals(built.item, await fixture<Beans>("draft-beans.json"));
 });
 
@@ -28,6 +34,18 @@ Deno.test("correcting a beans draft keeps the fields not given", async () => {
   const existing = await fixture<Beans>("draft-beans.json");
   const built = buildBeans(existing.id, { processing: "Natural" }, existing);
   assertEquals(built.item, { ...existing, processing: "Natural" });
+});
+
+Deno.test("a roast date redates the draft's one batch, and an empty one clears its batches", async () => {
+  const existing = await fixture<Beans>("draft-beans.json");
+  assertEquals(buildBeans(existing.id, { roastDate: "2026-11-12" }, existing).item?.batches, [
+    { ...existing.batches![0], roastDate: "2026-11-12" },
+  ]);
+  assertEquals(buildBeans(existing.id, { roastDate: "" }, existing).item?.batches, []);
+  assertEquals(buildBeans("x", { name: "Kii", roaster: "Tim Wendelboe" }).item?.batches, []);
+  assertEquals(buildBeans("x", { name: "Kii", roaster: "Tim Wendelboe", roastDate: "2026-02-30" }).errors, [
+    "Give the roast date as YYYY-MM-DD.",
+  ]);
 });
 
 Deno.test("recipe drafts are built exactly as the app saves recipes, with no wait after the last pour", async () => {

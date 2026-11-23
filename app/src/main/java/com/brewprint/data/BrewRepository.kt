@@ -69,6 +69,54 @@ class BrewRepository(context: Context) {
         current.copy(beans = current.beans.filterNot { it.id == beans.id } + beans).resolvingDraft(beans.id) to Unit
     }
 
+    /**
+     * Saves beans from the beans form. Their batches are the live ones, so a batch synced from another phone while the
+     * form was open is kept. With at most one batch, [roastDate] sets that batch's date, adding the batch if needed.
+     */
+    fun saveBeans(beans: Beans, roastDate: String?): Result<Unit> = change { current ->
+        require(beans.name.isNotBlank()) { "Enter a name." }
+        require(beans.roaster.isNotBlank()) { "Enter a roaster." }
+        require(roastDateValid(roastDate)) { "Choose a roast date that isn't in the future." }
+        val live = current.beans.find { it.id == beans.id }
+        val batches = live?.batches ?: beans.batches
+        val saved = beans.copy(archived = live?.archived ?: beans.archived, batches = when {
+            batches.size > 1 -> batches
+            batches.size == 1 -> listOf(batches.single().copy(roastDate = roastDate))
+            roastDate != null -> listOf(BeanBatch.create(beans.copy(batches = emptyList()), roastDate))
+            else -> emptyList()
+        })
+        current.copy(beans = current.beans.filterNot { it.id == beans.id } + saved).resolvingDraft(beans.id) to Unit
+    }
+
+    /**
+     * Another bag of the same beans. Beans without batches gain their first bag as "Original bag", so it stays
+     * apart from the new one. Archived beans come back, since they're being bought again.
+     */
+    fun addBeanBatch(beansId: String, roastDate: String?): Result<BeanBatch> = change { current ->
+        require(roastDateValid(roastDate)) { "Choose a roast date that isn't in the future." }
+        val beans = requireNotNull(current.beans.find { it.id == beansId }) { "Beans not found." }
+        val existing = beans.batches.ifEmpty { listOf(BeanBatch(notes = "Original bag", addedAt = 0L)) }
+        val batch = BeanBatch.create(beans.copy(batches = existing), roastDate)
+        current.copy(beans = current.beans.map { if (it.id == beansId) it.copy(batches = existing + batch, archived = false) else it }) to batch
+    }
+
+    /**
+     * Removes one batch of beans that have others. Brew records keep theirs. A brew being set up moves to the newest
+     * batch left; one already brewing keeps the roast date it had.
+     */
+    fun deleteBeanBatch(beansId: String, batchId: String): Result<Unit> = change { current ->
+        val beans = requireNotNull(current.beans.find { it.id == beansId }) { "Beans not found." }
+        require(beans.batches.size > 1 && beans.batches.any { it.id == batchId }) { "Beans keep at least one batch." }
+        val remaining = beans.copy(batches = beans.batches.filterNot { it.id == batchId })
+        val draft = current.draft?.takeIf { it.beans?.id == beansId && it.batchId == batchId && it.stage == DraftStage.SETUP }
+            ?.let { it.withBeans(remaining).copy(beans = it.beans) } ?: current.draft
+        current.copy(
+            beans = current.beans.map { if (it.id == beansId) remaining else it },
+            draft = draft,
+            lastBatchId = current.lastBatchId?.takeIf { it != batchId },
+        ) to Unit
+    }
+
     fun upsertGrinder(grinder: Grinder): Result<Unit> = change { current ->
         require(grinder.name.isNotBlank()) { "Enter a name." }
         require(grinder.lastSetting == null || grinder.lastSetting in MIN_GRIND_SETTING..MAX_GRIND_SETTING) { "Enter whole ticks from 0 to 100." }
@@ -100,18 +148,22 @@ class BrewRepository(context: Context) {
     /** Removes beans from the Library. Brew records keep their own copy; a brew draft using them must choose other beans. */
     fun deleteBeans(id: String): Result<Unit> = change { current ->
         require(current.beans.any { it.id == id }) { "Beans not found." }
-        current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id }, sync = current.sync.copy(raw = current.sync.raw - "beans/$id")) to Unit
+        val batches = current.beans.find { it.id == id }?.batches.orEmpty().map { it.id }
+        current.copy(beans = current.beans.filterNot { it.id == id }, lastBeansId = current.lastBeansId?.takeIf { it != id },
+            lastBatchId = current.lastBatchId?.takeIf { it !in batches }, sync = current.sync.copy(raw = current.sync.raw - "beans/$id")) to Unit
     }
 
     /**
      * Undoes [deleteBeans]: the beans return, and are remembered for the next brew again if they were and nothing has been since.
      * Nothing changes once the phone has left [account], whose beans these are.
      */
-    fun restoreBeans(beans: Beans, remembered: Boolean, account: String?, raw: kotlinx.serialization.json.JsonObject? = null): Result<Unit> = change { current ->
+    fun restoreBeans(beans: Beans, remembered: Boolean, account: String?, raw: kotlinx.serialization.json.JsonObject? = null, rememberedBatchId: String? = null): Result<Unit> = change { current ->
         if (current.sync.userId != account) return@change current to Unit
+        val again = remembered && current.lastBeansId == null
         current.copy(
             beans = current.beans.filterNot { it.id == beans.id } + beans,
-            lastBeansId = if (remembered && current.lastBeansId == null) beans.id else current.lastBeansId,
+            lastBeansId = if (again) beans.id else current.lastBeansId,
+            lastBatchId = if (again) rememberedBatchId else current.lastBatchId,
             sync = if (raw != null) current.sync.copy(raw = current.sync.raw + ("beans/${beans.id}" to raw)) else current.sync,
         ) to Unit
     }
@@ -187,26 +239,27 @@ class BrewRepository(context: Context) {
     }
 
     /** A new brew with [beans] and [recipe], or the remembered ones, and the default grinder at its recorded setting. */
-    private fun freshDraft(current: AppState, beans: Beans? = null, recipe: Recipe? = null): BrewDraft {
+    private fun freshDraft(current: AppState, beans: Beans? = null, recipe: Recipe? = null, batchId: String? = null): BrewDraft {
         val grinder = current.grinders.firstOrNull { it.id == current.defaultGrinderId && !it.archived }
             ?: current.grinders.singleOrNull { !it.archived }
-        return BrewDraft(
-            beans = beans ?: current.beans.firstOrNull { it.id == current.lastBeansId && !it.archived },
+        val draft = BrewDraft(
             recipe = recipe ?: current.recipes.firstOrNull { it.id == current.lastRecipeId && !it.archived },
             grinder = grinder,
             setting = grinder?.lastSetting?.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING },
         )
+        val chosen = beans ?: current.beans.firstOrNull { it.id == current.lastBeansId && !it.archived }
+        return chosen?.let { draft.withBeans(it, current.lastBatchId, batchId) } ?: draft
     }
 
     /**
      * Starts a brew from a Library item: these [beansId] or this [recipeId], with the remembered choices for the rest.
      * Only one brew is in progress at a time, and archived items are not offered for a new brew.
      */
-    fun startDraftWith(beansId: String? = null, recipeId: String? = null): Result<BrewDraft> = change { current ->
+    fun startDraftWith(beansId: String? = null, recipeId: String? = null, batchId: String? = null): Result<BrewDraft> = change { current ->
         check(current.draft == null) { "A brew is already in progress. Resume or discard it first." }
         val beans = beansId?.let { id -> requireNotNull(current.beans.find { it.id == id && !it.archived }) { "These beans aren't available for a new brew." } }
         val recipe = recipeId?.let { id -> requireNotNull(current.recipes.find { it.id == id && !it.archived }) { "This recipe isn't available for a new brew." } }
-        val draft = freshDraft(current, beans, recipe)
+        val draft = freshDraft(current, beans, recipe, batchId)
         current.copy(draft = draft) to draft
     }
 
@@ -220,7 +273,14 @@ class BrewRepository(context: Context) {
             grinder = grinder,
             setting = if (grinder == null) null else original.setting.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING },
             recipe = original.recipe,
-        )
+            batchId = original.batchId,
+            roastDate = original.roastDate,
+        ).let { draft ->
+            // Beans bought again since: the repeat uses the newest bag, and says which bag the original used.
+            val live = current.beans.find { it.id == original.beans.id && !it.archived }
+            val newest = live?.newestBatch
+            if (newest != null && newest.id != original.batchId) draft.copy(batchId = newest.id, roastDate = newest.roastDate, repeatedFromRoastDate = original.roastDate.orEmpty()) else draft
+        }
         current.copy(draft = draft) to draft
     }
 
@@ -248,19 +308,22 @@ class BrewRepository(context: Context) {
         val record = BrewRecord(
             id = draft.id,
             startedAt = draft.startedAt,
-            beans = beans,
+            beans = beans.copy(batches = emptyList()),
             grinder = grinder,
             setting = setting,
             recipe = recipe,
             journal = draft.journal,
             timing = draft.timer?.timing(recipe),
             scale = draft.scale?.takeIf { draft.timer != null },
+            batchId = draft.batchId,
+            roastDate = draft.roastDate,
         )
         current.copy(
             brews = (current.brews + record).sortedByDescending { it.startedAt },
             grinders = current.grinders.map { if (it.id == grinder.id) it.copy(lastSetting = setting) else it },
             draft = null,
             lastBeansId = beans.id,
+            lastBatchId = draft.batchId,
             lastRecipeId = recipe.id,
         ) to record
     }

@@ -10,7 +10,8 @@
     "processing": "Washed",
     "expectedNotes": "Blackcurrant, hibiscus",
     "notes": "",
-    "archived": false
+    "archived": false,
+    "batches": []
   },
   "grinder": {
     "id": "grinder-1",
@@ -271,5 +272,7 @@
       240.0
     ],
     "liftSeconds": 170
-  }
+  },
+  "batchId": "batch-1",
+  "roastDate": "2025-11-10"
 }
