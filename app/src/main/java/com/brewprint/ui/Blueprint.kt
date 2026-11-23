@@ -4,7 +4,9 @@ package com.brewprint.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -127,20 +129,28 @@ internal fun DoubleRule(modifier: Modifier = Modifier) {
     }
 }
 
-/** A light rule between cells. */
+/** A light rule between cells: drafting lines in the blueprint, hairlines otherwise. */
 @Composable
 internal fun CellRule(modifier: Modifier = Modifier, vertical: Boolean = false) {
-    val rule = LocalLook.current.rule
+    val look = LocalLook.current
+    val rule = if (look.blueprint) look.rule else MaterialTheme.colorScheme.outlineVariant
     Box(modifier.then(if (vertical) Modifier.fillMaxHeight().width(1.dp) else Modifier.fillMaxWidth().height(1.dp)).background(rule))
 }
 
-/** One labelled value in a title block. [spoken] replaces the label and value for screen readers. */
-internal class Cell(val label: String, val value: String, val unit: String = "", val spoken: String = "$label, $value $unit")
+/** The rule above a strip or table that runs across a card: a double rule in the blueprint, a hairline otherwise. */
+@Composable
+internal fun HeadRule() = if (LocalLook.current.blueprint) DoubleRule() else CellRule()
+
+/**
+ * One labelled value in a title block. [spoken] replaces the label and value for screen readers.
+ * A [wide] cell takes a row of its own, for a value that runs long.
+ */
+internal class Cell(val label: String, val value: String, val unit: String = "", val spoken: String = "$label, $value $unit", val wide: Boolean = false)
 
 @Composable
-private fun CellContent(cell: Cell, modifier: Modifier) {
+private fun CellContent(cell: Cell, modifier: Modifier, start: Dp) {
     val colors = MaterialTheme.colorScheme
-    Column(modifier.clearAndSetSemantics { contentDescription = cell.spoken.trim() }.padding(start = 14.dp, end = 10.dp, top = 9.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(modifier.clearAndSetSemantics { contentDescription = cell.spoken.trim() }.padding(start = start, end = 10.dp, top = 9.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(cell.label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         // A unit that does not fit wraps under its value rather than squeezing it.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -150,23 +160,35 @@ private fun CellContent(cell: Cell, modifier: Modifier) {
     }
 }
 
-/** Cells in ruled rows of [columns], each value under its own label. [weights] widen the columns whose values run long. */
+/**
+ * Cells in ruled rows of [columns], each value under its own label. [weights] widen the columns whose values run long.
+ * [inset] is the first column's start padding: wider for a grid that runs to a card's edges, so it lines up with the card's text.
+ */
 @Composable
-internal fun CellGrid(cells: List<Cell>, columns: Int, modifier: Modifier = Modifier, weights: List<Float> = emptyList()) {
+internal fun CellGrid(cells: List<Cell>, columns: Int, modifier: Modifier = Modifier, weights: List<Float> = emptyList(), inset: Dp = 14.dp) {
     // A narrow screen or large text halves the columns, then stacks the cells, so values are not squeezed.
     val scale = androidx.compose.ui.platform.LocalDensity.current.fontScale
     BoxWithConstraints(modifier.fillMaxWidth()) {
     val room = maxWidth / scale
     val across = if (room >= 330.dp) columns else if (room >= 200.dp) maxOf(1, columns / 2) else 1
+    // A wide cell ends the row before it and takes its own.
+    val rows = buildList {
+        var current = mutableListOf<Cell>()
+        cells.forEach { cell ->
+            if (cell.wide) { if (current.isNotEmpty()) add(current); add(listOf(cell)); current = mutableListOf() }
+            else { current += cell; if (current.size == across) { add(current); current = mutableListOf() } }
+        }
+        if (current.isNotEmpty()) add(current)
+    }
     Column(Modifier.fillMaxWidth()) {
-        cells.chunked(across).forEachIndexed { row, items ->
+        rows.forEachIndexed { row, items ->
             if (row > 0) CellRule()
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 items.forEachIndexed { index, cell ->
                     if (index > 0) CellRule(vertical = true)
-                    CellContent(cell, Modifier.weight(weights.takeIf { across == columns }?.getOrNull(index) ?: 1f))
+                    CellContent(cell, Modifier.weight(weights.takeIf { across == columns }?.getOrNull(index) ?: 1f), if (index == 0) inset else 14.dp)
                 }
-                repeat(across - items.size) { CellRule(vertical = true); Spacer(Modifier.weight(1f)) }
+                if (items.singleOrNull()?.wide != true) repeat(across - items.size) { CellRule(vertical = true); Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -174,25 +196,56 @@ internal fun CellGrid(cells: List<Cell>, columns: Int, modifier: Modifier = Modi
 }
 
 /**
- * A drawing's title block: setup and results in ruled cells, and an optional revision row beneath a double
- * rule for what changes next time.
+ * Setup values in labelled cells, the same in every theme: a soft card with hairlines in Monochrome, a title block
+ * with drafting lines in the blueprint.
  */
 @Composable
-internal fun TitleBlock(cells: List<Cell>, modifier: Modifier = Modifier, revision: (@Composable RowScope.() -> Unit)? = null) {
-    Column(modifier.fillMaxWidth().ruled()) {
-        CellGrid(cells, 2)
-        if (revision != null) {
-            DoubleRule()
-            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), content = revision)
-        }
+internal fun SetupBlock(cells: List<Cell>, modifier: Modifier = Modifier) {
+    val framed = if (LocalLook.current.blueprint) modifier.fillMaxWidth().ruled() else modifier.fillMaxWidth()
+        .border(androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), MaterialTheme.shapes.medium)
+        .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+        .padding(vertical = 4.dp)
+    Column(framed) { CellGrid(cells, 2, inset = 20.dp) }
+}
+
+/**
+ * A strip of setup values across a card, run to its edges past the card's 20 dp padding: a hairline above and below
+ * in Monochrome, a double rule above in the blueprint.
+ */
+@Composable
+internal fun SetupStrip(cells: List<Cell>, weights: List<Float> = emptyList()) {
+    Column(Modifier.bleed(20.dp)) {
+        HeadRule()
+        CellGrid(cells, columns = cells.size, weights = weights, inset = 20.dp)
+        CellRule()
     }
 }
 
-/** Lets a strip at the end of a card run to the card's edges, past its [padding]. */
-internal fun Modifier.bleed(padding: Dp): Modifier = layout { measurable, constraints ->
+/**
+ * Lets a strip in a card run to the card's edges, past its [padding]. With [bottom], a strip that ends the card also
+ * runs into the card's bottom padding; a strip in the middle of a card keeps its height.
+ */
+internal fun Modifier.bleed(padding: Dp, bottom: Boolean = false): Modifier = layout { measurable, constraints ->
     val extra = padding.roundToPx()
     val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra * 2, maxWidth = constraints.maxWidth + extra * 2))
-    layout(placeable.width - extra * 2, (placeable.height - extra).coerceAtLeast(0)) { placeable.place(-extra, 0) }
+    layout(placeable.width - extra * 2, if (bottom) (placeable.height - extra).coerceAtLeast(0) else placeable.height) { placeable.place(-extra, 0) }
+}
+
+/**
+ * The user's "Next time" reminder with its label, the same words in every theme: a soft tag and semibold text in
+ * Monochrome, red pencil in the blueprint.
+ */
+@Composable
+internal fun NextTimeLine(text: String, maxLines: Int = Int.MAX_VALUE, modifier: Modifier = Modifier) {
+    val look = LocalLook.current
+    val colors = MaterialTheme.colorScheme
+    Row(modifier.fillMaxWidth().semantics(mergeDescendants = true) { }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        if (look.blueprint) Text("Next time", Modifier.padding(top = 4.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        else Text("Next time", Modifier.padding(top = 1.dp).background(colors.soft, MaterialTheme.shapes.extraSmall).padding(horizontal = 8.dp, vertical = 2.dp), color = colors.onSecondaryContainer, style = MaterialTheme.typography.labelMedium)
+        Text(text, Modifier.weight(1f), maxLines = maxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            color = if (look.blueprint) look.accent else colors.onSurface,
+            style = if (look.blueprint) look.hand(MaterialTheme.typography.bodyLarge) else MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+    }
 }
 
 /** A strip of drafting tape holding a card to the page. Decorative; drawn only in the blueprint. */

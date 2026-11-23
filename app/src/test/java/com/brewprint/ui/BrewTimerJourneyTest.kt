@@ -179,7 +179,7 @@ class BrewTimerJourneyTest {
         compose.onNodeWithText("Timing").assertDoesNotExist()
         compose.runOnIdle { assertNull(repository.state.value.brews.single().timing) }
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.onNode(hasText("Settings") and isSelectable()).performClick()
         compose.onNodeWithText("Blocked by Android").assertDoesNotExist()
         tap("Vibrate at each step")
         tap("Keep screen on while brewing")

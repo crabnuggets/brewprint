@@ -94,13 +94,17 @@ fun JournalSummary(journal: Journal) {
         "Mouthfeel" to (journal.mouthfeelTags + journal.mouthfeel).filter { it.isNotBlank() }.joinToString(", "),
         "Finish / aftertaste" to listOfNotNull(journal.finish.takeIf { it.isNotBlank() }, journal.finishLength).joinToString(" · "),
         "As it cools" to journal.asItCools,
-        "Next time" to journal.nextTime,
     ).filter { it.second.isNotBlank() }.forEach { (label, value) ->
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            // The user's own words, in pencil in the blueprint; what to change next time in red.
-            val look = LocalLook.current
-            Text(value, color = if (label == "Next time" && look.blueprint) look.accent else androidx.compose.ui.graphics.Color.Unspecified, style = look.hand(LocalTextStyle.current))
+            // The user's own words, in pencil in the blueprint.
+            Text(value, style = LocalLook.current.hand(LocalTextStyle.current))
         }
+    }
+    // "Next time" closes the journal in every theme, set apart by a rule: a hairline, or the blueprint's double rule.
+    if (journal.nextTime.isNotBlank()) {
+        val others = journal.copy(nextTime = "") != Journal()
+        if (others) Column(Modifier.bleed(20.dp)) { HeadRule() }
+        NextTimeLine(journal.nextTime)
     }
 }

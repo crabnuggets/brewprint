@@ -394,7 +394,7 @@ private fun FooterButton(text: String, icon: ImageVector, modifier: Modifier, fi
 internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? = null) {
     val colors = MaterialTheme.colorScheme
     SectionTitle(if (scale != null) "Timing and water" else "Timing")
-    // The blueprint draws the pulse table on its own, ruled like a schedule on a drawing.
+    // One card in every theme; the blueprint rules its pulse table like a schedule on a drawing.
     val ruled = LocalLook.current.blueprint
     val schedule = recipe.schedule()
     val unstarted = schedule.indices.any { timing.pulseStarts.getOrNull(it) == null }
@@ -411,23 +411,18 @@ internal fun TimingPanel(recipe: Recipe, timing: BrewTiming, scale: ScaleData? =
             else -> "First pour to Finish brew.$paused"
         }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         if (scale != null) {
-            HorizontalDivider(color = colors.outlineVariant)
+            CellRule()
             MeasuredTrio(recipe, scale)
-            HorizontalDivider(color = colors.outlineVariant)
+            CellRule()
             CurveLegend()
             val latest = schedule.indices.mapNotNull { index -> timing.pulseStarts.getOrNull(index)?.let { it - schedule[index].startSeconds } }.maxOrNull() ?: 0
             val summary = "Water over brew time against the plan. " + (scale.water?.let { "Ended at ${tenths(it)} grams" } ?: "Final water not recorded") +
                 ", planned ${formatAmount(recipe.totalWater)} grams." + if (latest > 0) " Pulses started up to ${spokenDifference(latest)}." else ""
             WaterCurve(scale.curve, maxOf(timing.totalSeconds ?: 0, scale.curve.size), recipe.totalWater, plan = planLine(recipe), flows = scale.flows(), description = summary)
         }
-        if (!ruled) {
-            HorizontalDivider(color = colors.outlineVariant)
-            TimingRows(schedule, timing, scale)
-            Text(key, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    if (ruled) {
-        Column(Modifier.fillMaxWidth().ruled()) { TimingRows(schedule, timing, scale) }
+        // The ruled table runs to the card's edges beneath a double rule; the soft one sits under a hairline.
+        if (ruled) Column(Modifier.bleed(20.dp)) { HeadRule(); TimingRows(schedule, timing, scale); CellRule() }
+        else { CellRule(); TimingRows(schedule, timing, scale) }
         Text(key, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -455,12 +450,15 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
     // The blueprint rules the table: light rules between rows and columns, and a double rule under the headings.
     val ruled = LocalLook.current.blueprint
     val cell = if (ruled) Modifier.padding(horizontal = 10.dp, vertical = 9.dp) else Modifier
+    // The ruled table runs to the card's edges, so its outer cells line up with the card's 20 dp padding.
+    val first = if (ruled) Modifier.padding(start = 10.dp) else Modifier
+    val last = if (ruled) Modifier.padding(end = 10.dp) else Modifier
     // Large text: the name on its own line, then the three values with their labels.
     val stacked: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 12.dp)) {
             rows.forEachIndexed { index, row ->
                 if (ruled && index > 0) CellRule()
-                Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = row.spoken }.then(cell), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = row.spoken }.then(first).then(last).then(cell), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(row.name, style = body)
                     Text(listOfNotNull("Plan ${row.plan}", "Started ${row.started}", row.reached?.let { "Reached $it" }).joinToString(" \u00B7 "), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -479,12 +477,12 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
         Row(modifier.fillMaxWidth().then(if (ruled) Modifier.height(IntrinsicSize.Min) else Modifier), horizontalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 12.dp)) {
             val dim = colors.onSurfaceVariant
             val divide: @Composable () -> Unit = { if (ruled) CellRule(vertical = true) }
-            Text(name, Modifier.weight(1f).then(cell), color = if (header) dim else colors.onSurface, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, Modifier.weight(1f).then(first).then(cell), color = if (header) dim else colors.onSurface, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
             divide()
             Text(plan, cell.width(planWidth), color = dim, style = style, textAlign = TextAlign.End, maxLines = 1)
             divide()
-            Text(started, cell.width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
-            if (reached != null) { divide(); Text(reached, cell.width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1) }
+            Text(started, (if (reached == null) last else Modifier).then(cell).width(startedWidth), color = if (late) colors.onSurface else dim, fontWeight = if (late) FontWeight.SemiBold else null, style = style, textAlign = TextAlign.End, maxLines = 1)
+            if (reached != null) { divide(); Text(reached, last.then(cell).width(reachedWidth), color = if (header || reached == "\u2014") dim else colors.onSurface, style = style, textAlign = TextAlign.End, maxLines = 1) }
         }
     val table: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(if (ruled) 0.dp else 10.dp)) {
@@ -493,10 +491,11 @@ private fun TimingRows(schedule: List<ScheduledPulse>, timing: BrewTiming, scale
             rows.forEachIndexed { index, row -> if (ruled && index > 0) CellRule(); line(row.name, row.plan, row.started, row.reached, body, header = false, late = row.late, modifier = Modifier.clearAndSetSemantics { contentDescription = row.spoken }) }
         }
     }
-    if (!ruled) return table()
-    // Ruled cells are padded, so a narrow screen can leave too little room for the pulse names; then the rows stack.
+    // A narrow screen can leave too little room for the pulse names; then the rows stack, in either theme.
+    // Each theme's own spacing counts: padded, ruled cells in the blueprint, 12 dp gaps otherwise.
     val columns = if (scale != null) 3 else 2
-    val fixed = planWidth + startedWidth + reachedWidth + 20.dp * (columns + 1) + 1.dp * columns
+    val spacing = if (ruled) 20.dp * (columns + 1) + 20.dp + 1.dp * columns else 12.dp * columns
+    val fixed = planWidth + startedWidth + reachedWidth + spacing
     val nameWidth = widest(rows.map { it.name }, "Pulse")
     BoxWithConstraints { if (maxWidth - fixed < nameWidth) stacked() else table() }
 }

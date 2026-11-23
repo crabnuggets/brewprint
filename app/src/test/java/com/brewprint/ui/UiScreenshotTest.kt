@@ -307,8 +307,9 @@ class UiScreenshotTest {
         capture("timer-09-record")
         compose.onNodeWithText("Started shows how far each pulse was from the plan: + late, − early. Pours are not measured.").performScrollTo()
         capture("timer-10-record-timing")
-        compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNodeWithContentDescription("Settings").performClick()
+        // The header has scrolled away, so go back as Android Back does.
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNode(hasText("Settings") and isSelectable()).performClick()
         capture("timer-11-settings")
     }
 

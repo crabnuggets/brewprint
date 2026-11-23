@@ -73,6 +73,10 @@ The [v3 blueprint boards](v3-blueprint/index.html) are **three alternative direc
 | [B, revised with title blocks](v3-blueprint/b2.png) | **Built as the experimental Blueprint theme.** B with A's title block: setup and results in ruled, labelled cells; "Next time" in the block's revision row, ringed to the setting it is about; a ruled timing schedule; a four-cell strip on the latest brew. Tables use drafting line weights: a heavy border that overshoots its corners, light inner rules, and a double rule under headings and before the revision row. The brew sheet drops B's ring on the plan strip, so red marks only the pour target. |
 | [C, Patent figure](v3-blueprint/c.png) | Black ink on white, with a photostat negative for dark appearance. Engraved line art and hatching replace grey fills. The latest brew is drawn as Fig. 1, with numbered callouts. Set in Newsreader. Cafe touch: engraving like a coffee-bag label. |
 
+## v2 improvements
+
+The owner accepted the v2 screens on 2026-11-23 after three rounds of council review. They live in the owner's Claude Design canvas, [Brewprint logo](https://claude.ai/artifact/FdiWCE989aXrtCL1MLZsmw), on pages 1 to 6: Brew home and theme parity, the brew record, Settings and the Library, the recipe editor and iced timer, and bean batches with brew setup. Its "Theme guide" page records the only places a screen's markup may differ between Monochrome and Blueprint. Behavior is defined in [UX journeys](../../ux.md), which supersedes the canvas where they differ.
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.
