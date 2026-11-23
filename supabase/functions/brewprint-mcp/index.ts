@@ -15,6 +15,7 @@ import {
   findBrews,
   library,
   type Recipe,
+  recipeRatio,
   type Row,
 } from "./brews.ts";
 import { type BeansInput, buildBeans, buildRecipe, type Built, type DraftKind, type RecipeInput } from "./drafts.ts";
@@ -40,8 +41,11 @@ after editing it if they like, or discards it. Correct a draft with its id rathe
 A brew record keeps the beans, grinder, grind setting and recipe as they were on that day, plus the timing,
 scale readings and the user's tasting journal. Grind settings are ticks from each grinder's own reference
 point, so compare them only within one grinder. Times are UTC; the user's app shows their local time. Measured water is the scale's reading after the last pour,
-not the weight of the drink. The app records no water temperature, roast date or overall score; ask the user
-when they matter.`;
+not the weight of the drink. A recipe's ratio comes from its dose and pours. Recipes may be iced, with ice in the
+server that isn't part of the brew water, and may give water temperature, a target finish time, a grind size and a
+note on each pour. Beans keep each bag bought as a batch with its roast date, and a brew gives the roast date of
+the bag it used; count days off roast in the user's local time zone. The app records no overall score; ask the user
+when it matters.`;
 
 function unauthorized(error?: string) {
   const challenge = [`Bearer resource_metadata="${RESOURCE_METADATA}"`, error && `error="${error}"`].filter(Boolean)
@@ -146,12 +150,17 @@ function server(client: SupabaseClient) {
       grinders: shown(grinders),
       recipes: shown(recipes).map((item) => ({
         ...item,
+        // The stored ratio is for older app versions; this is the one the app shows.
+        ratio: `1:${recipeRatio(item)}`,
         brews: brews.filter((brew) => brew.recipe.id === item.id).length,
       })),
       totalBrews: brews.length,
       drafts: {
         beans: drafts.filter((draft) => draft.kind === "beans").map((draft) => draft.data),
-        recipes: drafts.filter((draft) => draft.kind === "recipes").map((draft) => draft.data),
+        recipes: drafts.filter((draft) => draft.kind === "recipes").map((draft) => ({
+          ...(draft.data as Recipe),
+          ratio: `1:${recipeRatio(draft.data as Recipe)}`,
+        })),
       },
     });
   });
@@ -199,7 +208,10 @@ function server(client: SupabaseClient) {
     {
       title: "Draft beans",
       description: "Drafts beans for the user to add to their Brewprint library, or corrects a draft with draftId, " +
-        "changing only the fields given. Check get_library first so the same beans aren't drafted twice. " +
+        "changing only the fields given. Check get_library with includeArchived first so the same beans aren't " +
+        "drafted twice: when the beans are already in the library, archived or not, don't draft them again, and tell " +
+        'the user to tap "Bought again" on them in the app (under "Archived beans" if they are archived) to add the ' +
+        "new bag with its roast date. " +
         "A new draft needs a name and roaster; leave out what the source doesn't say rather than guessing.",
       inputSchema: {
         draftId,
@@ -212,6 +224,7 @@ function server(client: SupabaseClient) {
         notes: field(
           "Anything else worth keeping, such as altitude, roast level, harvest or the product page's address.",
         ),
+        roastDate: field('The bag\'s roast date as YYYY-MM-DD, when it gives one. "" clears it on a correction.'),
       },
       annotations: write,
     },
@@ -225,15 +238,27 @@ function server(client: SupabaseClient) {
       title: "Draft a recipe",
       description:
         "Drafts a recipe for the user to add to their Brewprint library, or corrects a draft with draftId, " +
-        "changing only the fields given (pulses are replaced as a whole). Check get_library first so the same " +
-        "recipe isn't drafted twice. Dose and each pulse's water take up to one decimal place. The pulses' water " +
-        "must add up to dose × ratio rounded to 0.1 g; when a recipe gives total water rather than a ratio, use " +
-        "water ÷ dose with enough decimals, such as 16.667 for 15 g and 250 g.",
+        "changing only the fields given (pulses are replaced as a whole; null clears an optional detail). Check " +
+        "get_library first so the same recipe isn't drafted twice. Dose and each pulse's water take up to one " +
+        "decimal place. There is no ratio to give: the app works it out from the dose and the pours, so when a " +
+        "recipe gives a ratio, work out each pour's water from it. Correcting only the dose changes the ratio; " +
+        "give new pulses too to keep it. For an iced recipe the ice is not part of the pours.",
       inputSchema: {
         draftId,
         name: field("The recipe's name, such as the author's name for it."),
         dose: z.number().optional().describe("Coffee dose in grams."),
-        ratio: z.number().optional().describe("Grams of water per gram of coffee: 16 for 1:16."),
+        drinkStyle: z.enum(["HOT", "ICED"]).optional().describe("ICED for a recipe brewed onto ice; HOT otherwise."),
+        iceGrams: z.number().nullable().optional().describe(
+          "For an iced recipe, grams of ice put in the server before brewing, up to one decimal place.",
+        ),
+        waterTempC: z.number().int().nullable().optional().describe("Water temperature in °C, 1 to 100."),
+        targetFinishSeconds: z.number().int().nullable().optional().describe(
+          'When the drawdown should end, in seconds from the first pour: 130 for "about 2:10".',
+        ),
+        grindDescription: z.string().nullable().optional().describe(
+          'How the grind should look, in the source\'s words, such as "Medium-fine".',
+        ),
+        sourceUrl: z.string().nullable().optional().describe("The recipe's web address, http or https."),
         pulses: z.array(z.object({
           label: z.string().optional().describe('Such as "Bloom"; leave out for a plain pour.'),
           water: z.number().describe("Grams of water this pour adds, not the running total."),
@@ -243,12 +268,15 @@ function server(client: SupabaseClient) {
           waitSeconds: z.number().int().optional().describe(
             "From the end of this pour to the start of the next. Ignored on the last pulse.",
           ),
+          notes: z.string().optional().describe(
+            'What to do during this pour or the wait after it, such as "Stir gently 3 times".',
+          ),
         })).optional().describe(
           "Every pour in order. When a recipe gives start times, a wait is the next pour's start minus this " +
             'pour\'s start and pourSeconds; when it gives running totals ("pour to 150 g"), water is the difference.',
         ),
-        notes: field(
-          "Preparation notes: grind, water temperature, dripper, swirls or stirs, and the source's address.",
+        notes: z.string().nullable().optional().describe(
+          "Preparation notes that fit no other field, such as the dripper, filter, or what to do after the drawdown.",
         ),
       },
       annotations: write,
