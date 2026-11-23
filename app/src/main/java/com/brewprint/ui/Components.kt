@@ -305,9 +305,9 @@ internal fun FloatingNavigation(selectedTab: String, shown: Boolean, modifier: M
                                 "Library" -> if (selected) Icons.AutoMirrored.Filled.LibraryBooks else Icons.AutoMirrored.Outlined.LibraryBooks
                                 else -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
                             }, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                            // Monochrome like the rest of the bar: a dark dot ringed in the bar's own color, never red.
+                            // Monochrome like the rest of the bar: a dark dot ringed in the color behind it, never red.
                             if (alert) Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-2).dp).size(10.dp)
-                                .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape).padding(2.dp)
+                                .background(if (selected) MaterialTheme.colorScheme.soft else MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape).padding(2.dp)
                                 .background(MaterialTheme.colorScheme.onSurface, androidx.compose.foundation.shape.CircleShape).testTag("sync-failed-dot"))
                         }
                         if (selected) Text(destination, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)

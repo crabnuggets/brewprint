@@ -165,7 +165,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     chrome.navSpace = if (navVisible) 78.dp else 0.dp
     val cloud by com.brewprint.cloud.CloudSync.state.collectAsState()
     // Back on History, Library or Settings goes to Brew, the starting point; Library's own screens handle Back first.
-    BackHandler(enabled = LocalScreenActive.current && route == null && tab != "Brew" && !libraryEditing) { tab = "Brew" }
+    BackHandler(enabled = route == null && tab != "Brew" && !libraryEditing) { tab = "Brew" }
     fun startBrew() {
         repository.startDraft().onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") }
     }
@@ -214,14 +214,15 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             // "New brew", or "Resume brew" while one is in progress, floats over Brew above the navigation,
             // and drops to the corner while the navigation is hidden. Screen readers reach it after the screen's content.
             val onBrew = route == null && tab == "Brew"
-            val fabBottom by androidx.compose.animation.core.animateDpAsState(if (navShown) 86.dp else 16.dp, tween(280), label = "fab")
+            val fabTarget = if (navShown) 86.dp else 16.dp
+            val fabBottom by androidx.compose.animation.core.animateDpAsState(fabTarget, tween(280), label = "fab")
             if (onBrew) BrewAction(state.draft != null, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = fabBottom).semantics { traversalIndex = 1f }) {
                 if (state.draft != null) resumeDraft() else startBrew()
             }
             if (navVisible) FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) { tab = it }
             // The Undo bar moves with the navigation instead of jumping, and sits above the floating action on Brew.
             val lift by androidx.compose.animation.core.animateDpAsState(when {
-                onBrew -> fabBottom + 64.dp
+                onBrew -> fabTarget + 64.dp
                 navShown -> 78.dp
                 route != null -> chrome.footerSpace + 8.dp
                 else -> 8.dp
@@ -275,9 +276,9 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 // Side by side where they fit; stacked on a narrow screen or with large text.
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val padding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                    val repeat: @Composable (Modifier) -> Unit = { modifier -> SoftButton(onClick = { onRepeat(recent.id) }, modifier = modifier.heightIn(min = 56.dp), enabled = state.draft == null, contentPadding = padding) { Icon(Icons.Outlined.Repeat, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Repeat") } }
-                    val edit: @Composable (Modifier) -> Unit = { modifier -> SoftButton(onClick = { onNotes(recent.id) }, modifier = modifier.heightIn(min = 56.dp), contentPadding = padding) { Text(notes, textAlign = androidx.compose.ui.text.style.TextAlign.Center) } }
-                    if (maxWidth / androidx.compose.ui.platform.LocalDensity.current.fontScale >= 300.dp) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { repeat(Modifier); edit(Modifier.weight(1f)) }
+                    val repeat: @Composable (Modifier) -> Unit = { modifier -> SoftButton(onClick = { onRepeat(recent.id) }, modifier = modifier.heightIn(min = 56.dp).fillMaxHeight(), enabled = state.draft == null, contentPadding = padding) { Icon(Icons.Outlined.Repeat, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Repeat") } }
+                    val edit: @Composable (Modifier) -> Unit = { modifier -> SoftButton(onClick = { onNotes(recent.id) }, modifier = modifier.heightIn(min = 56.dp).fillMaxHeight(), contentPadding = padding) { Text(notes, textAlign = androidx.compose.ui.text.style.TextAlign.Center) } }
+                    if (maxWidth / androidx.compose.ui.platform.LocalDensity.current.fontScale >= 300.dp) Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) { repeat(Modifier); edit(Modifier.weight(1f)) }
                     else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { repeat(Modifier.fillMaxWidth()); edit(Modifier.fillMaxWidth()) }
                 }
             } }
@@ -724,13 +725,11 @@ private fun RecipeNumbers(recipe: Recipe) {
 }
 
 @Composable
-private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Recipe, onCorrect: (() -> Unit)? = null, showBeans: Boolean = true) {
+private fun PlanSummary(beans: Beans, grinder: Grinder, setting: Int, recipe: Recipe, onCorrect: (() -> Unit)? = null) {
     Panel {
-        if (showBeans) {
-            Text(beans.name, style = MaterialTheme.typography.titleLarge)
-            Text(recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else Text(recipe.name, style = MaterialTheme.typography.titleMedium)
-        if (showBeans) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text(beans.name, style = MaterialTheme.typography.titleLarge)
+        Text(recipe.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             val dose = formatAmount(recipe.dose)
             val ratio = formatAmount(recipe.ratio)
