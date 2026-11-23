@@ -179,14 +179,31 @@ class BrewRepository(context: Context) {
     }
 
     fun startDraft(): Result<BrewDraft> = change { current ->
+        val draft = current.draft ?: freshDraft(current)
+        current.copy(draft = draft) to draft
+    }
+
+    /** A new brew with [beans] and [recipe], or the remembered ones, and the default grinder at its recorded setting. */
+    private fun freshDraft(current: AppState, beans: Beans? = null, recipe: Recipe? = null): BrewDraft {
         val grinder = current.grinders.firstOrNull { it.id == current.defaultGrinderId && !it.archived }
             ?: current.grinders.singleOrNull { !it.archived }
-        val draft = current.draft ?: BrewDraft(
-            beans = current.beans.firstOrNull { it.id == current.lastBeansId && !it.archived },
-            recipe = current.recipes.firstOrNull { it.id == current.lastRecipeId && !it.archived },
+        return BrewDraft(
+            beans = beans ?: current.beans.firstOrNull { it.id == current.lastBeansId && !it.archived },
+            recipe = recipe ?: current.recipes.firstOrNull { it.id == current.lastRecipeId && !it.archived },
             grinder = grinder,
             setting = grinder?.lastSetting?.takeIf { it in MIN_GRIND_SETTING..MAX_GRIND_SETTING },
         )
+    }
+
+    /**
+     * Starts a brew from a Library item: these [beansId] or this [recipeId], with the remembered choices for the rest.
+     * Only one brew is in progress at a time, and archived items are not offered for a new brew.
+     */
+    fun startDraftWith(beansId: String? = null, recipeId: String? = null): Result<BrewDraft> = change { current ->
+        check(current.draft == null) { "A brew is already in progress. Resume or discard it first." }
+        val beans = beansId?.let { id -> requireNotNull(current.beans.find { it.id == id && !it.archived }) { "These beans aren't available for a new brew." } }
+        val recipe = recipeId?.let { id -> requireNotNull(current.recipes.find { it.id == id && !it.archived }) { "This recipe isn't available for a new brew." } }
+        val draft = freshDraft(current, beans, recipe)
         current.copy(draft = draft) to draft
     }
 

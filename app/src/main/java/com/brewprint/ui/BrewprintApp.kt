@@ -70,6 +70,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     var draftFresh by rememberSaveable { mutableStateOf(false) }
     var error by remember { mutableStateOf(repository.loadError) }
     var libraryEditing by remember { mutableStateOf(false) }
+    // The Library tab's place, kept here so a brew started from an item returns to that item.
+    val libraryNav = rememberSaveable(saver = LibraryNav.Saver) { LibraryNav() }
     val onError: (String) -> Unit = { error = it }
     val clock = LocalClock.current
     // The live notification asks for the sheet or the review; show the draft it belongs to.
@@ -161,7 +163,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
         libraryUndo?.let { offerLibraryUndo(Json.decodeFromString<BeansUndo>(it)) }
     }
     val shown = if (pendingDeletes.isEmpty()) state else state.copy(brews = state.brews.filterNot { it.id in pendingDeletes })
-    val navVisible = route == null && !libraryEditing
+    // An item's own screen in the Library hides the navigation, as other screens opened from a destination do.
+    val navVisible = route == null && !libraryEditing && !(tab == "Library" && libraryNav.detailId != null)
     chrome.navSpace = if (navVisible) 78.dp else 0.dp
     val cloud by com.brewprint.cloud.CloudSync.state.collectAsState()
     // Back on History, Library or Settings goes to Brew, the starting point; Library's own screens handle Back first.
@@ -195,7 +198,10 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
                 else -> when (screen.removePrefix("tab:")) {
-                    "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo)
+                    "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo, nav = libraryNav,
+                        onBrewWith = { beansId, recipeId ->
+                            repository.startDraftWith(beansId, recipeId).onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") }
+                        }, onResumeBrew = { resumeDraft() })
                     "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
                     "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(onError) },
                         experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }) {
@@ -204,7 +210,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                             repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
                         }
                     }
-                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { tab = "Library" })
+                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" })
                 }
             }
             } }
@@ -219,7 +225,11 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             if (onBrew) BrewAction(state.draft != null, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = fabBottom).semantics { traversalIndex = 1f }) {
                 if (state.draft != null) resumeDraft() else startBrew()
             }
-            if (navVisible) FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) { tab = it }
+            if (navVisible) FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) {
+                // Tapping Library again returns to its hub.
+                if (it == "Library" && tab == "Library") libraryNav.reset()
+                tab = it
+            }
             // The Undo bar moves with the navigation instead of jumping, and sits above the floating action on Brew.
             val lift by androidx.compose.animation.core.animateDpAsState(when {
                 onBrew -> fabTarget + 64.dp

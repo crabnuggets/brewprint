@@ -20,7 +20,7 @@ Use four bottom navigation destinations:
 
 - Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress and another the drafts from Claude waiting. The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
 - History: completed brew records, newest first. Open a record to inspect, edit, or repeat it.
-- Library: recipes, beans, and grinders, grouped into three plainly labeled lists.
+- Library: a hub with a card for each of recipes, beans, and grinders, each showing its count and one useful value: the most used recipe, the beans brewed last, the default grinder and its setting. A card opens that kind's own list, with "Add" in its header. Tapping Library again returns to the hub.
 - Settings: account, appearance, the brew timer, the coffee scale, and experiments. It has no Back arrow; Android Back on History, Library, or Settings returns to Brew.
 
 Create and edit screens open above these destinations. Android Back returns to the previous screen. A brew setup with nothing chosen, or a new one left as it opened from "New brew" or "Repeat", is discarded on Back, so it neither blocks "Repeat" nor keeps a stale start time. Unsaved form edits prompt "Discard changes?" with "Keep editing" and "Discard". An active brew draft saves automatically and offers "Resume brew" on the Brew screen after navigation or an app restart. Support one active draft at a time for this version.
@@ -48,6 +48,10 @@ For a small grind adjustment, change "Grind setting, ticks" in setup. Saving the
 
 ## Library forms
 
+### Brewing from the Library
+
+A recipe's page offers "Brew with this recipe", and active beans offer "Brew with these beans", beneath the item's summary. Either opens a new brew's setup with that item chosen and the remembered choices for the rest. Leaving that setup untouched discards it and returns to the item. While a brew is in progress, the action is unavailable, with "A brew is already in progress." and "Resume brew". Archived beans and recipes offer no brew.
+
 ### Beans
 
 Require a name and roaster. Keep these as text fields rather than separate roaster records. Example name: "Ethiopia natural".
@@ -64,7 +68,7 @@ In the Library, swiping a beans row left archives it with a short swipe or delet
 
 Require a name. Offer a last recorded setting in whole ticks from 0 through 100, inclusive, and optional reference notes, such as "Count from my usual zero mark". Keep the range visible as neutral helper text. Do not assume a shared physical zero or direction of adjustment across grinders. Do not instruct the user to force the burrs closed to establish a reference. The half-wheel dial and direct numeric entry use the same range. The dial has no visible increase or decrease buttons; retain accessible wheel adjustment semantics.
 
-With one grinder, select it automatically. With several, let the user choose a default in the grinder list. Selecting another grinder loads its own recorded setting, never the previous grinder's tick count. Require a setting in brew setup if the selected grinder has none.
+With one grinder, select it automatically. With several, let the user choose a default on a grinder's page; the grinder list marks it "Default". Selecting another grinder loads its own recorded setting, never the previous grinder's tick count. Require a setting in brew setup if the selected grinder has none.
 
 Allow renaming and archiving. Archiving the default requires selecting another active grinder, or clears the default if none remain. Old brew records keep their original grinder information. Repeating an archived grinder requires choosing an active grinder before continuing.
 
@@ -95,7 +99,7 @@ Allow editing, duplicating, and archiving recipes. On a Library item's screen th
 
 With Brewprint connected to Claude, Claude can draft beans or a recipe from a product page, a photo of a bag, or a recipe link. Drafts reach the phone when it syncs, so they need a signed-in account.
 
-The Library lists them first, under "Drafts from Claude", each as its name with "Beans · [roaster]" or "Recipe · [dose] g · 1:[ratio] · [water] g". While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") above the most recent brew, with the drafts' names beneath, which opens the Library.
+The Library's hub shows them first, in a "Drafts from Claude" card, each as its name with a "Beans" or "Recipe" tag and the roaster or "[dose] g · 1:[ratio] · [water] g" beneath. While any wait, the Brew screen shows "Review 1 draft from Claude" (or "Review 2 drafts from Claude") above the most recent brew, with the drafts' names beneath, which opens the Library.
 
 Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync, including on an open review the user hasn't edited. A review whose draft was added on another phone or discarded closes.
 

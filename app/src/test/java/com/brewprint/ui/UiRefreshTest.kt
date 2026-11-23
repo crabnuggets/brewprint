@@ -46,7 +46,7 @@ class UiRefreshTest {
     private fun field(label: String) = compose.onNode(hasText(label) and hasSetTextAction())
 
     private fun openForm(kind: String) {
-        tap("Library")
+        compose.openLibrarySection(when (kind) { "recipe" -> "recipes"; "grinder" -> "grinders"; else -> kind })
         tap("Add $kind")
     }
 
@@ -144,7 +144,7 @@ class UiRefreshTest {
     @Config(qualifiers = "w320dp-h891dp")
     @Test fun `explicit grinder setting update rejects invalid ticks and saves endpoint`() {
         compose.runOnIdle { repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 100)).getOrThrow() }
-        tap("Library")
+        compose.openLibrarySection("grinders")
         tap("Hand grinder")
         tap("Update last recorded setting")
         field("Grind setting, ticks").performTextReplacement("101")
@@ -183,9 +183,13 @@ class UiRefreshTest {
         assertTrue(backBounds.right <= titleBounds.left)
         assertEquals(backBounds.center.y, titleBounds.center.y, 2f)
         back.performClick()
-        compose.onAllNodesWithText("Library").assertCountEquals(2)
+        // Back from the form returns to the beans list, and Back from an item returns to it too.
+        compose.onNodeWithText("Beans").assertIsDisplayed()
         tap("Ethiopia")
         compose.onNodeWithText("Roaster").assertExists()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Beans").assertIsDisplayed()
+        // Back from the list returns to the Library's hub.
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onAllNodesWithText("Library").assertCountEquals(2)
         tap("Brew")
