@@ -126,7 +126,8 @@ fun LibraryScreen(
         val savedKind = editKind
         editing = false
         draftId = null
-        if (onPicked != null) onPicked(savedKind, id) else { place.section = savedKind; place.detailId = id }
+        // An archived item stays under "Archived beans", so Back returns there.
+        if (onPicked != null) onPicked(savedKind, id) else { if (place.section != "archived") place.section = savedKind; place.detailId = id }
     }
     // A swipe acts at once and offers Undo.
     fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
@@ -347,14 +348,14 @@ private fun LibraryHub(state: AppState, onDraft: (LibraryDraft) -> Unit, onSecti
     val activeBeans = state.beans.filterNot { it.archived }
     val archived = state.beans.size - activeBeans.size
     val lastBrewed = state.brews.sortedByDescending { it.startedAt }.firstNotNullOfOrNull { brew -> activeBeans.find { it.id == brew.beans.id } }
-    SectionCard(Icons.Outlined.Grain, "Beans", count(activeBeans.size, "active", "active") + if (archived > 0) " · $archived archived" else "", { onSection("beans") }, lastBrewed?.let { beans -> {
+    SectionCard(Icons.Outlined.Grain, "Beans", (if (archived > 0) "${activeBeans.size} active · $archived archived" else count(activeBeans.size, "active", "active")), { onSection("beans") }, lastBrewed?.let { beans -> {
         Text("Last brewed", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         Text("${beans.name} · ${beans.roaster}", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     } })
     val activeGrinders = state.grinders.filterNot { it.archived }
     val default = activeGrinders.find { it.id == state.defaultGrinderId }
     SectionCard(Icons.Outlined.Album, "Grinders", count(activeGrinders.size, "grinder", "grinders"), { onSection("grinders") }, default?.let { grinder -> {
-        Row(verticalAlignment = Alignment.CenterVertically) { GrinderRowContent(grinder, isDefault = true) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { GrinderRowContent(grinder, isDefault = true) }
     } })
 }
 

@@ -125,8 +125,13 @@ class NavigationTest {
         compose.onNodeWithText("Archived beans").performScrollTo().performClick()
         compose.onNodeWithText("Old bag").performClick()
         compose.onNodeWithText("Brew with these beans").assertDoesNotExist()
-        // Tapping Library again goes back to the hub.
+        // Saving an edit keeps the beans under "Archived beans", where Back returns.
+        compose.onNodeWithContentDescription("Edit beans").performClick()
+        compose.onNodeWithText("Save beans").performScrollTo().performClick()
         back()
+        // Only the archived list shows archived beans.
+        compose.onNodeWithText("Old bag").assertExists()
+        // Tapping Library again goes back to the hub.
         back()
         compose.onNode(tab and hasText("Library")).performClick()
         compose.onNodeWithTag("library-beans").assertIsDisplayed()
