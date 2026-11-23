@@ -108,7 +108,7 @@ Deno.test("the stored ratio comes from the dose and the pours, to 6 decimals lik
   assertEquals(buildRecipe(iced.id, { drinkStyle: "HOT", iceGrams: 70 }, iced).errors, [
     'Ice is only for an iced recipe: give drinkStyle "ICED".',
   ]);
-  assertEquals(buildRecipe(iced.id, { notes: null }, iced).item?.notes, "");
+  assertEquals(buildRecipe(iced.id, { notes: null }, { ...iced, notes: "Swirl after the bloom." }).item?.notes, "");
 });
 
 Deno.test("only http and https addresses with a host are kept as a source", () => {
