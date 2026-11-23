@@ -103,8 +103,12 @@ Deno.test("the stored ratio comes from the dose and the pours, to 6 decimals lik
     buildRecipe("x", { name: "15 to 250", dose: 15, pulses: [{ water: 250, pourSeconds: 50 }] }).item?.ratio,
     16.666667,
   );
-  // A hot recipe keeps no ice.
+  // A hot recipe keeps no ice, and ice given for one is a mistake to fix.
   assertEquals(buildRecipe(iced.id, { drinkStyle: "HOT" }, iced).item?.iceGrams, null);
+  assertEquals(buildRecipe(iced.id, { drinkStyle: "HOT", iceGrams: 70 }, iced).errors, [
+    'Ice is only for an iced recipe: give drinkStyle "ICED".',
+  ]);
+  assertEquals(buildRecipe(iced.id, { notes: null }, iced).item?.notes, "");
 });
 
 Deno.test("only http and https addresses with a host are kept as a source", () => {

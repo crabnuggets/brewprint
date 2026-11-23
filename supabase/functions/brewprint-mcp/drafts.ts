@@ -36,7 +36,7 @@ export interface RecipeInput {
   name?: string;
   dose?: number;
   pulses?: PulseInput[];
-  notes?: string;
+  notes?: string | null;
   drinkStyle?: DrinkStyle;
   iceGrams?: number | null;
   waterTempC?: number | null;
@@ -118,7 +118,12 @@ export function buildRecipe(id: string, input: RecipeInput, existing?: Recipe): 
     grindDescription: text(input.grindDescription, existing?.grindDescription),
     sourceUrl: text(input.sourceUrl, existing?.sourceUrl),
   };
-  const errors = recipeErrors(recipe);
+  const errors = [
+    ...recipeErrors(recipe),
+    ...(input.iceGrams != null && drinkStyle !== "ICED"
+      ? ['Ice is only for an iced recipe: give drinkStyle "ICED".']
+      : []),
+  ];
   return errors.length ? { item: null, errors } : { item: recipe, errors: [] };
 }
 

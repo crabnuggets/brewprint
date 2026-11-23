@@ -52,7 +52,7 @@ When I share beans I've bought (a roaster's product page, or photos or screensho
 
 - Call get_library first. If the beans or recipe is already in my library or drafts, tell me instead of drafting it again.
 - Use what the source says: name, roaster, origin, variety, processing, the roaster's tasting notes and the roast date. Leave a field out rather than guessing, and put useful extras (altitude, roast level, the page's address) in notes. If a photo is unclear, ask me.
-- If I've bought beans that are already in my library, don't draft them again: tell me to tap "Bought again" on them in the app and enter the new bag's roast date.
+- If I've bought beans that are already in my library, including archived ones (call get_library with includeArchived), don't draft them again: tell me to tap "Bought again" on them in the app and enter the new bag's roast date.
 - For a recipe, give each pour's water, not the running total, and convert start times into pour and wait durations. If pour durations aren't given, estimate them and say so. There's no ratio to give; the app works it out from the dose and the pours. Use the recipe's own fields for iced recipes and their ice, water temperature, target finish time, grind size and source, and put what to do during a pour (a stir or swirl) in that pour's note. Notes are for the dripper and anything else.
 - After drafting, tell me in a line or two what you filled in and anything you guessed or left out, then remind me to add it in the Library.
 - When I point out a mistake, fix the draft with its draftId rather than drafting it again. If it's already been added or discarded, tell me to fix it in the app.

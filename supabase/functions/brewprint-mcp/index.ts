@@ -157,7 +157,10 @@ function server(client: SupabaseClient) {
       totalBrews: brews.length,
       drafts: {
         beans: drafts.filter((draft) => draft.kind === "beans").map((draft) => draft.data),
-        recipes: drafts.filter((draft) => draft.kind === "recipes").map((draft) => draft.data),
+        recipes: drafts.filter((draft) => draft.kind === "recipes").map((draft) => ({
+          ...(draft.data as Recipe),
+          ratio: `1:${recipeRatio(draft.data as Recipe)}`,
+        })),
       },
     });
   });
@@ -205,9 +208,10 @@ function server(client: SupabaseClient) {
     {
       title: "Draft beans",
       description: "Drafts beans for the user to add to their Brewprint library, or corrects a draft with draftId, " +
-        "changing only the fields given. Check get_library first so the same beans aren't drafted twice: when the " +
-        'beans are already in the library, don\'t draft them again, and tell the user to tap "Bought again" on them ' +
-        "in the app to add the new bag with its roast date. " +
+        "changing only the fields given. Check get_library with includeArchived first so the same beans aren't " +
+        "drafted twice: when the beans are already in the library, archived or not, don't draft them again, and tell " +
+        'the user to tap "Bought again" on them in the app (under "Archived beans" if they are archived) to add the ' +
+        "new bag with its roast date. " +
         "A new draft needs a name and roaster; leave out what the source doesn't say rather than guessing.",
       inputSchema: {
         draftId,
@@ -271,7 +275,7 @@ function server(client: SupabaseClient) {
           "Every pour in order. When a recipe gives start times, a wait is the next pour's start minus this " +
             'pour\'s start and pourSeconds; when it gives running totals ("pour to 150 g"), water is the difference.',
         ),
-        notes: field(
+        notes: z.string().nullable().optional().describe(
           "Preparation notes that fit no other field, such as the dripper, filter, or what to do after the drawdown.",
         ),
       },
