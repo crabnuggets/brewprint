@@ -139,7 +139,7 @@ class SyncTest {
     @Test fun `adding or discarding a library draft deletes it from the account, once`() {
         val repository = BrewRepository(context)
         val kii = Beans(name = "Kii", roaster = "Tim Wendelboe")
-        val plan = Recipe(name = "Three pours", dose = 15.0, ratio = 16.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 40)))
+        val plan = Recipe(name = "Three pours", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 40)))
         val drafts = listOf(LibraryDraft(kii.id, beans = kii), LibraryDraft(plan.id, recipe = plan))
         repository.applyDrafts(drafts).getOrThrow()
         assertEquals(drafts, repository.state.value.libraryDrafts)

@@ -45,7 +45,7 @@ class BrewJourneyTest {
         compose.runOnIdle {
             val beans = Beans(name = "Ethiopia", roaster = "Sample")
             val grinder = Grinder(name = "Hand grinder", lastSetting = 24)
-            val recipe = Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
+            val recipe = Recipe(name = "Filter", dose = 15.0,
                 pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
             repository.upsertBeans(beans).getOrThrow()
             repository.upsertGrinder(grinder).getOrThrow()
@@ -102,7 +102,7 @@ class BrewJourneyTest {
 
     @Test fun `a new dose keeps the pours until the user scales them back to the ratio`() {
         compose.runOnIdle {
-            repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
+            repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0,
                 pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))).getOrThrow()
         }
         compose.openLibrarySection("recipes")
@@ -117,13 +117,13 @@ class BrewJourneyTest {
         compose.runOnIdle {
             val saved = repository.state.value.recipes.single()
             assertEquals(256.0, saved.totalWater, 0.0)
-            assertEquals(16.0, saved.ratio, 0.0)
+            assertEquals(16.0, saved.computedRatio, 0.0)
         }
     }
 
     @Test fun `recipe actions sit in the header`() {
         compose.runOnIdle {
-            repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
+            repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0,
                 pulses = List(10) { Pulse(water = 24.0, pourSeconds = 5, waitSeconds = if (it < 9) 10 else 0) })).getOrThrow()
         }
         compose.openLibrarySection("recipes")

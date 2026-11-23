@@ -6,7 +6,7 @@ import org.junit.Test
 
 class RecipeTest {
     private val recipe = Recipe(
-        name = "Three pulses", dose = 15.0, ratio = 16.0,
+        name = "Three pulses", dose = 15.0,
         pulses = listOf(Pulse("Bloom", 60.0, 10, 30), Pulse(water = 90.0, pourSeconds = 20, waitSeconds = 20), Pulse(water = 90.0, pourSeconds = 20)),
     )
 
@@ -28,20 +28,15 @@ class RecipeTest {
         assertEquals("15", formatRatio(changed.computedRatio))
     }
 
-    @Test fun `the stored ratio is the pours' ratio to 6 decimals, which older versions' check accepts`() {
+    @Test fun `the ratio is the pours over the dose, shown to one decimal`() {
         val kurasu = Recipe(name = "Kurasu Iced", dose = 16.0, drinkStyle = DrinkStyle.ICED, iceGrams = 70.0,
             pulses = listOf(Pulse(water = 40.0, pourSeconds = 10, waitSeconds = 35), Pulse(water = 60.0, pourSeconds = 15, waitSeconds = 15), Pulse(water = 50.0, pourSeconds = 15))).normalized()
-        assertEquals(9.375, kurasu.ratio, 0.0)
+        assertEquals(9.375, kurasu.computedRatio, 0.0)
         assertEquals("9.4", formatRatio(kurasu.computedRatio))
         assertEquals("13.8", formatRatio(kurasu.overallRatio!!))
         val thirds = Recipe(name = "Thirds", dose = 15.0, pulses = listOf(Pulse(water = 250.0, pourSeconds = 50))).normalized()
-        assertEquals(16.666667, thirds.ratio, 0.0)
-        assertEquals("16.7", formatRatio(thirds.ratio))
-        // Older versions check dose × ratio, rounded half up to 0.1 g, against the pours.
-        for (stored in listOf(kurasu, thirds, recipe.normalized(), Recipe(name = "x", dose = 0.1, pulses = listOf(Pulse(water = 999.9, pourSeconds = 1))).normalized())) {
-            val olderCheck = java.math.BigDecimal.valueOf(stored.dose).multiply(java.math.BigDecimal.valueOf(stored.ratio)).setScale(1, java.math.RoundingMode.HALF_UP).toDouble()
-            assertEquals(stored.totalWater, olderCheck, 0.0)
-        }
+        assertEquals(16.666667, thirds.computedRatio, 0.0)
+        assertEquals("16.7", formatRatio(thirds.computedRatio))
     }
 
     @Test fun `a hot recipe keeps no ice, and the details are checked`() {
@@ -64,7 +59,7 @@ class RecipeTest {
     }
 
     @Test fun `water target rounds half up to one decimal place`() {
-        val rounded = Recipe(name = "Rounded", dose = 15.1, ratio = 16.5, pulses = listOf(Pulse(water = 249.2, pourSeconds = 10)))
+        val rounded = Recipe(name = "Rounded", dose = 15.1, pulses = listOf(Pulse(water = 249.2, pourSeconds = 10)))
         assertEquals(249.2, rounded.totalWater, 0.0)
         assertTrue(rounded.validationErrors().isEmpty())
         assertEquals("249.2", formatAmount(rounded.totalWater))
@@ -79,7 +74,7 @@ class RecipeTest {
     }
 
     @Test fun `decimal operands round the water target without binary multiplication error`() {
-        val rounded = Recipe(name = "Rounded", dose = 15.1, ratio = 15.5,
+        val rounded = Recipe(name = "Rounded", dose = 15.1,
             pulses = listOf(Pulse(water = 234.1, pourSeconds = 10)))
         assertEquals(234.1, rounded.totalWater, 0.0)
         assertTrue(rounded.validationErrors().isEmpty())

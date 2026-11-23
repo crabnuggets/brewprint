@@ -39,7 +39,7 @@ class BlueprintThemeTest {
     private val beans = Beans(name = "Ethiopia natural", roaster = "Sample Roaster", expectedNotes = "Blueberry, cocoa")
     private val grinder = Grinder(name = "Comandante C40", lastSetting = 24)
     // Ten pulses of 30 g: a bloom with a long wait, then one every 15 s.
-    private val recipe = Recipe(name = "Ten-pulse", dose = 20.0, ratio = 15.0, pulses = List(10) { index ->
+    private val recipe = Recipe(name = "Ten-pulse", dose = 20.0, pulses = List(10) { index ->
         Pulse(if (index == 0) "Bloom" else "", 30.0, 5, if (index == 0) 25 else if (index == 9) 0 else 10)
     })
 

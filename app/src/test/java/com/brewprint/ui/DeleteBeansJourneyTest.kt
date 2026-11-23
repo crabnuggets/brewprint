@@ -30,7 +30,7 @@ class DeleteBeansJourneyTest {
     private val kii = Beans(name = "Kii", roaster = "Tim Wendelboe")
     private val gesha = Beans(name = "Gesha", roaster = "Onyx")
     private val grinder = Grinder(name = "Comandante", lastSetting = 24)
-    private val plan = Recipe(name = "One pour", dose = 15.0, ratio = 16.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
+    private val plan = Recipe(name = "One pour", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
 
     private fun repository(vararg beans: Beans): BrewRepository {
         val data = temporary.newFolder("data")

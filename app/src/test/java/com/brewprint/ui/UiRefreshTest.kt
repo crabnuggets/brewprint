@@ -60,7 +60,7 @@ class UiRefreshTest {
         compose.runOnIdle {
             val beans = Beans(name = "Ethiopia", roaster = "Sample")
             val grinder = Grinder(name = "Hand grinder", lastSetting = 24)
-            val recipe = Recipe(name = "Filter", dose = 15.0, ratio = 16.0,
+            val recipe = Recipe(name = "Filter", dose = 15.0,
                 pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
             repository.upsertBeans(beans).getOrThrow()
             repository.upsertGrinder(grinder).getOrThrow()

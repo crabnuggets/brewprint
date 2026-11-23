@@ -66,11 +66,6 @@ data class Recipe(
     val id: String = newId(),
     val name: String = "",
     val dose: Double = 0.0,
-    /**
-     * Kept in synced JSON for older versions of the app, which check it against the pours. This version always
-     * stores [derivedRatio] here and reads [computedRatio] instead.
-     */
-    val ratio: Double = 0.0,
     val pulses: List<Pulse> = listOf(Pulse()),
     val notes: String = "",
     val archived: Boolean = false,
@@ -95,8 +90,8 @@ data class Recipe(
         BigDecimal.valueOf(totalWater).add(BigDecimal.valueOf(it)).divide(BigDecimal.valueOf(dose), 6, RoundingMode.HALF_UP).toDouble()
     }
 
-    /** The recipe as every version saves it: the stored ratio from the pours, and no ice on a hot recipe. */
-    fun normalized(): Recipe = copy(ratio = computedRatio, iceGrams = iceGrams.takeIf { drinkStyle == DrinkStyle.ICED })
+    /** The recipe as it is saved: no ice on a hot recipe. */
+    fun normalized(): Recipe = copy(iceGrams = iceGrams.takeIf { drinkStyle == DrinkStyle.ICED })
 
     fun validationErrors(): List<String> = buildList {
         if (name.isBlank()) add("Enter a recipe name.")
@@ -134,7 +129,7 @@ data class Recipe(
     }
 }
 
-/** [pulses]' water over [dose], rounded half up to 6 decimals in decimal arithmetic, as the MCP server does too. */
+/** [pulses]' water over [dose], rounded half up to 6 decimals in decimal arithmetic; [formatRatio] shows it to one. */
 fun derivedRatio(dose: Double, pulses: List<Pulse>): Double {
     val water = roundedAmount(pulses.sumOf { it.water })
     if (!dose.isFinite() || dose <= 0 || !water.isFinite() || water <= 0) return 0.0

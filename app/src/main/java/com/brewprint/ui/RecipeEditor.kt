@@ -347,6 +347,6 @@ private fun SideBySide(count: Int, fields: @Composable (Modifier) -> Unit) {
 
 private fun pulseInputs(recipe: Recipe) = recipe.pulses.mapIndexed { index, pulse -> PulseInput(pulse.label, pulse.water.takeIf { it > 0 }?.let(::formatAmount) ?: "", pulse.pourSeconds.takeIf { it > 0 }?.toString() ?: "", pulse.waitSeconds.toString(), "initial-$index", pulse.notes) }
 
-private fun positiveDecimal(value: String): Double? = value.toDoubleOrNull()?.takeIf {
+internal fun positiveDecimal(value: String): Double? = value.toDoubleOrNull()?.takeIf {
     value.matches(Regex("[0-9]+(?:\\.[0-9])?")) && it.isFinite() && it > 0
 }

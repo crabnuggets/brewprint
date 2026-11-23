@@ -25,7 +25,7 @@ class LibraryDraftJourneyTest {
     @get:Rule val temporary = TemporaryFolder()
 
     private val kii = Beans(name = "Kii", roaster = "Tim Wendelboe", origin = "Kenya", expectedNotes = "Blackcurrant, hibiscus")
-    private val plan = Recipe(name = "Three pours", dose = 15.0, ratio = 16.0,
+    private val plan = Recipe(name = "Three pours", dose = 15.0,
         pulses = listOf(Pulse("Bloom", 45.0, 10, 35), Pulse(water = 100.0, pourSeconds = 15, waitSeconds = 20), Pulse(water = 95.0, pourSeconds = 15)))
 
     private fun repository(): BrewRepository {

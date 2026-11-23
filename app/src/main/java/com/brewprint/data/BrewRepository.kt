@@ -127,7 +127,6 @@ class BrewRepository(context: Context) {
 
     fun upsertRecipe(recipe: Recipe): Result<Unit> = change { current ->
         require(recipe.validationErrors().isEmpty()) { recipe.validationErrors().first() }
-        // Every saved recipe carries the ratio its pours give, which older versions of the app check.
         val saved = recipe.normalized()
         current.copy(recipes = current.recipes.filterNot { it.id == recipe.id } + saved).resolvingDraft(recipe.id) to Unit
     }

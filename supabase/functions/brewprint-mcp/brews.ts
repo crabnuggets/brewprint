@@ -46,8 +46,6 @@ export interface Recipe {
   id: string;
   name: string;
   dose: number;
-  /** Older app versions check this against the pours; read the ratio from dose and pulses instead (recipeRatio). */
-  ratio: number;
   pulses: Pulse[];
   notes: string;
   archived: boolean;
@@ -150,7 +148,7 @@ export function totalWater(pulses: Pulse[]): number {
 
 /**
  * [grams] per gram of [dose], rounded half up to [places] decimals in decimal arithmetic, as the app's BigDecimal
- * does: 6 places for the ratio the app stores, 1 for the ratio people read. 0 when either is missing.
+ * does. 0 when either is missing.
  */
 export function ratioOf(dose: number, grams: number, places: number): number {
   const d = decimal(dose);
