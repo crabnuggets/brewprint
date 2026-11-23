@@ -19,6 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w411dp-h891dp")
@@ -115,6 +116,35 @@ class ScaleJourneyTest {
         assertEquals(256.0, draft.recipe.totalWater, 0.0)
         assertEquals(16.0, draft.scale!!.weighedDose!!, 0.0)
         assertEquals(ScaleStep.ARMED, draft.scaleStep)
+    }
+
+    private fun armedFooter(): Pair<androidx.compose.ui.geometry.Rect, androidx.compose.ui.geometry.Rect> {
+        open(paired = true)
+        tap("Tare")
+        live = ScaleLive(connected = true, grams = 15.0, steady = true)
+        tap("Keep 15 g")
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        shows("Waiting for the first pour")
+        return compose.onNodeWithText("Start timer now").fetchSemanticsNode().boundsInRoot to compose.onNodeWithText("Finish without timing").fetchSemanticsNode().boundsInRoot
+    }
+
+    // Real text widths decide whether the actions fit side by side.
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun `the armed footer's actions share one row when they fit`() {
+        val (start, finish) = armedFooter()
+        assertEquals(start.top, finish.top, 0.5f)
+        assertEquals(start.width, finish.width, 1f)
+        assertTrue(start.right < finish.left)
+    }
+
+    // A narrow screen, as with a larger display size: the actions stack at full width with a gap, never staggered.
+    @Config(qualifiers = "w355dp-h770dp")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test fun `on a narrow screen the armed footer's actions stack at full width`() {
+        val (start, finish) = armedFooter()
+        assertEquals(start.left, finish.left, 0.5f)
+        assertEquals(start.width, finish.width, 1f)
+        assertTrue(finish.top > start.bottom)
     }
 
     @Test fun `a reading at zero is not coffee and a dropped scale tares the brewer again`() {

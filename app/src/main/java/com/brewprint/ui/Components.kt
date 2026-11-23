@@ -55,7 +55,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -237,15 +239,15 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
     val scrolledUnder by remember(scroll) { derivedStateOf { scroll.value > headerHeight } }
     var footerTop by remember { mutableFloatStateOf(0f) }
     Column(Modifier.fillMaxSize().paper().imePadding()) {
+        // The header is measured first and the content's top space reads its height in the same pass,
+        // so a new page's first frame already starts below the header instead of jumping down a frame later.
         Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
-            val density = LocalDensity.current
-            Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-                Spacer(Modifier.height(with(density) { headerHeight.toDp() }))
-                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
-                Spacer(Modifier.height(chrome.navSpace))
-            }
             Row(
-                Modifier.fillMaxWidth().onSizeChanged { headerHeight = it.height }.graphicsLayer { translationY = offset }
+                Modifier.zIndex(1f).fillMaxWidth().layout { measurable, constraints ->
+                    val header = measurable.measure(constraints)
+                    headerHeight = header.height
+                    layout(header.width, header.height) { header.place(0, 0) }
+                }.graphicsLayer { translationY = offset }
                     .paper { offset }
                     .then(if (scrolledUnder) Modifier.drawBehind { drawLine(outlineVariant, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx()) } else Modifier)
                     .padding(start = if (back == null) 24.dp else 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
@@ -254,6 +256,14 @@ fun Page(title: String, back: (() -> Unit)? = null, actions: @Composable RowScop
                 if (back != null) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
                 Text(title, style = if (back == null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).semantics { heading() })
                 actions()
+            }
+            Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                Spacer(Modifier.fillMaxWidth().layout { measurable, constraints ->
+                    val space = measurable.measure(constraints.copy(minHeight = headerHeight, maxHeight = headerHeight))
+                    layout(space.width, space.height) { space.place(0, 0) }
+                })
+                Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
+                Spacer(Modifier.height(chrome.navSpace))
             }
         }
         // A hairline marks where content continues under the footer, so a cut-off line reads as scrollable.
@@ -376,6 +386,43 @@ internal fun SecondaryAction(text: String, enabled: Boolean = true, icon: ImageV
 
 /** False inside a screen that is animating out, so its Back handler stands aside. */
 internal val LocalScreenActive = compositionLocalOf { true }
+
+/**
+ * Footer actions side by side in equal shares when each fits its share on one line, else stacked at full width,
+ * so a narrow screen or large text never leaves them staggered. A single action keeps its own width, centered.
+ */
+@Composable
+internal fun ActionRow(content: @Composable () -> Unit) {
+    androidx.compose.ui.layout.Layout(content, Modifier.fillMaxWidth()) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        if (measurables.size == 1) {
+            val only = measurables.single().measure(loose)
+            return@Layout layout(width, only.height) { only.place((width - only.width) / 2, 0) }
+        }
+        val gap = 10.dp.roundToPx()
+        val share = (width - gap * (measurables.size - 1)) / measurables.size
+        if (measurables.all { it.maxIntrinsicWidth(constraints.maxHeight) <= share }) {
+            val placeables = measurables.map { it.measure(loose.copy(minWidth = share, maxWidth = share)) }
+            val height = placeables.maxOf { it.height }
+            layout(width, height) { placeables.forEachIndexed { index, it -> it.place(index * (share + gap), (height - it.height) / 2) } }
+        } else {
+            val stackGap = 8.dp.roundToPx()
+            val placeables = measurables.map { it.measure(loose.copy(minWidth = width)) }
+            layout(width, placeables.sumOf { it.height } + stackGap * (placeables.size - 1)) {
+                var y = 0
+                placeables.forEach { it.place(0, y); y += it.height + stackGap }
+            }
+        }
+    }
+}
+
+/** Opening a deeper screen slides it in a short way while it fades; Back reverses it. Screens at one depth cross-fade. */
+internal fun screenChange(from: Int, to: Int): androidx.compose.animation.ContentTransform = when {
+    to == from -> fadeIn(tween(300, delayMillis = 60)) togetherWith fadeOut(tween(160))
+    to > from -> (androidx.compose.animation.slideInHorizontally(tween(340)) { it / 8 } + fadeIn(tween(300))) togetherWith (androidx.compose.animation.slideOutHorizontally(tween(340)) { -it / 16 } + fadeOut(tween(200)))
+    else -> (androidx.compose.animation.slideInHorizontally(tween(340)) { -it / 16 } + fadeIn(tween(300))) togetherWith (androidx.compose.animation.slideOutHorizontally(tween(340)) { it / 8 } + fadeOut(tween(200)))
+}
 
 /** Content animating out: still drawn, but it takes no touches and is hidden from TalkBack. */
 internal fun Modifier.inert(on: Boolean): Modifier = if (!on) this else clearAndSetSemantics { }.pointerInput(Unit) {

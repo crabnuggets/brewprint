@@ -31,7 +31,7 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - **Header.** A screen's header, with its title, Back action, and header actions, slides away as the content scrolls down and returns as soon as it scrolls up. Android Back keeps working while it is hidden. On the brew sheet the header stays while a timer runs, so the scale status is always in view.
 - **Bottom navigation.** The floating navigation hides as the content scrolls down and returns when it scrolls up or reaches the end.
 - **Floating action.** "New brew", or "Resume brew" while a brew is in progress, floats at the bottom right of Brew, above the navigation. It is a filled primary button with the small corners, and it drops to the corner while the navigation is hidden. It stays in view while TalkBack is on, and screen readers reach it after the screen's content.
-- **Footer actions.** Actions pinned to the bottom of a screen, such as Pause, the skip action, and "Save brew", never hide. On the running brew sheet they take one row of buttons with "Finish brew" as a smaller action beneath.
+- **Footer actions.** Actions pinned to the bottom of a screen, such as Pause, the skip action, and "Save brew", never hide. On the running brew sheet they take one row of buttons with "Finish brew" as a smaller action beneath. Actions that share a row split it evenly; when one would not fit its share, as on a narrow screen or with large text, they stack at full width with a gap, never staggered.
 
 ## Lists and gestures
 
@@ -43,7 +43,7 @@ While a row is swiped, the action behind it shows on soft gray. Once the swipe p
 
 Motion should feel calm and continuous rather than snappy: about 250–400 ms with a gentle ease-out, and nothing that bounces.
 
-- **Screens.** Opening a screen slides it in a short distance while it fades in; Back reverses it. Switching destinations cross-fades.
+- **Screens.** Opening a screen slides it in a short distance while it fades in; Back reverses it. Switching destinations cross-fades. The Library's own screens (a section, an item, its editor) move the same way. A screen on its way out keeps what it showed: starting a brew does not add "Brew in progress" to the Brew screen as it fades. Its first frame already sits below its header. The floating "New brew" action and the navigation fade or slide away with the screen they belong to.
 - **Focus card.** On each step change, the state word, labels, and large numbers swap with a short blur cross-fade, for example "On scale" to "Time left" when a pour ends. It starts on the same step change as the vibration and sound, so they land together. Numbers that count within a step, brew time and time left, change in place with fixed-width digits; only the bars move continuously, so the card has one moving thing between steps.
 - **Cards.** Cards grow and shrink smoothly when their content changes, such as the full plan, the scale steps, and the Undo bar.
 - **Chrome.** The header and bottom navigation slide in and out with the scroll. Button labels that change in place, such as Pause and Resume or the skip label, cross-fade.
