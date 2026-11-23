@@ -9,13 +9,14 @@ import kotlinx.serialization.json.JsonObject
 /**
  * What this device knows about syncing with a signed-in account. Beans, grinders, recipes and
  * brew records sync, one item at a time; the brew draft, unsaved note edits and settings stay on the device.
- * Library drafts come from the account, and the account forgets each one once it is added or discarded here.
+ * Library drafts and Claude's tasting notes come from the account, and the account forgets each one once it is added,
+ * saved or discarded here.
  */
 @Serializable
 data class SyncState(
     /** The account this device's data was last synced with; null before the first sign-in. */
     val userId: String? = null,
-    /** Items changed or deleted on this device and not yet uploaded, as "kind/id"; "drafts/id" is a library draft to delete. */
+    /** Items changed or deleted on this device and not yet uploaded, as "kind/id"; "drafts/id" is one of Claude's drafts to delete. */
     val pending: Set<String> = emptySet(),
     /** The server time of the newest change already merged; null to fetch everything. */
     val pulledUpTo: String? = null,
@@ -58,6 +59,20 @@ fun AppState.resolvingDraft(id: String): AppState {
     return copy(libraryDrafts = libraryDrafts.filterNot { it.id == id }, sync = sync.copy(pending = sync.pending + key(DRAFTS, id), raw = sync.raw + listOfNotNull(added)))
 }
 
+/**
+ * Takes Claude's tasting notes for the brew with [brewId] off that brew, if they are there, and queues their deletion
+ * from the account. Saving them sets the brew's journal; discarding them changes nothing else.
+ */
+fun AppState.resolvingJournalDraft(brewId: String): AppState {
+    if (journalDrafts.none { it.brewId == brewId }) return this
+    return copy(journalDrafts = journalDrafts.filterNot { it.brewId == brewId }, sync = sync.copy(pending = sync.pending + key(DRAFTS, brewId)))
+}
+
+/** Tasting notes Claude drafted, held by the account under the brew's id, or null when this isn't such a draft. */
+fun journalDraft(kind: String, id: String, data: JsonElement): JournalDraft? = runCatching {
+    if (kind == "journals") JournalDraft(id, syncJson.decodeFromJsonElement(Journal.serializer(), data)) else null
+}.getOrNull()
+
 /** A draft as the account holds it, or null when this version can't read it. */
 fun libraryDraft(kind: String, id: String, data: JsonElement): LibraryDraft? = runCatching {
     when (kind) {
@@ -81,10 +96,13 @@ private fun overlay(raw: JsonObject, known: JsonObject): JsonObject = JsonObject
     if (under is JsonObject && value is JsonObject) overlay(under, value) else value
 })
 
-/** Replaces the Library's drafts with the account's, leaving out ones this phone already added or discarded. */
-fun AppState.withDrafts(drafts: List<LibraryDraft>): AppState = copy(libraryDrafts = drafts.filter { draft ->
-    key(DRAFTS, draft.id) !in sync.pending && beans.none { it.id == draft.id } && recipes.none { it.id == draft.id }
-})
+/** Replaces Claude's drafts with the account's, leaving out ones this phone already added, saved or discarded. */
+fun AppState.withDrafts(drafts: List<LibraryDraft>, journals: List<JournalDraft> = emptyList()): AppState = copy(
+    libraryDrafts = drafts.filter { draft ->
+        key(DRAFTS, draft.id) !in sync.pending && beans.none { it.id == draft.id } && recipes.none { it.id == draft.id }
+    },
+    journalDrafts = journals.filter { key(DRAFTS, it.brewId) !in sync.pending },
+)
 
 /** The synced items that differ between [old] and [new], including ones added or removed. */
 fun changedKeys(old: AppState, new: AppState): Set<String> = buildSet {
@@ -138,6 +156,7 @@ fun AppState.withoutAccountData(): AppState = copy(
     draft = null,
     noteEdits = emptyList(),
     libraryDrafts = emptyList(),
+    journalDrafts = emptyList(),
     defaultGrinderId = null,
     lastBeansId = null,
     lastBatchId = null,

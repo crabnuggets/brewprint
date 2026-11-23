@@ -30,6 +30,10 @@ _Avoid_: Age, freshness
 Beans or a recipe Claude proposes, waiting in the Library until the user adds it, after any edits, or discards it. Shown in the app as a draft from Claude.
 _Avoid_: Brew draft, suggestion
 
+**Tasting notes draft**:
+A tasting journal Claude proposes for one brew record, from what the user told it about the cup, waiting on that record until the user saves it, after any edits, or discards it. Shown in the app as tasting notes from Claude.
+_Avoid_: Library draft, brew draft
+
 **Dose**:
 The mass of dry coffee used for a brew, measured in grams.
 _Avoid_: Serving size

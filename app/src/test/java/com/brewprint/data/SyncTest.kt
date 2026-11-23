@@ -175,4 +175,57 @@ class SyncTest {
         assertNull(libraryDraft("grinders", "draft-2", data))
         assertNull(libraryDraft("recipes", "draft-3", syncJson.parseToJsonElement("""{"pulses":"none"}""")))
     }
+
+    private fun savedBrew(repository: BrewRepository, journal: Journal = Journal()): BrewRecord {
+        val recipe = Recipe(name = "Three pours", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 40)))
+        repository.upsertBeans(beans).getOrThrow()
+        repository.upsertGrinder(grinder).getOrThrow()
+        repository.upsertRecipe(recipe).getOrThrow()
+        val draft = repository.startDraft().getOrThrow().copy(beans = beans, grinder = grinder, setting = 24, recipe = recipe, journal = journal)
+        repository.updateDraft(draft).getOrThrow()
+        return repository.saveBrew(draft.id).getOrThrow()
+    }
+
+    @Test fun `saving or discarding Claude's tasting notes deletes them from the account, once`() {
+        val repository = BrewRepository(context)
+        val first = savedBrew(repository, Journal(impression = "Bright"))
+        val second = savedBrew(repository)
+        repository.state.value.let { repository.markPushed(it.sync.pending.associateWith(it::syncData)).getOrThrow() }
+        val notes = listOf(JournalDraft(first.id, Journal(impression = "Bright", aroma = "Jammy")), JournalDraft(second.id, Journal(body = "Light")))
+        repository.applyDrafts(emptyList(), notes).getOrThrow()
+        assertEquals(notes, repository.state.value.journalDrafts)
+        assertTrue(repository.state.value.sync.pending.isEmpty())
+
+        // Saving sets the brew's notes as reviewed and replaces unsaved edits; discarding leaves the brew as it was.
+        repository.saveNoteEdit(first.id, Journal(impression = "Half-typed")).getOrThrow()
+        repository.saveDraftedNotes(first.id, notes[0].journal.copy(nextTime = "Finer")).getOrThrow()
+        repository.discardJournalDraft(second.id).getOrThrow()
+        val state = repository.state.value
+        assertEquals(listOf(Journal(), Journal(impression = "Bright", aroma = "Jammy", nextTime = "Finer")), state.brews.sortedBy { it.id != second.id }.map { it.journal })
+        assertTrue(state.journalDrafts.isEmpty() && state.noteEdits.isEmpty())
+        assertEquals(setOf("brews/${first.id}", "drafts/${first.id}", "drafts/${second.id}"), state.sync.pending)
+
+        // A fetch made before the deletions reach the account doesn't bring the notes back.
+        repository.applyDrafts(emptyList(), notes).getOrThrow()
+        assertTrue(repository.state.value.journalDrafts.isEmpty())
+        repository.markPushed(state.sync.pending.associateWith(state::syncData)).getOrThrow()
+        assertTrue(repository.state.value.sync.pending.isEmpty())
+    }
+
+    @Test fun `deleting a brew discards Claude's tasting notes for it`() {
+        val repository = BrewRepository(context)
+        val brew = savedBrew(repository)
+        repository.applyDrafts(emptyList(), listOf(JournalDraft(brew.id, Journal(impression = "Sweet")))).getOrThrow()
+        repository.deleteBrew(brew.id).getOrThrow()
+        assertTrue(repository.state.value.journalDrafts.isEmpty())
+        assertTrue("drafts/${brew.id}" in repository.state.value.sync.pending)
+    }
+
+    @Test fun `tasting notes drafts take the brew's id and aren't read as library drafts`() {
+        val data = syncJson.parseToJsonElement("""{"impression":"Sweet","body":"Light"}""")
+        assertEquals(JournalDraft("brew-1", Journal(impression = "Sweet", body = "Light")), journalDraft("journals", "brew-1", data))
+        assertNull(libraryDraft("journals", "brew-1", data))
+        assertNull(journalDraft("beans", "brew-1", data))
+        assertNull(journalDraft("journals", "brew-1", syncJson.parseToJsonElement("""{"flavorTags":"none"}""")))
+    }
 }

@@ -35,6 +35,13 @@ class McpContractTest {
         assertEquals(recipe, libraryDraft("recipes", recipe.id, syncJson.parseToJsonElement(recipeFixture))?.recipe)
     }
 
+    @Test fun `the MCP server's tasting notes are a journal the app can save as they are`() {
+        val fixture = File("../supabase/functions/brewprint-mcp/fixtures/draft-journal.json").readText()
+        val journal = Json.decodeFromString(Journal.serializer(), fixture)
+        assertEquals(syncJson.parseToJsonElement(fixture), syncJson.encodeToJsonElement(Journal.serializer(), journal))
+        assertEquals(JournalDraft("brew-1", journal), journalDraft("journals", "brew-1", syncJson.parseToJsonElement(fixture)))
+    }
+
     private fun paths(element: JsonElement, at: String = ""): Set<String> = when (element) {
         is JsonObject -> element.flatMap { (name, value) -> paths(value, "$at/$name") + "$at/$name" }.toSet()
         is JsonArray -> element.flatMapIndexed { index, value -> paths(value, "$at/$index") }.toSet()

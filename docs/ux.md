@@ -18,7 +18,7 @@ Recipes describe the brewing plan. Beans, grinder, and tick setting belong to an
 
 Use four bottom navigation destinations:
 
-- Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress and another the drafts from Claude waiting. The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
+- Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress, another the drafts from Claude waiting, and one for each older brew with tasting notes from Claude waiting. The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
 - History: completed brew records, newest first. Open a record to inspect, edit, or repeat it.
 - Library: a hub with a card for each of recipes, beans, and grinders, each showing its count and one useful value: the most used recipe, the beans brewed last, the default grinder and its setting. A card opens that kind's own list, with "Add" in its header. Tapping Library again returns to the hub.
 - Settings: account, appearance, the brew timer, the coffee scale, and experiments. It has no Back arrow; Android Back on History, Library, or Settings returns to Brew.
@@ -248,6 +248,12 @@ Offer an optional text field labeled "As it cools" with the prompt "Did anything
 
 On the saved record, show the user's written impression first, followed by only the guided fields they filled in and their "Next time" reminder. Keep preparation details below the journal. History rows may show a one-line excerpt of the written impression; an empty journal displays "Add tasting notes" without a warning or an incomplete status.
 
+### Tasting notes from Claude
+
+With Brewprint connected to Claude, the user can talk through a cup with Claude, which then drafts the tasting notes for that brew from what the user said. The notes reach the phone when it syncs and wait on the brew; they never replace its notes until the user saves them.
+
+While Claude's notes wait, the brew's tasting notes action reads "Review tasting notes from Claude", on the record and on the most recent brew's card. An older brew gets its own card on Brew, "Review tasting notes from Claude" with the beans' name and the brew's date beneath. The review is the usual tasting notes form, titled "Review tasting notes", filled in with Claude's notes, which start from the brew's own notes, and with "Explore the taste" open when Claude filled in any guided field. A line beneath the beans' name says "Claude filled these in from your conversation. Check them, change anything, then save." "Save notes" saves them, with any edits, as the brew's notes, in place of any unsaved note edits. Back leaves Claude's notes waiting; unsaved edits ask "Discard changes?" first, and are not kept. The header's red trash action, "Discard draft", asks "Discard Claude's notes?" with "Your brew keeps the notes it has.", "Discard" and "Keep draft". To have Claude fix the notes instead, ask it in the conversation; its correction replaces them on the next sync, including on an open review the user hasn't edited. A review whose notes were saved or discarded on another phone closes. Deleting a brew discards Claude's notes for it.
+
 For example, the user saves a brew before tasting, returns from the Brew screen, writes "Smells like cocoa; lighter than I expected", selects Light body and silky mouthfeel, and adds "Sweeter as it cooled" later. On their next visit to that record, those observations sit beside the exact recipe and tick setting that produced the cup. The app makes no automatic diagnosis or grinder adjustment from tasting notes.
 
 ## Account and sync
@@ -256,7 +262,7 @@ Settings opens with "Account". Signed out, it explains what signing in keeps and
 
 Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
 
-- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, and the paired scale stay on the phone. Each sync also fetches Claude's drafts; adding or discarding one deletes it from the account.
+- **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, and the paired scale stay on the phone. Each sync also fetches Claude's drafts, beans, recipes and tasting notes; adding, saving or discarding one deletes it from the account.
 - **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
 - **Signing in.** Anything made on the phone while signed out joins the account; a fresh install receives everything in the account.
 - **One account's data at a time.** Accounts never merge. Signing in to a different account than the phone last synced with replaces the phone's beans, grinders, recipes, brews, and brew draft with that account's. If the earlier account still has changes waiting to upload, for example after its session ended while offline, sign-in is refused with "This phone has changes that haven't reached the Google account you used before. Sign in with that account first."

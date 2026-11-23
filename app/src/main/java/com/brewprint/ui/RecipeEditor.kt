@@ -171,7 +171,7 @@ fun RecipeEditor(initial: Recipe?, onSave: (Recipe) -> Boolean, onBack: () -> Un
         }
     }
 
-    LibraryPage(if (onDiscardDraft != null) "Review recipe" else if (initial == null) "New recipe" else "Edit recipe", back, actions = { onDiscardDraft?.let { DiscardDraftAction(it) } }) {
+    LibraryPage(if (onDiscardDraft != null) "Review recipe" else if (initial == null) "New recipe" else "Edit recipe", back, actions = { onDiscardDraft?.let { DiscardDraftAction(onDiscard = it) } }) {
         LibraryField(name, { name = it }, "Name", error = if (name.isBlank()) "Enter a recipe name." else null, required = true)
         Text("Style", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

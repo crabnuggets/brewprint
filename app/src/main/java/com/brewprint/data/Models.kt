@@ -239,6 +239,13 @@ data class LibraryDraft(
     val raw: kotlinx.serialization.json.JsonObject? = null,
 )
 
+/**
+ * Tasting notes Claude drafted for the brew with [brewId], waiting on that brew for the user to save or discard. The
+ * account holds the draft under the brew's id; this phone keeps the latest copy it fetched.
+ */
+@Serializable
+data class JournalDraft(val brewId: String, val journal: Journal)
+
 @Serializable
 data class AppState(
     val beans: List<Beans> = emptyList(),
@@ -248,6 +255,7 @@ data class AppState(
     val draft: BrewDraft? = null,
     val noteEdits: List<NoteEdit> = emptyList(),
     val libraryDrafts: List<LibraryDraft> = emptyList(),
+    val journalDrafts: List<JournalDraft> = emptyList(),
     val defaultGrinderId: String? = null,
     val lastBeansId: String? = null,
     /** The batch of [lastBeansId] used last, chosen again for the next brew with those beans. */
