@@ -52,28 +52,54 @@ data class Pulse(
     val water: Double = 0.0,
     val pourSeconds: Int = 0,
     val waitSeconds: Int = 0,
+    /** What to do during this step, such as "Stir gently 3 times". Optional. */
+    val notes: String = "",
 )
+
+/** Whether a recipe brews hot coffee, or onto ice. */
+@Serializable enum class DrinkStyle { HOT, ICED }
 
 @Serializable
 data class Recipe(
     val id: String = newId(),
     val name: String = "",
     val dose: Double = 0.0,
+    /**
+     * Kept in synced JSON for older versions of the app, which check it against the pours. This version always
+     * stores [derivedRatio] here and reads [computedRatio] instead.
+     */
     val ratio: Double = 0.0,
     val pulses: List<Pulse> = listOf(Pulse()),
     val notes: String = "",
     val archived: Boolean = false,
+    val drinkStyle: DrinkStyle = DrinkStyle.HOT,
+    /** Ice in the server before brewing, for an iced recipe only. Never a scale target. */
+    val iceGrams: Double? = null,
+    val waterTempC: Int? = null,
+    /** When the drawdown should end, counted from the first pour. */
+    val targetFinishSeconds: Int? = null,
+    /** How the grind should look, such as "Medium-fine", alongside the grinder's ticks. */
+    val grindDescription: String = "",
+    val sourceUrl: String = "",
 ) {
-    val totalWater: Double get() = totalBrewWater(dose, ratio)
-    val plannedWater: Double get() = roundedAmount(pulses.sumOf { it.water })
+    /** The hot water poured: the pulses' total, rounded to 0.1 g. */
+    val totalWater: Double get() = roundedAmount(pulses.sumOf { it.water })
+
+    /** Grams of water per gram of coffee, from the dose and the pours; 0 when either is missing. */
+    val computedRatio: Double get() = derivedRatio(dose, pulses)
+
+    /** For an iced recipe, water and ice together per gram of coffee; null otherwise. */
+    val overallRatio: Double? get() = iceGrams?.takeIf { drinkStyle == DrinkStyle.ICED && it > 0 && dose > 0 }?.let {
+        BigDecimal.valueOf(totalWater).add(BigDecimal.valueOf(it)).divide(BigDecimal.valueOf(dose), 6, RoundingMode.HALF_UP).toDouble()
+    }
+
+    /** The recipe as every version saves it: the stored ratio from the pours, and no ice on a hot recipe. */
+    fun normalized(): Recipe = copy(ratio = computedRatio, iceGrams = iceGrams.takeIf { drinkStyle == DrinkStyle.ICED })
 
     fun validationErrors(): List<String> = buildList {
         if (name.isBlank()) add("Enter a recipe name.")
         if (!dose.isFinite() || dose <= 0 || !oneDecimal(dose)) {
             add("Coffee dose must be positive with up to one decimal place.")
-        }
-        if (!ratio.isFinite() || ratio <= 0 || !totalWater.isFinite() || totalWater <= 0) {
-            add("Enter a positive brew ratio.")
         }
         if (pulses.isEmpty()) add("Add at least one pulse.")
         pulses.forEachIndexed { index, pulse ->
@@ -86,14 +112,12 @@ data class Recipe(
                 add("The last pulse cannot have a wait.")
             }
         }
-        if (plannedWater.isFinite() && totalWater.isFinite() && plannedWater != totalWater) {
-            val difference = roundedAmount(totalWater - plannedWater)
-            add(if (difference > 0) {
-                "Add ${formatAmount(difference)} g across your pulses to reach ${formatAmount(totalWater)} g."
-            } else {
-                "Remove ${formatAmount(-difference)} g across your pulses to reach ${formatAmount(totalWater)} g."
-            })
+        if (drinkStyle == DrinkStyle.ICED && iceGrams != null && (!iceGrams.isFinite() || iceGrams <= 0 || !oneDecimal(iceGrams))) {
+            add("Ice must be positive with up to one decimal place.")
         }
+        if (waterTempC != null && waterTempC !in 1..100) add("Water temperature must be from 1 to 100 °C.")
+        if (targetFinishSeconds != null && targetFinishSeconds <= 0) add("Target finish time must be positive.")
+        if (sourceUrl.isNotBlank() && !webAddress(sourceUrl)) add("Enter a web address starting with http:// or https://.")
     }
 
     fun schedule(): List<ScheduledPulse> {
@@ -108,11 +132,20 @@ data class Recipe(
     }
 }
 
-data class ScheduledPulse(val pulse: Pulse, val startSeconds: Int, val cumulativeWater: Double)
+/** [pulses]' water over [dose], rounded half up to 6 decimals in decimal arithmetic, as the MCP server does too. */
+fun derivedRatio(dose: Double, pulses: List<Pulse>): Double {
+    val water = roundedAmount(pulses.sumOf { it.water })
+    if (!dose.isFinite() || dose <= 0 || !water.isFinite() || water <= 0) return 0.0
+    return BigDecimal.valueOf(water).divide(BigDecimal.valueOf(dose), 6, RoundingMode.HALF_UP).toDouble()
+}
 
-fun totalBrewWater(dose: Double, ratio: Double): Double = if (dose.isFinite() && ratio.isFinite()) {
-    BigDecimal.valueOf(dose).multiply(BigDecimal.valueOf(ratio)).setScale(1, RoundingMode.HALF_UP).toDouble()
-} else dose * ratio
+/** An http or https address with a host, the only kind the app opens. */
+fun webAddress(text: String): Boolean = runCatching {
+    val uri = java.net.URI(text.trim())
+    uri.scheme?.lowercase() in setOf("http", "https") && !uri.host.isNullOrBlank()
+}.getOrDefault(false)
+
+data class ScheduledPulse(val pulse: Pulse, val startSeconds: Int, val cumulativeWater: Double)
 
 fun roundedAmount(value: Double): Double = if (value.isFinite()) {
     BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).toDouble()
@@ -122,6 +155,11 @@ private fun oneDecimal(value: Double): Boolean = roundedAmount(value) == value
 
 fun formatAmount(value: Double): String = if (value.isFinite()) {
     BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
+} else "0"
+
+/** A ratio's denominator for display: half up to one decimal, without a trailing ".0", the same in every locale. */
+fun formatRatio(value: Double): String = if (value.isFinite()) {
+    BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 } else "0"
 
 fun formatDuration(seconds: Int): String = "%d:%02d".format(seconds / 60, seconds % 60)
@@ -189,7 +227,13 @@ data class NoteEdit(val brewId: String, val journal: Journal)
  * [recipe] is set, with this draft's [id]. The account holds drafts; this phone keeps the latest copy it fetched.
  */
 @Serializable
-data class LibraryDraft(val id: String, val beans: Beans? = null, val recipe: Recipe? = null)
+data class LibraryDraft(
+    val id: String,
+    val beans: Beans? = null,
+    val recipe: Recipe? = null,
+    /** The draft's JSON when it has fields this version doesn't know, kept for the item it becomes once added. */
+    val raw: kotlinx.serialization.json.JsonObject? = null,
+)
 
 @Serializable
 data class AppState(

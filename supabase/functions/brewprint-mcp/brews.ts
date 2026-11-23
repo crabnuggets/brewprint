@@ -26,16 +26,28 @@ export interface Pulse {
   water: number;
   pourSeconds: number;
   waitSeconds: number;
+  /** Missing on records saved before step notes. */
+  notes?: string;
 }
+
+export type DrinkStyle = "HOT" | "ICED";
 
 export interface Recipe {
   id: string;
   name: string;
   dose: number;
+  /** Older app versions check this against the pours; read the ratio from dose and pulses instead (recipeRatio). */
   ratio: number;
   pulses: Pulse[];
   notes: string;
   archived: boolean;
+  // Missing on recipes saved before these details existed.
+  drinkStyle?: DrinkStyle;
+  iceGrams?: number | null;
+  waterTempC?: number | null;
+  targetFinishSeconds?: number | null;
+  grindDescription?: string;
+  sourceUrl?: string;
 }
 
 export interface Journal {
@@ -109,7 +121,58 @@ export function library(rows: Row[]): Library {
 }
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
-const totalWater = (recipe: Recipe) => round1(recipe.dose * recipe.ratio);
+
+/** A number's exact decimal digits and scale, as the app's BigDecimal.valueOf reads it. Null for exponent notation. */
+export function decimal(value: number): [bigint, number] | null {
+  const written = String(value);
+  if (!Number.isFinite(value) || !/^-?\d+(\.\d+)?$/.test(written)) return null;
+  const [whole, fraction = ""] = written.split(".");
+  return [BigInt(whole + fraction), fraction.length];
+}
+
+/** The hot water poured: the pulses' total, in whole tenths of a gram as the app adds it. */
+export function totalWater(pulses: Pulse[]): number {
+  return pulses.reduce((tenths, pulse) => tenths + Math.round(pulse.water * 10), 0) / 10;
+}
+
+/**
+ * [grams] per gram of [dose], rounded half up to [places] decimals in decimal arithmetic, as the app's BigDecimal
+ * does: 6 places for the ratio the app stores, 1 for the ratio people read. 0 when either is missing.
+ */
+export function ratioOf(dose: number, grams: number, places: number): number {
+  const d = decimal(dose);
+  const tenths = Math.round(grams * 10);
+  if (!d || dose <= 0 || !Number.isFinite(tenths) || tenths <= 0) return 0;
+  const numerator = BigInt(tenths) * 10n ** BigInt(d[1] + places);
+  const denominator = d[0] * 10n;
+  const quotient = numerator / denominator + (2n * (numerator % denominator) >= denominator ? 1n : 0n);
+  return Number(quotient) / 10 ** places;
+}
+
+/** The ratio as people read it, from the dose and the pours: 1:9.4, 1:16. */
+export const recipeRatio = (recipe: Recipe) => ratioOf(recipe.dose, totalWater(recipe.pulses), 1);
+
+/** For an iced recipe with its ice given, water and ice together per gram of coffee, to one decimal. */
+export function overallRatio(recipe: Recipe): number | null {
+  if (recipe.drinkStyle !== "ICED" || !(recipe.iceGrams != null && recipe.iceGrams > 0) || !(recipe.dose > 0)) {
+    return null;
+  }
+  return ratioOf(recipe.dose, totalWater(recipe.pulses) + recipe.iceGrams, 1);
+}
+
+/** The recipe's style and the details it gives; ones it leaves out are null. */
+function recipeDetails(recipe: Recipe) {
+  const iced = recipe.drinkStyle === "ICED";
+  return {
+    style: iced ? "iced" : "hot",
+    iceGrams: iced ? recipe.iceGrams ?? null : null,
+    overallRatio: overallRatio(recipe) == null ? null : `1:${overallRatio(recipe)}`,
+    waterTempC: recipe.waterTempC ?? null,
+    targetFinishSeconds: recipe.targetFinishSeconds ?? null,
+    grindSize: recipe.grindDescription || null,
+    sourceUrl: recipe.sourceUrl || null,
+  };
+}
 
 /** The journal's filled-in fields only, so empty answers don't read as observations. */
 export function tasting(journal: Journal): Record<string, unknown> {
@@ -155,8 +218,10 @@ export function brewSummary(brew: BrewRecord) {
     grindSetting: brew.setting,
     recipe: brew.recipe.name,
     doseGrams: brew.recipe.dose,
-    ratio: `1:${brew.recipe.ratio}`,
-    totalBrewWaterGrams: totalWater(brew.recipe),
+    ratio: `1:${recipeRatio(brew.recipe)}`,
+    totalBrewWaterGrams: totalWater(brew.recipe.pulses),
+    style: recipeDetails(brew.recipe).style,
+    iceGrams: recipeDetails(brew.recipe).iceGrams,
     pulses: brew.recipe.pulses.length,
     totalBrewTimeSeconds: brew.timing?.totalSeconds ?? null,
     measuredWaterGrams: brew.scale?.water ?? null,
@@ -179,6 +244,7 @@ export function brewDetail(brew: BrewRecord) {
       cumulativeTargetGrams: cumulative,
       pourSeconds: pulse.pourSeconds,
       waitSeconds: pulse.waitSeconds,
+      note: pulse.notes || null,
       plannedStartSeconds: plannedStart,
       actualStartSeconds: timing?.pulseStarts[index] ?? null,
       reachedGrams: scale?.reached[index] ?? null,
@@ -188,7 +254,13 @@ export function brewDetail(brew: BrewRecord) {
     ...brewSummary(brew),
     beans: brew.beans,
     grinder: { name: brew.grinder.name, referenceNotes: brew.grinder.referenceNotes },
-    recipe: { name: recipe.name, dose: recipe.dose, ratio: recipe.ratio, notes: recipe.notes },
+    recipe: {
+      name: recipe.name,
+      dose: recipe.dose,
+      ratio: `1:${recipeRatio(recipe)}`,
+      notes: recipe.notes,
+      ...recipeDetails(recipe),
+    },
     pulses,
     timing: timing && {
       totalSeconds: timing.totalSeconds,

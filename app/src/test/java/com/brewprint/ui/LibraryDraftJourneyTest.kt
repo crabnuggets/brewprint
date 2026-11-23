@@ -68,7 +68,7 @@ class LibraryDraftJourneyTest {
         compose.onNode(hasText("Library") and isSelectable()).performClick()
         compose.onNodeWithText("Three pours").performClick()
         compose.onNodeWithText("Review recipe").assertIsDisplayed()
-        compose.onNodeWithText("Planned pours: 240 g / Target: 240 g").performScrollTo().assertExists()
+        compose.onNodeWithContentDescription("Total brew water 240 grams").performScrollTo().assertExists()
         // Back without changes keeps the draft waiting.
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("Discard changes?").assertDoesNotExist()
@@ -96,7 +96,7 @@ class LibraryDraftJourneyTest {
         val corrected = plan.copy(name = "Two pours", pulses = listOf(Pulse("Bloom", 40.0, 10, 30), Pulse(water = 200.0, pourSeconds = 40)))
         compose.runOnIdle { repository.applyDrafts(listOf(LibraryDraft(kii.id, beans = kii), LibraryDraft(plan.id, recipe = corrected))).getOrThrow() }
         compose.onNodeWithText("Two pours").assertIsDisplayed()
-        compose.onNodeWithText("Planned pours: 240 g / Target: 240 g").assertExists()
+        compose.onNodeWithContentDescription("Total brew water 240 grams").assertExists()
         compose.onNodeWithText("Add to Library").performScrollTo().performClick()
         assertEquals(listOf(corrected), repository.state.value.recipes)
 

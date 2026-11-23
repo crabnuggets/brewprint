@@ -1,5 +1,8 @@
 package com.brewprint.data
 
+import java.math.BigDecimal
+import java.math.RoundingMode
+
 import kotlinx.serialization.Serializable
 
 /** The Bluetooth coffee scale chosen in Android's device picker. */
@@ -66,14 +69,28 @@ fun AppState.scaleBrewRunning(now: Long): Boolean {
     return scale != null && draft.scale != null && TimerNow(recipe, timer, now).active
 }
 
-/** This brew's plan for [dose] at the same ratio. The last pulse takes the rounding, so the plan stays valid. */
-fun Recipe.scaledTo(dose: Double): Recipe {
+/**
+ * This recipe for [dose] at the same ratio, worked in whole tenths of a gram. Each pulse scales and rounds, the last
+ * takes what is left of the scaled total, and no pulse drops below 0.1 g: a short one borrows from the largest.
+ * [scaleIce] scales the ice too, as the recipe editor does; a weighed dose leaves the ice alone.
+ */
+fun Recipe.scaledTo(dose: Double, scaleIce: Boolean = false): Recipe {
     val rounded = roundedAmount(dose)
-    val total = totalBrewWater(rounded, ratio)
-    val factor = total / plannedWater
-    val scaled = pulses.dropLast(1).map { it.copy(water = roundedAmount(it.water * factor)) }
-    val last = pulses.last().copy(water = roundedAmount(total - scaled.sumOf { it.water }))
-    return copy(dose = rounded, pulses = scaled + last)
+    if (this.dose <= 0 || rounded <= 0 || pulses.isEmpty()) return copy(dose = rounded).normalized()
+    fun scaled(grams: Double, places: Int) = BigDecimal.valueOf(grams).multiply(BigDecimal.valueOf(rounded)).divide(BigDecimal.valueOf(this.dose), places, RoundingMode.HALF_UP)
+    fun tenths(grams: Double) = scaled(grams, 1).movePointRight(1).toLong()
+    val total = maxOf(tenths(totalWater), pulses.size.toLong())
+    val scaled = pulses.map { maxOf(1L, tenths(it.water)) }.toMutableList()
+    scaled[scaled.lastIndex] = total - scaled.dropLast(1).sum()
+    while (scaled.any { it < 1 }) {
+        val short = scaled.indexOfFirst { it < 1 }
+        val largest = scaled.indices.maxBy { scaled[it] }
+        val take = minOf(1 - scaled[short], scaled[largest] - 1)
+        scaled[short] += take
+        scaled[largest] -= take
+    }
+    val ice = if (scaleIce) iceGrams?.let { maxOf(0.1, scaled(it, 1).toDouble()) } else iceGrams
+    return copy(dose = rounded, iceGrams = ice, pulses = pulses.mapIndexed { index, pulse -> pulse.copy(water = scaled[index] / 10.0) }).normalized()
 }
 
 /**

@@ -15,3 +15,8 @@ Each draft holds the item's JSON exactly as the app saves it. The server checks 
 - The app only syncs once this migration is applied: it reads `drafts` on every sync, so apply `20261121120000_drafts.sql` before releasing an app that does.
 - If Claude corrects a draft after the user adds it on the phone but before the phone syncs, the correction is lost when the draft is deleted. The added item is what the user saw.
 - A draft added or discarded offline waits to be deleted, like any change not yet uploaded, and signing out waits for it too.
+
+## Amendment: the ratio comes from the pours
+
+Recipes no longer take a ratio: the app and `drafts.ts` work it out from the dose and the pulses, so pulses no longer have to add up to dose × ratio. The synced `ratio` field stays, set on every save to the pours' ratio to 6 decimals, because app versions before this change check dose × ratio against the pours and would refuse the recipe otherwise. While those versions may still be installed, `draft_recipe` still accepts a `ratio` and checks the pours against it; a later change removes the argument once every phone is updated.
+

@@ -133,7 +133,7 @@ fun LibraryScreen(
     fun swipeArchive(item: Beans) { if (save(repository.archiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.ARCHIVED, item)) }
     fun swipeUnarchive(item: Beans) { if (save(repository.unarchiveBeans(item.id))) onUndoable(BeansUndo(BeansUndo.Action.UNARCHIVED, item)) }
     fun swipeDelete(item: Beans) {
-        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId)
+        val undo = BeansUndo(BeansUndo.Action.DELETED, item, remembered = state.lastBeansId == item.id, account = state.sync.userId, raw = state.sync.raw["beans/${item.id}"])
         if (save(repository.deleteBeans(item.id))) onUndoable(undo)
     }
     LaunchedEffect(editing) { onEditingChanged(editing) }
@@ -195,7 +195,12 @@ fun LibraryScreen(
                 SoftButton(shape = MaterialTheme.shapes.small, onClick = { settingText = grinder.lastSetting?.toString() ?: ""; settingDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Update last recorded setting") }
             }
             if (recipe != null && kind == "recipes") {
-                Text("${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g", style = MaterialTheme.typography.titleLarge)
+                val ice = recipe.iceGrams?.takeIf { recipe.drinkStyle == DrinkStyle.ICED }
+                Text("${formatAmount(recipe.dose)} g · ${formatAmount(recipe.totalWater)} g water" + (ice?.let { " + ${formatAmount(it)} g ice" } ?: "") + " · 1:${formatRatio(recipe.computedRatio)}" +
+                    (recipe.overallRatio?.let { " · 1:${formatRatio(it)} with ice" } ?: ""), style = MaterialTheme.typography.titleLarge)
+                val facts = recipeFacts(recipe)
+                if (facts.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { facts.forEach { Tag(it) } }
+                SourceLink(recipe.sourceUrl)
                 if (onBrewWith != null && !recipe.archived) BrewWithAction("Brew with this recipe", state.draft != null, onResumeBrew) { onBrewWith(null, recipe.id) }
                 recipe.schedule().forEachIndexed { index, scheduled ->
                     OutlinedCard(Modifier.fillMaxWidth()) {
@@ -203,6 +208,7 @@ fun LibraryScreen(
                             Text("${formatDuration(scheduled.startSeconds)} · ${scheduled.pulse.label.ifBlank { "Pulse ${index + 1}" }}", style = MaterialTheme.typography.titleMedium)
                             Text("Add ${formatAmount(scheduled.pulse.water)} g · Pour to ${formatAmount(scheduled.cumulativeWater)} g total")
                             Text("Pour ${scheduled.pulse.pourSeconds} s" + if (index < recipe.pulses.lastIndex) " · Wait ${scheduled.pulse.waitSeconds} s" else "")
+                            scheduled.pulse.notes.takeIf { it.isNotBlank() }?.let { StepNote(it) }
                         }
                     }
                 }
@@ -403,11 +409,16 @@ private fun Tag(text: String, modifier: Modifier = Modifier, strong: Boolean = f
 @Composable
 private fun RowScope.RecipeRowContent(recipe: Recipe) {
     val colors = MaterialTheme.colorScheme
+    val iced = recipe.drinkStyle == DrinkStyle.ICED
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(recipe.name, style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(recipe.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Tag(if (iced) "Iced" else "Hot", strong = iced)
+        }
+        val water = waterCell(recipe)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            listOf(Triple("Dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Ratio", "1:${formatAmount(recipe.ratio)}", "Brew ratio 1 to ${formatAmount(recipe.ratio)}"),
-                Triple("Water", "${formatAmount(recipe.totalWater)} g", "Total brew water ${formatAmount(recipe.totalWater)} grams")).forEach { (label, value, spoken) ->
+            listOf(Triple("Dose", "${formatAmount(recipe.dose)} g", "Coffee dose ${formatAmount(recipe.dose)} grams"), Triple("Ratio", "1:${formatRatio(recipe.computedRatio)}", "Brew ratio 1 to ${formatRatio(recipe.computedRatio)}"),
+                Triple("Water", recipe.iceGrams?.takeIf { iced }?.let { "${water.value} + ${formatAmount(it)} ice" } ?: "${water.value} g", water.spoken)).forEach { (label, value, spoken) ->
                 Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = spoken }) {
                     Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     Text(value, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
@@ -416,7 +427,7 @@ private fun RowScope.RecipeRowContent(recipe: Recipe) {
         }
         val pours = recipe.pulses.size
         val end = recipe.schedule().lastOrNull()?.let { it.startSeconds + it.pulse.pourSeconds } ?: 0
-        Text("${if (pours == 1) "1 pour" else "$pours pours"} · ends ${formatDuration(end)}", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text((listOf("${if (pours == 1) "1 pour" else "$pours pours"} · ends ${formatDuration(end)}") + listOfNotNull(recipe.waterTempC?.let { "$it °C" })).joinToString(" · "), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -460,7 +471,9 @@ private const val DELETE_REACH = .65f
  * [shownUntil] is when the Undo window ends, once its bar has shown.
  */
 @kotlinx.serialization.Serializable
-data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boolean = false, val account: String? = null, val shownUntil: Long? = null) {
+data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boolean = false, val account: String? = null, val shownUntil: Long? = null,
+    /** The deleted beans' fields a newer version added, restored with them. */
+    val raw: kotlinx.serialization.json.JsonObject? = null) {
     enum class Action(val message: String) { ARCHIVED("Beans archived"), UNARCHIVED("Beans unarchived"), DELETED("Beans deleted") }
 
     /** Reverses only what the swipe did: the archive flag on beans still in the Library, or deleted beans while the phone is in the same account. */
@@ -469,7 +482,7 @@ data class BeansUndo(val action: Action, val beans: Beans, val remembered: Boole
         return when (action) {
             Action.ARCHIVED -> if (present) repository.unarchiveBeans(beans.id) else Result.success(Unit)
             Action.UNARCHIVED -> if (present) repository.archiveBeans(beans.id) else Result.success(Unit)
-            Action.DELETED -> repository.restoreBeans(beans, remembered, account)
+            Action.DELETED -> repository.restoreBeans(beans, remembered, account, raw)
         }
     }
 }
@@ -533,7 +546,7 @@ private fun SwipeRow(onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Uni
     }
 }
 
-private fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatAmount(recipe.ratio)} · ${formatAmount(recipe.totalWater)} g"
+private fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatRatio(recipe.computedRatio)} · ${formatAmount(recipe.totalWater)} g"
 
 /** The header action that discards a library draft under review, after asking. */
 @Composable

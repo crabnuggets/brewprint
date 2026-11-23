@@ -164,9 +164,8 @@ class UiRefreshTest {
         field("Coffee dose, g").performScrollTo().performTextInput("0")
         field("Coffee dose, g").assert(error)
         field("Coffee dose, g").performTextReplacement("15")
-        field("Brew ratio").performScrollTo().performTextInput("16")
-        field("Water to add, g").performScrollTo().performTextInput("240")
-        field("Pour duration, seconds").performScrollTo().performTextInput("30")
+        field("Water, g").performScrollTo().performTextInput("240")
+        field("Pour, s").performScrollTo().performTextInput("30")
         compose.onAllNodes(error).assertCountEquals(0)
         compose.onNodeWithText("Save recipe").performScrollTo().assertIsEnabled().performClick()
         compose.runOnIdle { assertTrue(repository.state.value.recipes.single().validationErrors().isEmpty()) }

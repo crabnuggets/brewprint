@@ -35,6 +35,7 @@ Deno.test("a summary keeps only the tasting notes the user filled in", () => {
   const summary = brewSummary(brew);
   assertEquals(summary.ratio, "1:16");
   assertEquals(summary.totalBrewWaterGrams, 240);
+  assertEquals([summary.style, summary.iceGrams], ["hot", null]);
   assertEquals(summary.measuredWaterGrams, 238.6);
   assertEquals(summary.tasting, {
     impression: "Bright but a little thin",
@@ -98,4 +99,28 @@ Deno.test("a brew without a scale or timer has no analysis", () => {
   const detail = brewDetail({ ...brew, scale: null, timing: null });
   assertEquals([detail.scale, detail.timing, detail.totalBrewTimeSeconds], [null, null, null]);
   assertEquals(detail.pulses.map((pulse) => pulse.actualStartSeconds), [null, null, null]);
+});
+
+Deno.test("the ratio comes from the dose and pours, to one decimal, with the ice of an iced recipe", () => {
+  const iced = {
+    ...brew,
+    recipe: {
+      ...brew.recipe,
+      dose: 16,
+      ratio: 9.375,
+      drinkStyle: "ICED" as const,
+      iceGrams: 70,
+      pulses: [40, 60, 50].map((water) => ({ label: "", water, pourSeconds: 10, waitSeconds: 0, notes: "" })),
+    },
+  };
+  assertEquals(brewSummary(iced).ratio, "1:9.4");
+  assertEquals(brewDetail(iced).recipe.overallRatio, "1:13.8");
+  // Older records have neither notes nor details.
+  const old = {
+    ...brew,
+    recipe: { ...brew.recipe, pulses: brew.recipe.pulses.map(({ notes: _, ...pulse }) => pulse) },
+  };
+  assertEquals(brewDetail(old).pulses[0].note, null);
+  assertEquals(brewDetail(brew).pulses[0].note, "Stir gently");
+  assertEquals(brewDetail(brew).recipe.grindSize, "Medium-fine");
 });
