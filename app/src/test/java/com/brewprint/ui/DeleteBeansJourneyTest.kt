@@ -147,6 +147,7 @@ class DeleteBeansJourneyTest {
         show(repository)
         compose.onNode(hasText("History") and isSelectable()).performClick()
         compose.onNodeWithText("Gesha").performTouchInput { swipeLeft() }
+        val historyEnds = compose.mainClock.currentTime + UNDO_MILLIS
         compose.openLibrarySection("beans")
         compose.onNodeWithText("Kii").performTouchInput { swipeLeft(startX = right - 1f, endX = centerX) }
         // The History Undo keeps its bar and its time.
@@ -155,8 +156,8 @@ class DeleteBeansJourneyTest {
         compose.waitForIdle()
         compose.runOnIdle { assertTrue(repository.state.value.brews.isEmpty()) }
         compose.onNodeWithText("Beans archived").assertExists()
-        // Its bar showed about when the History one ended, so 3 s on its Undo is still there.
-        compose.mainClock.advanceTimeBy(3_000)
+        // Its bar showed about when the History one ended, so 3 s after that its Undo is still there.
+        compose.mainClock.advanceTimeBy(historyEnds + 3_000 - compose.mainClock.currentTime)
         compose.onNodeWithText("Undo").performClick()
         compose.runOnIdle { assertTrue(repository.state.value.beans.none { it.archived }) }
     }

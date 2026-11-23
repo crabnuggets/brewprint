@@ -36,10 +36,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -179,16 +182,12 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).semantics { isTraversalGroup = true }) {
           CompositionLocalProvider(LocalChrome provides chrome) {
            // Opening a screen slides it in a short way while it fades; Back reverses it. Destinations cross-fade.
-           AnimatedContent(route ?: "tab:$tab", label = "screen", transitionSpec = {
-               val from = screenDepth(initialState)
-               val to = screenDepth(targetState)
-               when {
-                   to == from -> fadeIn(tween(300, delayMillis = 60)) togetherWith fadeOut(tween(160))
-                   to > from -> (slideInHorizontally(tween(340)) { it / 8 } + fadeIn(tween(300))) togetherWith (slideOutHorizontally(tween(340)) { -it / 16 } + fadeOut(tween(200)))
-                   else -> (slideInHorizontally(tween(340)) { -it / 16 } + fadeIn(tween(300))) togetherWith (slideOutHorizontally(tween(340)) { it / 8 } + fadeOut(tween(200)))
-               }
-           }) { screen ->
+           AnimatedContent(route ?: "tab:$tab", label = "screen", transitionSpec = { screenChange(screenDepth(initialState), screenDepth(targetState)) }) { screen ->
             val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+            // A destination on its way out keeps what it last showed, so the change that opened the next screen,
+            // such as a new brew's draft, doesn't redraw it while it fades.
+            val held = remember { arrayOf(state, shown) }
+            if (!leaving) { held[0] = state; held[1] = shown }
             Box(Modifier.fillMaxSize().inert(leaving)) { CompositionLocalProvider(LocalScreenActive provides !leaving) {
             when (screen) {
                 "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
@@ -197,7 +196,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
-                else -> when (screen.removePrefix("tab:")) {
+                else -> { val state = held[0]; val shown = held[1]; when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo, nav = libraryNav,
                         onBrewWith = { beansId, recipeId ->
                             repository.startDraftWith(beansId, recipeId).onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") }
@@ -211,7 +210,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                         }
                     }
                     else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" })
-                }
+                } }
             }
             } }
            }
@@ -221,11 +220,19 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             // and drops to the corner while the navigation is hidden. Screen readers reach it after the screen's content.
             val onBrew = route == null && tab == "Brew"
             val fabTarget = if (navShown) 86.dp else 16.dp
-            val fabBottom by androidx.compose.animation.core.animateDpAsState(fabTarget, tween(280), label = "fab")
-            if (onBrew) BrewAction(state.draft != null, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = fabBottom).semantics { traversalIndex = 1f }) {
-                if (state.draft != null) resumeDraft() else startBrew()
+            // It fades out with Brew rather than vanishing as another screen opens, keeping its label and place,
+            // and takes no taps on its way out.
+            AnimatedVisibility(onBrew, Modifier.align(Alignment.BottomEnd).semantics { traversalIndex = 1f },
+                enter = fadeIn(tween(200, delayMillis = 60)) + scaleIn(tween(200, delayMillis = 60), initialScale = 0.92f),
+                exit = fadeOut(tween(160)) + scaleOut(tween(160), targetScale = 0.92f)) {
+                val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+                val held = remember { arrayOf<Any>(fabTarget, state.draft != null) }
+                if (!leaving) { held[0] = fabTarget; held[1] = state.draft != null }
+                val fabBottom by androidx.compose.animation.core.animateDpAsState(held[0] as androidx.compose.ui.unit.Dp, tween(280), label = "fab")
+                BrewAction(held[1] as Boolean, Modifier.padding(end = 16.dp, bottom = fabBottom)) { if (!leaving) { if (state.draft != null) resumeDraft() else startBrew() } }
             }
-            if (navVisible) FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) {
+            // Always composed, so leaving a destination slides it away instead of removing it.
+            FloatingNavigation(tab, navShown, Modifier.align(Alignment.BottomCenter).semantics { traversalIndex = 2f }, syncFailed = cloud.failed) {
                 // Tapping Library again returns to its hub.
                 if (it == "Library" && tab == "Library") libraryNav.reset()
                 tab = it

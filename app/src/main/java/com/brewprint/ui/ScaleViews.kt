@@ -301,7 +301,7 @@ internal fun ArmedFooter(live: ScaleLive, onStartNow: () -> Unit, onFinishWithou
                 color = if (waiting) colors.onSurface else colors.onSurfaceVariant,
                 style = if (waiting) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge)
         }
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        ActionRow {
             if (live.zeroed) SoftTextButton(onClick = onStartNow, modifier = Modifier.heightIn(min = 48.dp)) { Text("Start timer now") }
             SoftTextButton(onClick = onFinishWithout, modifier = Modifier.heightIn(min = 48.dp)) { Text("Finish without timing") }
         }

@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
@@ -51,6 +52,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.brewprint.data.*
 
+/** The kind of item a Library section holds; the archived list holds beans. */
+private fun kindOf(section: String?): String = when (section) { null -> ""; "archived" -> "beans"; else -> section }
+
+/** One screen of the Library. A deeper one slides in from the side, and Back slides it away. */
+private data class LibraryView(val section: String?, val detailId: String?, val editing: Boolean, val draftId: String?) {
+    val depth: Int get() = when { editing -> 4; detailId != null -> 3; section == "archived" -> 2; section != null -> 1; else -> 0 }
+}
+
 /**
  * Where the Library is: its hub ([section] null), one section's list ("recipes", "beans", "grinders" or "archived"),
  * or one item ([detailId]) in that section. The Library tab keeps it above the screen, so starting a brew from an
@@ -88,8 +97,7 @@ fun LibraryScreen(
 ) {
     val local = rememberSaveable(requestedKind, saver = LibraryNav.Saver) { LibraryNav(requestedKind) }
     val place = nav ?: local
-    // The kind of item the open list or item holds; the archived list holds beans.
-    val kind = when (val section = place.section) { null -> ""; "archived" -> "beans"; else -> section }
+    val kind = kindOf(place.section)
     val detailId = place.detailId
     // A library draft open for review: its editor adds it to the Library.
     var draftId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -140,7 +148,23 @@ fun LibraryScreen(
     LaunchedEffect(editing) { onEditingChanged(editing) }
     DisposableEffect(Unit) { onDispose { onEditingChanged(false) } }
 
-    if (editing) {
+    // Each change of screen slides and fades as the app's own screens do. A screen on its way out keeps showing its
+    // own item with the state it last had, and takes no touches.
+    val active = LocalScreenActive.current
+    AnimatedContent(LibraryView(place.section, detailId, editing, draftId), label = "library", transitionSpec = { screenChange(initialState.depth, targetState.depth) }) { view ->
+    val leaving = transition.targetState == androidx.compose.animation.EnterExitState.PostExit
+    val held = remember { arrayOf(state) }
+    if (!leaving) held[0] = state
+    val state = held[0]
+    val kind = kindOf(view.section)
+    val detailId = view.detailId
+    val beans = state.beans.find { it.id == detailId }
+    val grinder = state.grinders.find { it.id == detailId }
+    val recipe = state.recipes.find { it.id == detailId }
+    val libraryDraft = state.libraryDrafts.find { it.id == view.draftId }
+    val editKind = libraryDraft?.let { if (it.beans != null) "beans" else "recipes" } ?: kind
+    Box(Modifier.fillMaxSize().inert(leaving)) { CompositionLocalProvider(LocalScreenActive provides (active && !leaving)) {
+    if (view.editing) {
         when (editKind) {
             "beans" -> BeansEditor(libraryDraft?.beans ?: beans, onSave = { item, roastDate ->
                 save(repository.saveBeans(item, roastDate)).also { if (it) saved(item.id) }
@@ -152,9 +176,7 @@ fun LibraryScreen(
                 save(repository.upsertRecipe(item)).also { if (it) saved(item.id) }
             }, onBack = leaveEditor, onDiscardDraft = libraryDraft?.let { draft -> { if (save(repository.discardLibraryDraft(draft.id))) leaveEditor() } })
         }
-        return
-    }
-    if (detailId != null) {
+    } else if (detailId != null) {
         BackHandler(LocalScreenActive.current, closeDetail)
         var menu by remember { mutableStateOf(false) }
         // The item's actions sit in the header, so a long recipe never hides them at the end of the page.
@@ -221,7 +243,7 @@ fun LibraryScreen(
                 DetailLine("Preparation notes", recipe.notes)
             }
         }
-    } else if (place.section == "archived") {
+    } else if (view.section == "archived") {
         val back = { place.section = "beans" }
         BackHandler(LocalScreenActive.current, back)
         LibraryPage("Archived beans", back) {
@@ -229,7 +251,7 @@ fun LibraryScreen(
             if (archived.isEmpty()) Text("No archived beans.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             archived.forEach { item -> key(item.id) { SwipeRow({ place.detailId = item.id }, SwipeAction("Unarchive", Icons.Outlined.Unarchive) { swipeUnarchive(item) }, onDelete = { swipeDelete(item) }) { BeansRowContent(item) } } }
         }
-    } else if (place.section != null) {
+    } else if (view.section != null) {
         // One kind's list, from the hub or, while picking for a brew, opened directly.
         val back = onClose ?: { place.section = null }
         BackHandler(LocalScreenActive.current, back)
@@ -270,6 +292,9 @@ fun LibraryScreen(
             LibraryHub(state, onDraft = { draft -> draftId = draft.id; place.detailId = null; editing = true }, onSection = { place.section = it })
         }
     }
+    } }
+    }
+    if (editing) return
     if (archive) {
         val replacements = state.grinders.filter { !it.archived && it.id != detailId }
         val needsReplacement = kind == "grinders" && detailId == state.defaultGrinderId && replacements.isNotEmpty()

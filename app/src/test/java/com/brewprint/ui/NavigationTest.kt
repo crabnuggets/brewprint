@@ -57,6 +57,75 @@ class NavigationTest {
         compose.onNodeWithContentDescription("Settings").assertDoesNotExist()
     }
 
+    @Test fun `a new page starts below its header in its first frame`() {
+        val repository = repository()
+        repository.upsertRecipe(Recipe(name = "Filter", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))).getOrThrow()
+        open(repository)
+        compose.onNode(tab and hasText("Library")).performClick()
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("library-recipes").performClick()
+        // Frame by frame, the list never sits under the header while the header is being measured.
+        var checked = 0
+        repeat(4) {
+            compose.mainClock.advanceTimeByFrame()
+            val title = compose.onAllNodesWithText("Recipes").fetchSemanticsNodes().singleOrNull() ?: return@repeat
+            val first = compose.onAllNodesWithText("Filter").fetchSemanticsNodes().singleOrNull() ?: return@repeat
+            assertTrue("The first recipe at ${first.boundsInRoot.top} starts under the header at ${title.boundsInRoot.bottom}", first.boundsInRoot.top >= title.boundsInRoot.bottom)
+            checked++
+        }
+        assertTrue(checked > 0)
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithText("Filter").assertIsDisplayed()
+    }
+
+    @Test fun `New brew and the navigation take no taps on their way out`() {
+        val repository = repository()
+        repository.upsertBeans(Beans(name = "Ethiopia", roaster = "Sample")).getOrThrow()
+        open(repository)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNode(tab and hasText("History")).performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        // New brew is still fading out with Brew; tapping it starts nothing.
+        compose.onNode(hasText("New brew") and hasClickAction()).performClick()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertNull(repository.state.value.draft)
+        compose.onNode(tab and hasText("History")).assertIsSelected()
+        // Opening an item's form hides the navigation; while it slides away it offers no tabs.
+        compose.openLibrarySection("beans")
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("Add beans").performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("bottom-navigation").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun `New brew keeps its label while it fades out with Brew`() {
+        val repository = repository()
+        repository.upsertBeans(Beans(name = "Ethiopia", roaster = "Sample")).getOrThrow()
+        repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 24)).getOrThrow()
+        open(repository)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("New brew").performClick()
+        repeat(6) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.onNodeWithText("Resume brew").assertDoesNotExist()
+        }
+        // Still fading out, it keeps its label.
+        compose.onNode(hasText("New brew") and hasClickAction()).assertExists()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        // The draft's page is titled "New brew"; the floating action is gone.
+        compose.onNode(hasText("New brew") and hasClickAction()).assertDoesNotExist()
+        compose.onNodeWithTag("bottom-navigation").assertDoesNotExist()
+    }
+
     @Test fun `New brew floats over Brew only, and becomes Resume brew while a brew is in progress`() {
         val repository = repository()
         open(repository)
