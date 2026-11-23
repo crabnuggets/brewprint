@@ -435,7 +435,6 @@ private fun Tag(text: String, modifier: Modifier = Modifier, strong: Boolean = f
 }
 
 /** A recipe in a list: its name, its dose, ratio and water, and how its pours run. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RowScope.RecipeRowContent(recipe: Recipe) {
     val colors = MaterialTheme.colorScheme
