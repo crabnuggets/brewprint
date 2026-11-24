@@ -172,7 +172,7 @@ internal fun ScaleChip(name: String, connected: Boolean, reading: Boolean = true
 }
 
 @Composable
-private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false, onType: (() -> Unit)? = null) {
+private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false, dim: Boolean = false, busy: Boolean = false, onType: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     val note = plan?.let { "plan ${formatAmount(it)} g" }
     val spoken = "$label, " + (value?.let { "${tenths(it)} grams" } ?: "no reading") + (plan?.let { ", plan ${formatAmount(it)} grams" } ?: "")
@@ -180,9 +180,13 @@ private fun Reading(label: String, value: Double?, plan: Double? = null, announc
     val tap = if (onType != null) Modifier.clickable(onClickLabel = "Type the coffee weight", role = Role.Button, onClick = onType) else Modifier
     // [announce] makes a steady reading a polite live region, so TalkBack says when it becomes ready; a moving one stays quiet.
     Column(tap.clearAndSetSemantics { contentDescription = spoken; if (announce) liveRegion = LiveRegionMode.Polite }) {
-        Text(label, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (busy) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = colors.onSurface, trackColor = colors.outlineVariant)
+            Text(label, color = if (busy) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tenths(value), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.SemiBold))
+            // [dim] marks a reading about to change, such as the weight a tare is taking away.
+            Text(tenths(value), color = if (dim) colors.onSurfaceVariant else colors.onSurface, style = MaterialTheme.typography.headlineLarge.copy(fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.SemiBold))
             Text("g", Modifier.padding(bottom = 7.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
             if (onType != null) Icon(Icons.Outlined.Edit, null, Modifier.padding(bottom = 10.dp).size(18.dp), tint = colors.onSurfaceVariant)
             if (note != null) Text(note, Modifier.padding(bottom = 8.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
@@ -203,6 +207,9 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
     // The coffee weight being typed, while its dialog is open.
     var typing by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(step) { if (step != ScaleStep.COFFEE) typing = null }
+    // "Tare" was tapped on the coffee step, and the scale has not yet read about 0 g.
+    var retare by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(live.taring, step) { if (!live.taring || step != ScaleStep.COFFEE) retare = false }
     Panel {
         // With no readings, any weight would be stale and waiting would not help, so the card says so and offers the clock.
         if (live.silent) {
@@ -230,7 +237,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 }
             }
             // Until the scale reads about 0 g, coffee must wait: grounds added now would be tared away or taken as the dose.
-            ScaleStep.COFFEE -> if (live.taring) Row(Modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ScaleStep.COFFEE -> if (live.taring && !retare) Row(Modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.onSurface, trackColor = colors.outlineVariant)
                 Text("Taring the brewer", style = MaterialTheme.typography.titleMedium)
             } else {
@@ -240,9 +247,18 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 }
                 HorizontalDivider(color = colors.outlineVariant)
                 // A reading that still counts as zero is not coffee.
-                val coffee = live.grams?.takeIf { live.steady && it > ZERO_GRAMS }?.let(::roundedAmount)
-                // Coffee added before the tare reads as 0 g, so tapping the weight lets it be typed instead.
-                Reading(if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null, onType = { typing = formatAmount(coffee ?: plannedDose) })
+                // While a tare is pending, the reading is about to drop to 0 g, so it is no dose to use or keep.
+                val coffee = live.grams?.takeIf { live.steady && it > ZERO_GRAMS && !live.taring }?.let(::roundedAmount)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Coffee added before the tare reads as 0 g, so tapping the weight lets it be typed instead.
+                    Box(Modifier.weight(1f)) {
+                        Reading(if (live.taring) "Taring" else if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null || live.taring, dim = live.taring, busy = live.taring,
+                            // No weight is typed against a zero the scale has not reached yet.
+                            onType = if (live.taring) null else ({ typing = formatAmount(coffee ?: plannedDose) }))
+                    }
+                    // The scale can be zeroed again at will, for a rinsed filter or a dosing cup, before the dose is chosen.
+                    SoftButton(onClick = { retare = true; onTare() }, enabled = !live.taring, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
+                }
                 // The weighed dose rescales this brew's pours; say so before the choice, not after.
                 if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatRatio(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
