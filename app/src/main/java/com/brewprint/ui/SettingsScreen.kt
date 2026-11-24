@@ -50,7 +50,7 @@ private fun openNotificationSettings(context: Context, action: String = Settings
 }
 
 @Composable
-internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: (() -> Unit)? = null, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, liveUpdatesCheck: (Context) -> Boolean = ::liveUpdatesAllowed, scale: @Composable () -> Unit = {}) {
+internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppearance: (Appearance) -> Unit, onTimer: (TimerSettings) -> Unit, onClose: (() -> Unit)? = null, account: @Composable () -> Unit = {}, experiments: Experiments = Experiments(), onExperiments: (Experiments) -> Unit = {}, liveUpdatesCheck: (Context) -> Boolean = ::liveUpdatesAllowed, about: @Composable () -> Unit = {}, scale: @Composable () -> Unit = {}) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(notificationsAllowed(context)) }
@@ -98,6 +98,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
         Text("Theme", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
         Choice("Monochrome", null, experiments.theme == Theme.MONOCHROME) { onExperiments(experiments.copy(theme = Theme.MONOCHROME)) }
         Choice("Blueprint", "Graphite on gridded paper, with a red pencil for targets", experiments.theme == Theme.BLUEPRINT) { onExperiments(experiments.copy(theme = Theme.BLUEPRINT)) }
+        about()
     }
 }
 

@@ -206,7 +206,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                         }, onResumeBrew = { resumeDraft() })
                     "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
                     "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(onError) },
-                        experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }) {
+                        experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } },
+                        about = { AboutSettings(repository, onError) }) {
                         ScaleSettings(state.scale, LocalScale.current.live, pairScale) {
                             state.scale?.let { forgetScale(context, it) }
                             repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }

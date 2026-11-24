@@ -1,6 +1,7 @@
 package com.brewprint.cloud
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
@@ -9,6 +10,7 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.brewprint.BuildConfig
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.DRAFTS
+import com.brewprint.data.LOG_TAG
 import com.brewprint.data.RemoteItem
 import com.brewprint.data.journalDraft
 import com.brewprint.data.libraryDraft
@@ -129,6 +131,7 @@ object CloudSync {
             push(user.id)
             pull()
         }
+        result.exceptionOrNull()?.let { Log.w(LOG_TAG, "Sync failed", it) }
         mutable.update { it.copy(syncing = false, failed = result.isFailure, syncedAt = if (result.isSuccess) System.currentTimeMillis() else it.syncedAt) }
     }
 
@@ -197,6 +200,7 @@ object CloudSync {
             "Add a Google account to this phone, then try again."
         } catch (error: Exception) {
             if (error is kotlinx.coroutines.CancellationException) throw error
+            Log.w(LOG_TAG, "Sign-in failed", error)
             "Couldn't sign in. Check your connection and try again."
         }
     }

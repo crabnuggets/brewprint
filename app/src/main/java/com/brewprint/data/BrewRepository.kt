@@ -2,6 +2,7 @@ package com.brewprint.data
 
 import android.content.Context
 import android.util.AtomicFile
+import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.concurrent.CountDownLatch
@@ -35,6 +36,7 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
 
     private val file = AtomicFile(File(context.filesDir, "brewprint.json"))
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val exportJson = Json(json) { prettyPrint = true }
     private val mutableState: MutableStateFlow<AppState>
     val state: StateFlow<AppState>
     val loadError: String?
@@ -55,7 +57,10 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
                 AppState()
             }
         }
-        loadError = loaded.exceptionOrNull()?.let { "Couldn't read saved data. Your data has been kept on this device." }
+        loadError = loaded.exceptionOrNull()?.let {
+            Log.e(LOG_TAG, "Couldn't read saved data", it)
+            "Couldn't read saved data. Your data has been kept on this device."
+        }
         mutableState = MutableStateFlow(loaded.getOrDefault(AppState()))
         state = mutableState.asStateFlow()
     }
@@ -80,18 +85,19 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
     /** Writes the newest state. Each write holds the whole state, so a failed one is made good by the next. */
     private fun writeUnsaved() {
         val next = unsaved.getAndSet(null) ?: return
-        val output = runCatching { file.startWrite() }.getOrElse { return failed() }
+        val output = runCatching { file.startWrite() }.getOrElse { return failed(it) }
         try {
             output.write(json.encodeToString(next).toByteArray(Charsets.UTF_8))
             file.finishWrite(output)
             mutableSaveError.value = null
         } catch (error: Exception) {
             file.failWrite(output)
-            failed()
+            failed(error)
         }
     }
 
-    private fun failed() {
+    private fun failed(error: Throwable) {
+        Log.e(LOG_TAG, "Couldn't save data", error)
         mutableSaveError.value = "Couldn't save your latest changes on this phone. Free up storage; they are saved again with your next change."
     }
 
@@ -100,6 +106,10 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
 
     /** Waits until every write queued so far is done. */
     fun awaitWrites() = await(writes)
+
+    /** Everything the app keeps on this phone, for an export. Saved data the app couldn't read is given as it is on storage. */
+    fun exportData(): ByteArray =
+        if (loadError == null) exportJson.encodeToString(state.value).toByteArray(Charsets.UTF_8) else file.readFully()
 
     fun upsertBeans(beans: Beans): Result<Unit> = change { current ->
         require(beans.name.isNotBlank()) { "Enter a name." }
