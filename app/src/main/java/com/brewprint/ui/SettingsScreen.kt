@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material3.*
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,51 +67,69 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
     Page("Settings", onClose) {
         account()
         SectionTitle("Appearance")
-        Appearance.entries.forEach { option -> Choice(option.name.lowercase().replaceFirstChar { it.uppercase() }, null, option == appearance) { onAppearance(option) } }
-        SectionTitle("Brew timer")
-        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
-            Column(Modifier.padding(vertical = 4.dp)) {
-                SwitchRow("Live notification", "Shows the running brew on your lock screen", timer.liveNotification) { on ->
-                    onTimer(timer.copy(liveNotification = on))
-                    // The only place the app asks for notification permission.
-                    if (on && Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                        prompt.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-                if (timer.liveNotification && !allowed) {
-                    AndroidNotice("Blocked by Android", "Notifications for Brewprint are turned off. The timer still runs in the app.") { openNotificationSettings(context) }
-                } else if (timer.liveNotification && !liveUpdates) {
-                    AndroidNotice("Live Updates are off", "The brew shows as a normal notification, without the timer in the status bar. Turn on Live Updates for Brewprint to see it there.") {
-                        openNotificationSettings(context, Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
-                    }
-                }
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
-                SwitchRow("Vibrate at each step", null, timer.vibrate) { onTimer(timer.copy(vibrate = it)) }
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
-                SwitchRow("Sound at each step", "A short tone, for a phone propped on the counter", timer.sound) { onTimer(timer.copy(sound = it)) }
-                HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
-                SwitchRow("Keep screen on while brewing", null, timer.keepScreenOn) { onTimer(timer.copy(keepScreenOn = it)) }
+        SettingsCard(Modifier.selectableGroup()) {
+            Appearance.entries.forEachIndexed { index, option ->
+                if (index > 0) RowDivider()
+                Choice(option.name.lowercase().replaceFirstChar { it.uppercase() }, null, option == appearance) { onAppearance(option) }
             }
+        }
+        SectionTitle("Brew timer")
+        SettingsCard {
+            SwitchRow("Live notification", "Shows the running brew on your lock screen", timer.liveNotification) { on ->
+                onTimer(timer.copy(liveNotification = on))
+                // The only place the app asks for notification permission.
+                if (on && Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    prompt.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+            if (timer.liveNotification && !allowed) {
+                AndroidNotice("Blocked by Android", "Notifications for Brewprint are turned off. The timer still runs in the app.") { openNotificationSettings(context) }
+            } else if (timer.liveNotification && !liveUpdates) {
+                AndroidNotice("Live Updates are off", "The brew shows as a normal notification, without the timer in the status bar. Turn on Live Updates for Brewprint to see it there.") {
+                    openNotificationSettings(context, Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
+                }
+            }
+            RowDivider()
+            SwitchRow("Vibrate at each step", null, timer.vibrate) { onTimer(timer.copy(vibrate = it)) }
+            RowDivider()
+            SwitchRow("Sound at each step", "A short tone, for a phone propped on the counter", timer.sound) { onTimer(timer.copy(sound = it)) }
+            RowDivider()
+            SwitchRow("Keep screen on while brewing", null, timer.keepScreenOn) { onTimer(timer.copy(keepScreenOn = it)) }
         }
         scale()
         SectionTitle("Experimental")
         Text("Features still being tried out. They may change or go away.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Text("Theme", Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
-        Choice("Monochrome", null, experiments.theme == Theme.MONOCHROME) { onExperiments(experiments.copy(theme = Theme.MONOCHROME)) }
-        Choice("Blueprint", "Graphite on gridded paper, with a red pencil for targets", experiments.theme == Theme.BLUEPRINT) { onExperiments(experiments.copy(theme = Theme.BLUEPRINT)) }
+        SettingsCard {
+            Text("Theme", Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp).semantics { heading() }, style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.selectableGroup()) {
+                Choice("Monochrome", null, experiments.theme == Theme.MONOCHROME) { onExperiments(experiments.copy(theme = Theme.MONOCHROME)) }
+                RowDivider()
+                Choice("Blueprint", "Graphite on gridded paper, with a red pencil for targets", experiments.theme == Theme.BLUEPRINT) { onExperiments(experiments.copy(theme = Theme.BLUEPRINT)) }
+            }
+        }
         about()
     }
 }
 
+/** One card holding a section's rows, split by dividers. */
+@Composable
+private fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        Column(modifier.padding(vertical = 4.dp), content = content)
+    }
+}
+
+@Composable
+private fun RowDivider() = HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
 @Composable
 private fun Choice(label: String, detail: String?, selected: Boolean, onSelect: () -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = selected, onClick = null)
-            Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(label)
-                if (detail != null) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            }
+    Row(Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect).heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        RadioButton(selected = selected, onClick = null)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            if (detail != null) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
