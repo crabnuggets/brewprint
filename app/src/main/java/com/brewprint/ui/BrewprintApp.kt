@@ -965,7 +965,11 @@ private fun NotesScreen(brew: BrewRecord, pending: Journal?, claude: Journal?, r
     }
     fun back() { if (journal != original) discard = true else onClose() }
     BackHandler(active) { back() }
-    Page(if (reviewing) "Review tasting notes" else "Tasting notes", ::back, actions = { if (reviewing) DiscardDraftAction("Discard Claude's notes?", "Your brew keeps the notes it has.") { repository.discardJournalDraft(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard Claude's notes.") } } }, footer = {
+    Page(if (reviewing) "Review tasting notes" else "Tasting notes", ::back, actions = {
+        if (reviewing) DiscardDraftAction("Discard Claude's notes?", "Your brew keeps the notes it has.") { repository.discardJournalDraft(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard Claude's notes.") } }
+        // Unsaved edits, including ones resumed after "Continue later", can be thrown away without leaving by Back.
+        else if (journal != original) IconAction(Icons.Outlined.Delete, "Discard changes", danger = true) { discard = true }
+    }, footer = {
         PrimaryAction("Save notes", icon = Icons.Outlined.Check) {
             if (reviewing) repository.saveDraftedNotes(brew.id, journal).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") }
             else repository.saveNoteEdit(brew.id, journal).fold(onSuccess = { repository.saveNotes(brew.id).onSuccess { onClose() }.onFailure { onError("Couldn't save notes. Try again.") } }, onFailure = { onError("Couldn't save notes. Try again.") })
@@ -980,10 +984,10 @@ private fun NotesScreen(brew: BrewRecord, pending: Journal?, claude: Journal?, r
         }
         if (!reviewing) SecondaryAction("Continue later") { repository.saveNoteEdit(brew.id, journal).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't retain note edits. Try again.") } }
     }
-    if (discard) DiscardDialog({ discard = false }, {
-        discard = false
-        if (reviewing) onClose() else repository.discardNoteEdit(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard notes.") }
-    })
+    if (discard && reviewing) DiscardDialog({ discard = false }, { discard = false; onClose() })
+    else if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard changes?") }, text = { Text("Your brew keeps the notes it last saved.") },
+        confirmButton = { SoftTextButton(danger = true, onClick = { discard = false; repository.discardNoteEdit(brew.id).onSuccess { onClose() }.onFailure { onError(it.message ?: "Couldn't discard notes.") } }) { Text("Discard") } },
+        dismissButton = { SoftTextButton(onClick = { discard = false }) { Text("Keep editing") } })
 }
 
 @Composable

@@ -22,9 +22,17 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 - Reduce unnecessary subtext. Every line should help the user understand information or take an action.
 - Stay monochrome, and separate levels by contrast and weight rather than color. Section titles are darker and heavier than body text; secondary labels are lighter. A title, a label, and an action should never share one tone.
 - The one accent is red, kept for actions that delete or discard: "Discard brew", "Delete brew", "Delete beans", and a History or beans row swiped past its delete threshold. A destructive button has a soft red fill with darker red text; a swiped row turns solid red. Archiving stays neutral, since brew records keep the archived item's details. The one exception is amber, used only for a beans row swiped past its archive or unarchive threshold.
-- Header actions on a screen are 40 dp round icon buttons with no text, beside the title on the right: a red trash icon for "Discard brew" on setup and Finish brew, and on a Library item a pencil for "Edit" with a ⋮ "More actions" menu for duplicating, archiving or unarchiving and, for beans, deleting. Each keeps its name for screen readers and as a long-press tooltip.
+- Header actions on a screen are 40 dp round icon buttons with no text, beside the title on the right: a red trash icon for "Discard brew" on setup and Finish brew, "Discard changes" on saved tasting notes with unsaved edits, and on a Library item a pencil for "Edit" with a ⋮ "More actions" menu for duplicating, archiving or unarchiving and, for beans, deleting. Each keeps its name for screen readers and as a long-press tooltip.
 - Do not outline buttons. A primary action is filled near-black (near-white in dark appearance). A secondary action has a soft gray fill. Text-only actions also get a soft fill so they read as buttons, not prose. Buttons are softly rounded rectangles (16 dp), not pills, and shrink slightly while pressed. Use an icon on an action only where it adds meaning, such as Pause, skip, and Save.
 - Show an inline "Change …" action as a 40 dp round icon button with a soft fill, beside the value it changes: a pencil for a value edited in place (date, total brew time), and a sliders icon for "Change setup", which leaves the screen. Each keeps its name for screen readers and as a long-press tooltip, and has a 48 dp touch target. Full-width actions such as "Repeat" and "Edit brew" keep their text labels.
+
+## Choices
+
+- **One of a few.** A segmented control: a soft track with equal segments, and the selected one a filled block with no tick. The block slides to a new choice in about 280 ms, and fades in place when the group was empty. With nothing selected the track runs full width; once something is selected it narrows over about 300 ms and a 40 dp round "×" appears at its right to clear it.
+- **Any of several.** Separate softly rounded blocks in even columns, soft gray when off and filled when on, with no tick or outline: one row for up to four choices, three columns for more.
+- **Narrow screens and large text.** When the screen's width divided by the text scale is under 300 dp, segments stack in one column and blocks use two columns.
+
+The tasting journal uses both; the owner accepted them on 2026-11-24 (page 10 of the design canvas).
 
 ## Screen chrome while scrolling
 
