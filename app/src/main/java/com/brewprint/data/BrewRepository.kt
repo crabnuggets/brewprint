@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.AtomicFile
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,9 +15,17 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
-class BrewRepository(context: Context) {
+/** [writes] runs the file writes; by default one background thread shared by every repository in the process. */
+class BrewRepository(context: Context, private val writes: Executor = WRITES) {
     companion object {
         @Volatile private var shared: BrewRepository? = null
+        private val WRITES: Executor = Executors.newSingleThreadExecutor { Thread(it, "brewprint-writes").apply { isDaemon = true } }
+
+        private fun await(writes: Executor) {
+            val done = CountDownLatch(1)
+            writes.execute { done.countDown() }
+            done.await()
+        }
 
         /** The one repository for the app process, shared by the activity and the timer service. */
         fun get(context: Context): BrewRepository = shared ?: synchronized(this) {
@@ -26,8 +38,15 @@ class BrewRepository(context: Context) {
     private val mutableState: MutableStateFlow<AppState>
     val state: StateFlow<AppState>
     val loadError: String?
+    /** The state still to be written, or null when a queued write has taken it. */
+    private val unsaved = AtomicReference<AppState?>(null)
+    private val mutableSaveError = MutableStateFlow<String?>(null)
+    /** Why the last write to the phone's storage failed, until a later write succeeds. */
+    val saveError: StateFlow<String?> = mutableSaveError.asStateFlow()
 
     init {
+        // A repository opened again in this process reads what the last one saved.
+        await(WRITES)
         val loaded = runCatching {
             try {
                 file.openRead().bufferedReader().use { json.decodeFromString<AppState>(it.readText()) }
@@ -41,7 +60,10 @@ class BrewRepository(context: Context) {
         state = mutableState.asStateFlow()
     }
 
-    /** Saves a change. Changed beans, grinders, recipes and brews are queued for upload unless [track] is off. */
+    /**
+     * Applies a change at once and writes it to the phone's storage in the background, so a large journal never holds up
+     * the screen or the scale. Changed beans, grinders, recipes and brews are queued for upload unless [track] is off.
+     */
     @Synchronized
     private fun <T> change(track: Boolean = true, transform: (AppState) -> Pair<AppState, T>): Result<T> = runCatching {
         check(loadError == null) { loadError.orEmpty() }
@@ -49,18 +71,35 @@ class BrewRepository(context: Context) {
         val (changed, result) = transform(current)
         val keys = if (track) changedKeys(current, changed) else emptySet()
         val next = if (keys.isEmpty()) changed else changed.copy(sync = changed.sync.copy(pending = changed.sync.pending + keys))
-        val bytes = json.encodeToString(next).toByteArray(Charsets.UTF_8)
-        val output = file.startWrite()
-        try {
-            output.write(bytes)
-            file.finishWrite(output)
-        } catch (error: Exception) {
-            file.failWrite(output)
-            throw error
-        }
         mutableState.value = next
+        // A write already queued takes the newest state when it runs, so quick changes are written once.
+        if (unsaved.getAndSet(next) == null) writes.execute(::writeUnsaved)
         result
     }
+
+    /** Writes the newest state. Each write holds the whole state, so a failed one is made good by the next. */
+    private fun writeUnsaved() {
+        val next = unsaved.getAndSet(null) ?: return
+        val output = runCatching { file.startWrite() }.getOrElse { return failed() }
+        try {
+            output.write(json.encodeToString(next).toByteArray(Charsets.UTF_8))
+            file.finishWrite(output)
+            mutableSaveError.value = null
+        } catch (error: Exception) {
+            file.failWrite(output)
+            failed()
+        }
+    }
+
+    private fun failed() {
+        mutableSaveError.value = "Couldn't save your latest changes on this phone. Free up storage; they are saved again with your next change."
+    }
+
+    /** The failure has been shown; the next one is reported again. */
+    fun clearSaveError() { mutableSaveError.value = null }
+
+    /** Waits until every write queued so far is done. */
+    fun awaitWrites() = await(writes)
 
     fun upsertBeans(beans: Beans): Result<Unit> = change { current ->
         require(beans.name.isNotBlank()) { "Enter a name." }

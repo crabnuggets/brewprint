@@ -53,6 +53,7 @@ object ScaleLink {
     private var writing = false
     private var retries = 0
     private val silence = Runnable { brew?.lose(System.currentTimeMillis()) }
+    private val arrivals = Arrivals<BluetoothGatt>(post = { handler.post(it) }) { source, at, value -> if (source == gatt) read(value, at) }
 
     fun brew(context: Context): ScaleBrew = brew ?: ScaleBrew(BrewRepository.get(context), ::write).also {
         brew = it
@@ -144,8 +145,8 @@ object ScaleLink {
         return target.writeDescriptor(config)
     }
 
-    private fun read(value: ByteArray) {
-        val now = System.currentTimeMillis()
+    /** Readings carry the time they arrived, so a late pass on the main thread still times pours and steadiness right. */
+    private fun read(value: ByteArray, now: Long) {
         val brew = brew ?: return
         ScaleProtocol.parse(value).forEach { frame ->
             when (frame) {
@@ -199,13 +200,13 @@ object ScaleLink {
         }
 
         override fun onCharacteristicChanged(source: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            handler.post { if (source == gatt) read(value) }
+            arrivals.add(source, value)
         }
 
         @Deprecated("Called instead of the overload above before Android 13")
         override fun onCharacteristicChanged(source: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             @Suppress("DEPRECATION") val value = characteristic.value ?: return
-            if (Build.VERSION.SDK_INT < 33) handler.post { if (source == gatt) read(value) }
+            if (Build.VERSION.SDK_INT < 33) arrivals.add(source, value.copyOf())
         }
     }
 }

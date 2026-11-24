@@ -211,7 +211,9 @@ A scale brew's record also shows, in "Timing and water", a measured row (dose, w
 
 History rows show date, beans, recipe, and tick setting. The detail screen includes the grinder name and full saved plan. "Edit brew" permits explicit corrections to the record without editing library items or changing the grinder's current recorded setting. "Delete brew" removes only that record and offers "Undo" for 5 seconds, which restores it. In History, swiping a row left deletes it the same way and swiping right repeats it. Recipes and grinders use archive rather than deletion in this version; beans can be deleted.
 
-If saving fails, retain the draft and show "Couldn't save brew. Try again." Do not show a completed record or update remembered values until saving succeeds. Repeated taps on Save must create only one record.
+If a check stops the save, for example a grinder archived since setup, retain the draft and show why, or "Couldn't save brew. Try again." Do not show a completed record or update remembered values until saving succeeds. Repeated taps on Save must create only one record.
+
+Changes take effect at once and are written to the phone's storage in the background, so a large journal never slows the screen or the scale. If that write fails, for example because storage is full, the app says "Couldn't save your latest changes on this phone. Free up storage; they are saved again with your next change." Each write holds everything, so the next one that succeeds saves the changes the failed one missed.
 
 ## Tasting journal for each brew
 
