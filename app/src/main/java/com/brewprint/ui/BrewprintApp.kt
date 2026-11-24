@@ -59,7 +59,7 @@ import androidx.compose.ui.focus.focusRequester
 /** How deep a screen sits: destinations, then screens opened from them, then screens opened from those. */
 private fun screenDepth(screen: String) = when (screen) {
     "notes", "edit" -> 2
-    "draft", "record" -> 1
+    "draft", "record", "scale" -> 1
     else -> 0
 }
 
@@ -199,6 +199,11 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, state.journalDrafts.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
                 "notes" -> state.brews.find { it.id == recordId }?.let { brew -> NotesScreen(brew, state.noteEdits.find { it.brewId == brew.id }?.journal, state.journalDrafts.find { it.brewId == brew.id }?.journal, repository, onError) { route = notesReturn } }
                 "edit" -> state.brews.find { it.id == recordId }?.let { brew -> EditRecord(brew, state, repository, onError) { route = "record" } }
+                "scale" -> state.scale?.let { paired ->
+                    val scale = LocalScale.current
+                    // A brew whose scale steps have begun, or whose timer runs by weight, depends on the scale's zero.
+                    ScaleScreen(paired, scale.live, brewing = state.draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true, onTare = scale.tare, onResumeBrew = { resumeDraft() }) { route = null }
+                } ?: if (route == "scale") LaunchedEffect(Unit) { route = null } else Unit
                 else -> { val state = held[0]; val shown = held[1]; when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo, nav = libraryNav,
                         onBrewWith = { beansId, recipeId ->
@@ -213,7 +218,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                             repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
                         }
                     }
-                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" })
+                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" }, { route = "scale" })
                 } }
             }
             } }
@@ -262,7 +267,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
  * is the floating action over this screen. Every theme shows the same things in the same order.
  */
 @Composable
-private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onDrafts: () -> Unit) {
+private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onDrafts: () -> Unit, onScale: () -> Unit) {
     Page("Brew") {
         state.draft?.let { draft -> InProgressCard(draft, onResume) }
         val drafts = state.libraryDrafts
@@ -279,6 +284,8 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 HomeBanner(Icons.Outlined.EditNote, "Review tasting notes from Claude", "${brew.beans.name} · ${dateTime(brew.startedAt)}") { onNotes(brew.id) }
             }
         }
+        // A paired scale can weigh without a brew: its line shows the reading and opens the Scale screen.
+        state.scale?.let { ScaleHomeCard(it, LocalScale.current.live, onScale) }
         if (recent == null) {
             Column(Modifier.fillMaxWidth().padding(top = 52.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Icon(Icons.Outlined.Coffee, null, Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface, CircleShape).padding(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)

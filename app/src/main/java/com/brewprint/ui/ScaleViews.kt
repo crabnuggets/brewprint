@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BluetoothDisabled
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Scale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,7 +55,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.brewprint.data.*
 import com.brewprint.scale.ScaleLink
@@ -161,15 +165,100 @@ internal fun ScaleChip(name: String, connected: Boolean, reading: Boolean = true
     val colors = MaterialTheme.colorScheme
     // "Off" only for a dropped link; a link that is up but sends nothing says "No reading", like the card.
     val status = if (!connected) "Off" else if (!reading) "No reading" else null
-    val live = status == null
-    Surface(shape = MaterialTheme.shapes.small, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant),
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$name, ${if (!connected) "not connected" else if (!reading) "no reading" else "connected"}" }) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(8.dp).then(if (live) Modifier.background(colors.onSurface, CircleShape) else Modifier.background(colors.outlineVariant, CircleShape)))
-            Text(if (status == null) name else "$name · $status", color = if (live) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+    // Status only: quiet text beside the title, with no fill or border to suggest a button. A long name gives way to the title.
+    Row(Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * .42f).dp).padding(horizontal = 8.dp, vertical = 8.dp).semantics(mergeDescendants = true) { contentDescription = "$name, ${if (!connected) "not connected" else if (!reading) "no reading" else "connected"}" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(Icons.Outlined.Scale, null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
+        Text(if (status == null) name else "$name · $status", color = colors.onSurfaceVariant, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+/** The scale's line on Brew: its name and live reading, or "Off". It opens the Scale screen. */
+@Composable
+internal fun ScaleHomeCard(scale: PairedScale, live: ScaleLive, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val grams = live.grams?.takeIf { live.connected && !live.silent }
+    val status = if (!live.connected) "Off" else if (grams == null) "No reading" else null
+    val spoken = "Scale, ${scale.name}, " + (status?.lowercase() ?: "${tenths(grams)} grams")
+    Surface(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(onClickLabel = "Open", role = Role.Button, onClick = onClick).clearAndSetSemantics { contentDescription = spoken },
+        shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        Row(Modifier.heightIn(min = 52.dp).padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Outlined.Scale, null, Modifier.size(20.dp))
+            Text("Scale", style = MaterialTheme.typography.titleMedium)
+            Text(scale.name, Modifier.weight(1f), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (status != null) Text(status, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            else Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(tenths(grams), style = MaterialTheme.typography.titleMedium.tabular())
+                Text("g", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = colors.onSurfaceVariant)
         }
     }
 }
+
+/**
+ * The scale by itself, for weighing without a brew: one large reading and "Tare", as often as needed. Nothing here is
+ * saved. While a brew is using the scale ([brewing]) a tare would move its targets, so the screen offers the brew instead.
+ */
+@Composable
+internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, onTare: () -> Unit, onResumeBrew: () -> Unit, allowedCheck: (Context) -> Boolean = ScaleLink::allowed, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val colors = MaterialTheme.colorScheme
+    var allowed by remember { mutableStateOf(allowedCheck(context)) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { allowed = allowedCheck(context); ScaleLink.sync(context) }
+    androidx.activity.compose.BackHandler(LocalScreenActive.current) { onClose() }
+    KeepScreenOn(true)
+    val grams = live.grams?.takeIf { allowed && live.connected && !live.silent }
+    Page("Scale", onClose, actions = { ScaleChip(scale.name, allowed && live.connected, reading = grams != null) }, footer = {
+        when {
+            !allowed -> SecondaryAction("Open Android settings") { openAppSettings(context) }
+            brewing -> PrimaryAction("Resume brew", onClick = onResumeBrew)
+            else -> PrimaryAction("Tare", enabled = grams != null && !live.taring, onClick = onTare)
+        }
+    }) {
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        // Centered in the space between the header and the footer on a usual phone; it scrolls where that is too short.
+        Column(Modifier.fillMaxWidth().heightIn(min = (configuration.screenHeightDp - 280).coerceAtLeast(0).dp).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            @Composable fun message(title: String, text: String?, busy: Boolean = false) = Column(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.onSurface, trackColor = colors.outlineVariant)
+                    Text(title, style = MaterialTheme.typography.titleMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+                if (text != null) Text(text, Modifier.widthIn(max = 300.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+            @Composable fun tile(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+                Icon(icon, null, Modifier.size(64.dp).background(colors.soft, MaterialTheme.shapes.medium).padding(18.dp))
+                Spacer(Modifier.height(20.dp))
+            }
+            if (grams != null) {
+                // Already far larger than body text, so it keeps one size at every text scale and always fits the screen.
+                val size = with(androidx.compose.ui.platform.LocalDensity.current) { (if (configuration.screenWidthDp < 380) 88.dp else 112.dp).toSp() }
+                Column(Modifier.clearAndSetSemantics { contentDescription = "On scale, ${tenths(grams)} grams" }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("On scale", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(tenths(grams), modifier = Modifier.alignByBaseline(), color = if (live.taring) colors.onSurfaceVariant else colors.onSurface, maxLines = 1, softWrap = false,
+                            style = MaterialTheme.typography.headlineLarge.copy(fontSize = size, lineHeight = size * 1.07f, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.03f).em).tabular())
+                        Text("g", Modifier.alignByBaseline(), color = colors.onSurfaceVariant, style = MaterialTheme.typography.headlineMedium)
+                    }
+                }
+                Box(Modifier.heightIn(min = 80.dp).padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
+                    when {
+                        brewing -> message("Brew in progress", "No tare here, so the brew's targets stay right.")
+                        live.taring -> message("Taring", null, busy = true)
+                        live.tareFailed -> message("The scale didn't tare", "Tap Tare again, or press the scale's tare button.")
+                    }
+                }
+            } else when {
+                !allowed -> { tile(Icons.Outlined.BluetoothDisabled); message("Blocked by Android", "Nearby devices is turned off for Brewprint.") }
+                !live.connected -> { tile(Icons.Outlined.Scale); message("Turn the scale on", "It connects by itself.") }
+                else -> { tile(Icons.Outlined.Scale); message("No scale reading", "Check that the scale is on, nearby, and not overloaded. Its reading comes back here.") }
+            }
+        }
+    }
+}
+
+private fun openAppSettings(context: Context) =
+    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
 @Composable
 private fun Reading(label: String, value: Double?, plan: Double? = null, announce: Boolean = false, dim: Boolean = false, busy: Boolean = false, onType: (() -> Unit)? = null) {
@@ -517,9 +606,7 @@ internal fun ScaleSettings(scale: PairedScale?, live: ScaleLive, onAdd: () -> Un
                     Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
                 }
                 Text("Nearby devices is turned off for Brewprint. Brews are timed by the clock.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }) { Text("Open Android settings") }
+                SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = { openAppSettings(context) }) { Text("Open Android settings") }
             }
         }
     }

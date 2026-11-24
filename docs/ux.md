@@ -18,7 +18,7 @@ Recipes describe the brewing plan. Beans, grinder, and tick setting belong to an
 
 Use four bottom navigation destinations:
 
-- Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress, another the drafts from Claude waiting, and one for each older brew with tasting notes from Claude waiting. The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
+- Brew: the everyday starting point. "New brew" floats at the bottom of the screen, and becomes "Resume brew" while a brew is in progress. Above the most recent brew, a card shows a brew in progress, another the drafts from Claude waiting, and one for each older brew with tasting notes from Claude waiting. With a scale paired, a one-line "Scale" card sits above the most recent brew, with the scale's name and its live reading, or "Off"; it opens the [Scale screen](#weighing-without-a-brew). The most recent brew shows its beans, its recipe, dose, ratio, and grind setting, the start of its tasting notes and its "Next time" reminder, then "Repeat" and the tasting notes action.
 - History: completed brew records, newest first. Open a record to inspect, edit, or repeat it.
 - Library: a hub with a card for each of recipes, beans, and grinders, each showing its count and one useful value: the most used recipe, the beans brewed last, the default grinder and its setting. A card opens that kind's own list, with "Add" in its header. Tapping Library again returns to the hub.
 - Settings: account, appearance, the brew timer, the coffee scale, experiments, and about and support. It has no Back arrow; Android Back on History, Library, or Settings returns to Brew.
@@ -167,6 +167,16 @@ A TIMEMORE Dot (the "Black Mirror" open protocol) can guide a timed brew. The sc
 
 - **Pairing.** The first time a brew sheet opens with no scale paired, a card offers "Brew with a scale?" with "Pair a scale" and "Not now", and says a scale can be paired later in Settings. If Android finds no compatible scale, the app says "No compatible scale found. Turn it on and try again."; any other failure says "Couldn't pair the scale. Try again."; declining or cancelling the picker says nothing. "Not now" hides the card for good. "Pair a scale" opens Android's companion device picker, listing only nearby devices named like a TIMEMORE scale that speaks the open protocol (the Dot and the Basic3 Link), then asks for Nearby devices once. Settings → "Coffee scale" shows the paired scale with "Forget", or "Add a scale". If Nearby devices is refused, a "Blocked by Android" notice appears there with "Open Android settings", and brewing works without the scale.
 - **Connection.** Brewprint connects to the paired scale whenever the app is open, so a scale switched on beforehand is ready. It releases the scale when the app leaves the screen and no scale brew is running, so the TIMEMORE app can still use it. A scale brew keeps the connection with the screen off or the app in the background: the brew timer's service holds it, showing the live notification when that switch is on, or a plain ongoing "Brewing with <scale>" notification when it is off.
+
+### Weighing without a brew
+
+The "Scale" card on Brew opens the Scale screen, for weighing beans or anything else without starting a brew. It shows the scale's name beside the title, one large reading to 0.1 g, and "Tare" as its footer action, usable as often as needed. Nothing here is saved, and the screen stays on while it is open.
+
+- **Taring.** The reading dims and "Taring" shows until the scale reads about 0 g. If it does not within 1.5 seconds: "The scale didn't tare" with "Tap Tare again, or press the scale's tare button."
+- **Not connected.** "Turn the scale on" with "It connects by itself." "Tare" is unavailable.
+- **No reading.** "No scale reading" with "Check that the scale is on, nearby, and not overloaded. Its reading comes back here." "Tare" is unavailable.
+- **Blocked by Android.** If Nearby devices is refused: "Blocked by Android" with "Open Android settings".
+- **A brew using the scale.** Once a brew's scale steps have begun, a tare would move its targets. The screen shows the reading with "Brew in progress" and "No tare here, so the brew's targets stay right.", and offers "Resume brew" in place of "Tare".
 
 ### Before the first pour
 
