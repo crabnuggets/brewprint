@@ -193,27 +193,49 @@ class BrewRepositoryTest {
         assertNull(repository.state.value.lastRecipeId)
     }
 
-    @Test fun `failed save preserves draft notes remembered choices and grinder setting`() {
+    @Test fun `a failed write is reported and the next write saves what it missed`() {
         val draft = preparedDraft(Journal(impression = "Keep my notes")).copy(setting = 27)
         repository.updateDraft(draft).getOrThrow()
-        val before = repository.state.value
+        repository.awaitWrites()
         val directory = context.filesDir
         val held = File(directory.parentFile, "held-data")
         assertTrue(directory.renameTo(held))
         directory.writeText("Prevent writes to the data directory")
-        try {
-            assertTrue(repository.saveBrew(draft.id).isFailure)
-            assertEquals(before, repository.state.value)
+        val record = try {
+            repository.saveBrew(draft.id).getOrThrow().also { repository.awaitWrites() }
         } finally {
             assertTrue(directory.delete())
             assertTrue(held.renameTo(directory))
         }
+        assertNotNull(repository.saveError.value)
+        // Storage still holds the draft; the brew lives only in memory until the next write.
         assertEquals(draft, BrewRepository(context).state.value.draft)
-        repository.saveBrew(draft.id).getOrThrow()
-        assertEquals(1, repository.state.value.brews.size)
+        repository.setAppearance(Appearance.DARK).getOrThrow()
+        repository.awaitWrites()
+        assertNull(repository.saveError.value)
+        val reopened = BrewRepository(context).state.value
+        assertNull(reopened.draft)
+        assertEquals(listOf(record), reopened.brews)
+        assertEquals(27, reopened.grinders.single().lastSetting)
+    }
+
+    @Test fun `a change takes effect before its write, and quick changes are written once`() {
+        val writes = object : java.util.concurrent.Executor {
+            val queued = mutableListOf<Runnable>()
+            override fun execute(task: Runnable) { queued += task }
+        }
+        val held = BrewRepository(context, writes)
+        held.setAppearance(Appearance.DARK).getOrThrow()
+        held.setAppearance(Appearance.LIGHT).getOrThrow()
+        assertEquals(Appearance.LIGHT, held.state.value.appearance)
+        assertEquals(Appearance.SYSTEM, BrewRepository(context).state.value.appearance)
+        assertEquals(1, writes.queued.size)
+        writes.queued.single().run()
+        assertEquals(Appearance.LIGHT, BrewRepository(context).state.value.appearance)
     }
 
     @Test fun `corrupt saved data is protected from subsequent writes`() {
+        repository.awaitWrites()
         val storage = File(context.filesDir, "brewprint.json")
         storage.writeText("broken saved data")
         val reopened = BrewRepository(context)
@@ -257,6 +279,7 @@ class BrewRepositoryTest {
 
     @Test fun `legacy invalid draft setting cannot be saved as a brew`() {
         val draft = preparedDraft()
+        repository.awaitWrites()
         val storage = File(context.filesDir, "brewprint.json")
         for (setting in listOf(-1, 101)) {
             val original = storage.readText()

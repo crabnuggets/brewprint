@@ -30,6 +30,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -76,6 +77,8 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     // The Library tab's place, kept here so a brew started from an item returns to that item.
     val libraryNav = rememberSaveable(saver = LibraryNav.Saver) { LibraryNav() }
     val onError: (String) -> Unit = { error = it }
+    // Changes are written to storage in the background, so a failed write is reported when it happens.
+    LaunchedEffect(repository) { repository.saveError.filterNotNull().collect { error = it } }
     val clock = LocalClock.current
     // The live notification asks for the sheet or the review; show the draft it belongs to.
     LaunchedEffect(openDraftRequest) {
@@ -250,7 +253,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             }
         }
     }
-    if (error != null) AlertDialog(onDismissRequest = { error = null }, title = { Text("Couldn't complete action") }, text = { Text(error.orEmpty()) }, confirmButton = { SoftTextButton(onClick = { error = null }) { Text("Close") } })
+    if (error != null) AlertDialog(onDismissRequest = { error = null; repository.clearSaveError() }, title = { Text("Couldn't complete action") }, text = { Text(error.orEmpty()) }, confirmButton = { SoftTextButton(onClick = { error = null; repository.clearSaveError() }) { Text("Close") } })
 }
 
 /**
