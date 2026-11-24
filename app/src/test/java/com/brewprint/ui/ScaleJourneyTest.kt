@@ -42,7 +42,7 @@ class ScaleJourneyTest {
         repository.upsertBeans(beans).getOrThrow()
         repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 24)).getOrThrow()
         repository.upsertRecipe(recipe).getOrThrow()
-        if (paired) repository.setScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
+        if (paired) repository.pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
         repository.updateDraft(repository.startDraft().getOrThrow().copy(beans = beans, recipe = recipe, stage = DraftStage.SHEET)).getOrThrow()
         compose.setContent {
             val state by repository.state.collectAsState()

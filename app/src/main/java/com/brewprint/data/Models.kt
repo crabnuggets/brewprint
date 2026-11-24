@@ -264,7 +264,10 @@ data class AppState(
     val appearance: Appearance = Appearance.SYSTEM,
     val experiments: Experiments = Experiments(),
     val timerSettings: TimerSettings = TimerSettings(),
+    /** The scale in use: the one whose readings count. One of [scales]. */
     val scale: PairedScale? = null,
+    /** Every paired scale; see [pairedScales]. */
+    val scales: List<PairedScale> = emptyList(),
     /** "Not now" on the pairing card hides it for good. */
     val scaleOfferDismissed: Boolean = false,
     val sync: SyncState = SyncState(),

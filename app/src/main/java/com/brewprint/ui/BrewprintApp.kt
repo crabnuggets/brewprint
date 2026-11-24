@@ -91,8 +91,9 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
     }
     state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && (state.timerSettings.vibrate || state.timerSettings.sound)) StepCue(draft.recipe, draft.timer, state.timerSettings) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val useScale: (String) -> Unit = { address -> repository.useScale(address).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { error = it.message ?: "Couldn't change the scale." } }
     val pairScale = rememberScalePairing(onFailed = { error = it }) { scale ->
-        repository.setScale(scale).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { error = it.message ?: "Couldn't save the scale." }
+        repository.pairScale(scale).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { error = it.message ?: "Couldn't save the scale." }
     }
     fun resumeDraft() {
         // A brew that was left alone goes straight to the review, where the total can be entered.
@@ -193,7 +194,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             if (!leaving) { held[0] = state; held[1] = shown }
             Box(Modifier.fillMaxSize().inert(leaving)) { CompositionLocalProvider(LocalScreenActive provides !leaving) {
             when (screen) {
-                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, draftFresh) }
+                "draft" -> state.draft?.let { draft -> DraftFlow(draft, state, repository, onError, { route = draftReturn }, { openRecord(it) }, pairScale, useScale, draftFresh) }
                     // Only the screen being opened may close itself; the one animating out after a save has no draft by design.
                     ?: if (route == "draft") LaunchedEffect(Unit) { route = null } else Unit
                 "record" -> state.brews.find { it.id == recordId }?.let { brew -> RecordDetail(brew, state.noteEdits.any { it.brewId == brew.id }, state.journalDrafts.any { it.brewId == brew.id }, { route = null }, { repeat(brew.id) }, { notesReturn = "record"; route = "notes" }, { route = "edit" }, { delete(brew.id) }) }
@@ -202,7 +203,10 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "scale" -> state.scale?.let { paired ->
                     val scale = LocalScale.current
                     // A brew whose scale steps have begun, or whose timer runs by weight, depends on the scale's zero.
-                    ScaleScreen(paired, scale.live, brewing = state.draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true, onTare = scale.tare, onResumeBrew = { resumeDraft() }) { route = null }
+                    val brewing = state.draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true
+                    // While a brew is using the scale, the scale can't be changed from here.
+                    ScaleScreen(paired, scale.live, brewing, onTare = scale.tare, onResumeBrew = { resumeDraft() },
+                        chip = { connected, reading -> ScaleHeaderChip(state, scale, connected, reading, onChoose = useScale.takeIf { !brewing }) }) { route = null }
                 } ?: if (route == "scale") LaunchedEffect(Unit) { route = null } else Unit
                 else -> { val state = held[0]; val shown = held[1]; when (screen.removePrefix("tab:")) {
                     "Library" -> LibraryScreen(state, repository, onError, onEditingChanged = { libraryEditing = it }, onUndoable = ::offerLibraryUndo, nav = libraryNav,
@@ -213,10 +217,12 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                     "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(onError) },
                         experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } },
                         about = { AboutSettings(repository, onError) }) {
-                        ScaleSettings(state.scale, LocalScale.current.live, pairScale) {
-                            state.scale?.let { forgetScale(context, it) }
-                            repository.setScale(null).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
-                        }
+                        ScaleSettings(state.pairedScales, state.scale?.address, LocalScale.current, pairScale, useScale,
+                            onRename = { address, name -> repository.renameScale(address, name).onFailure { failure -> onError(failure.message ?: "Couldn't rename the scale.") } },
+                            onForget = { forgotten ->
+                                forgetScale(context, forgotten)
+                                repository.forgetScale(forgotten.address).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
+                            })
                     }
                     else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" }, { route = "scale" })
                 } }
@@ -496,7 +502,7 @@ private fun HistoryRow(brew: BrewRecord, canRepeat: Boolean, onOpen: () -> Unit,
 }
 
 @Composable
-private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit, onPairScale: () -> Unit, fresh: Boolean = false) {
+private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepository, onError: (String) -> Unit, onClose: () -> Unit, onSaved: (String) -> Unit, onPairScale: () -> Unit, onUseScale: (String) -> Unit, fresh: Boolean = false) {
     var encoded by rememberSaveable(initial.id) { mutableStateOf(Json.encodeToString(initial)) }
     val draft = remember(encoded) { Json.decodeFromString<BrewDraft>(encoded) }
     // The draft as New brew or Repeat made it; null for a resumed draft, which is kept on Back.
@@ -582,7 +588,15 @@ private fun DraftFlow(initial: BrewDraft, state: AppState, repository: BrewRepos
     // Opening or closing the full plan starts the sheet from the top, so the focus card is in view.
     Page(when (stage) { DraftStage.SETUP -> "New brew"; DraftStage.SHEET -> "Brew sheet"; DraftStage.REVIEW -> "Finish brew" }, ::back, pinHeader = stageView != null, scrollKey = showPlan.takeIf { stage == DraftStage.SHEET }, actions = {
         val paired = state.scale
-        if (stage == DraftStage.SHEET && paired != null && !draft.withoutScale) { ScaleChip(paired.name, scale.live.connected, reading = !scale.live.silent); Spacer(Modifier.width(8.dp)) }
+        if (stage == DraftStage.SHEET && paired != null && !draft.withoutScale) {
+            // Before the first pour another scale can take over, which starts the scale steps again: the tare and any
+            // weighed dose belong to the old scale. Once the timer runs, the chip only says how the scale is.
+            ScaleHeaderChip(state, scale, scale.live.connected, reading = !scale.live.silent, note = "Switching starts the scale steps again.", onChoose = if (draft.timer != null) null else ({ address ->
+                if (draft.scale != null) change(draft.copy(scale = null, scaleStep = ScaleStep.BREWER, recipe = if (draft.scale.weighedDose != null) state.recipes.firstOrNull { it.id == draft.recipe?.id } ?: draft.recipe else draft.recipe))
+                onUseScale(address)
+            }))
+            Spacer(Modifier.width(8.dp))
+        }
         val discardable = stage == DraftStage.REVIEW || stage == DraftStage.SETUP && (draft.beans != null || draft.recipe != null || draft.grinder != null)
         if (discardable) IconAction(Icons.Outlined.Delete, "Discard brew", danger = true) { discard = true }
     }, footer = {

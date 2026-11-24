@@ -34,6 +34,10 @@ Use the vocabulary in [the glossary](../GLOSSARY.md) and the journeys in [the UX
 
 The tasting journal uses both; the owner accepted them on 2026-11-24 (page 10 of the design canvas).
 
+## Scale chip
+
+The name of the scale in use sits beside the title of the brew sheet and the Scale screen as quiet text with a scale icon. While another paired scale is on, it is a soft-filled button with an arrow, and tapping it grows the chip itself into the "Choose a scale" list: the same surface anchored at the chip's top right, the icon and name staying where they were, the arrow turning over. The size and corners change over about 320 ms and the rows fade in after a short delay. It is not a bottom sheet or the stock dropdown menu.
+
 ## Screen chrome while scrolling
 
 - **Header.** A screen's header, with its title, Back action, and header actions, slides away as the content scrolls down and returns as soon as it scrolls up. Android Back keeps working while it is hidden. On the brew sheet the header stays while a timer runs, so the scale status is always in view.

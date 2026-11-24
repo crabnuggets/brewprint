@@ -190,7 +190,7 @@ class BlueprintThemeTest {
 
         // Pulse 4 of 10 is pouring, guided by the scale.
         compose.runOnIdle {
-            repository.setScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
+            repository.pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
             val plan = recipe.scaledTo(20.0)
             val start = now - 62_000L
             repository.updateDraft(repository.startDraft().getOrThrow().copy(beans = beans, grinder = grinder, setting = 24, recipe = plan, stage = DraftStage.SHEET,

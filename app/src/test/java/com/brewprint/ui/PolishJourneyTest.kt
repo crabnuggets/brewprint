@@ -306,7 +306,7 @@ class PolishJourneyTest {
         live = ScaleLive(connected = true, grams = 104.6, flow = 6.2, curve = (0..62).map { weightAt(it, starts.take(4), reached) }, flows = (0..62).map { if (it in 0..5 || it in 30..35 || it in 45..50 || it >= 60) 6.0 else 0.0 })
         open {
             val timer = BrewTimer(startedAt = startedAt, step = 6, stepAt = startedAt + 60_000, pulseStarts = listOf(0, 30_000, 45_000, 60_000), byWeight = true)
-            setScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
+            pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
             updateDraft(startDraft().getOrThrow().copy(beans = beans, grinder = grinder, setting = 24, recipe = recipe, stage = DraftStage.SHEET, timer = timer,
                 scale = ScaleData(weighedDose = 20.0))).getOrThrow()
         }
