@@ -529,10 +529,18 @@ internal fun planLine(recipe: Recipe): List<Pair<Int, Double>> =
 internal fun KeepScreenOn(on: Boolean) {
     val host = LocalView.current
     DisposableEffect(host, on) {
-        host.keepScreenOn = on
-        onDispose { host.keepScreenOn = false }
+        // Counted, so a screen animating out does not turn off what the screen replacing it just turned on.
+        if (on) screenHolds++
+        host.keepScreenOn = screenHolds > 0
+        onDispose {
+            if (on) screenHolds--
+            host.keepScreenOn = screenHolds > 0
+        }
     }
 }
+
+/** How many screens on show ask to keep the screen on. Touched on the main thread only. */
+private var screenHolds = 0
 
 /** Vibrates and sounds at each step change on any screen of the app, as Settings allow. Draws nothing. */
 @Composable
