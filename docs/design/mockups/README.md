@@ -77,6 +77,10 @@ The [v3 blueprint boards](v3-blueprint/index.html) are **three alternative direc
 
 The owner accepted the v2 screens on 2026-11-23 after three rounds of council review. They live in the owner's Claude Design canvas, [Brewprint logo](https://claude.ai/artifact/FdiWCE989aXrtCL1MLZsmw), on pages 1 to 6: Brew home and theme parity, the brew record, Settings and the Library, the recipe editor and iced timer, and bean batches with brew setup. Its "Theme guide" page records the only places a screen's markup may differ between Monochrome and Blueprint. Behavior is defined in [UX journeys](../../ux.md), which supersedes the canvas where they differ.
 
+## v3: Scale screen, paired scales, tare, tasting choices, discard changes
+
+The owner accepted these screens on 2026-11-24. They are pages 7 to 11 of the same canvas, [Brewprint logo](https://claude.ai/artifact/FdiWCE989aXrtCL1MLZsmw): the Scale screen and its card on Brew, more than one paired scale with "Choose a scale", "Tare" on the coffee step, the tasting journal's choices, and "Discard changes" on saved tasting notes. The pages are still titled "proposed"; every board on them is the chosen design. Boards 8o and 10f are interactive and hold the intended animation timings. Behavior is defined in [UX journeys](../../ux.md), which supersedes the canvas where they differ.
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.

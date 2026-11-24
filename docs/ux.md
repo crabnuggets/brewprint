@@ -227,7 +227,7 @@ After "Finish brew", show "How was this cup?" above a multiline text field with 
 
 Below it, offer "Explore the taste" for optional guided fields and "Next time" for a short reminder such as "Try one tick finer". All fields start empty. Save remains available without notes, with helper text "You can taste first and add notes later." Avoid a mandatory rating or a completion percentage.
 
-The saved brew detail shows "Add tasting notes" when empty and "Edit tasting notes" when populated. The most recent brew on the Brew screen exposes the same action, making it easy to return while drinking. Editing notes on a saved brew has an explicit "Save notes" action. Retain unsaved note edits locally across interruption and offer to resume them; discarding those edits preserves the last saved notes.
+The saved brew detail shows "Add tasting notes" when empty and "Edit tasting notes" when populated. The most recent brew on the Brew screen exposes the same action, making it easy to return while drinking. Editing notes on a saved brew has an explicit "Save notes" action. Retain unsaved note edits locally across interruption and offer to resume them. While there are unsaved edits, including resumed ones, the header shows a red trash action, "Discard changes". It asks "Discard changes?" with "Your brew keeps the notes it last saved.", "Discard" and "Keep editing"; Back with unsaved edits asks the same. Discarding preserves the last saved notes.
 
 ### Guided exploration
 
@@ -242,7 +242,7 @@ The saved brew detail shows "Add tasting notes" when empty and "Edit tasting not
 - Mouthfeel: "What is the texture like?" Offer selectable suggestions such as silky, creamy, syrupy, and drying, plus free text. Keep this distinct from body's sense of weight.
 - Finish / aftertaste: "What lingers after swallowing?" Offer a text field and an optional Short, Medium, or Long selection.
 
-Every single-choice group starts unselected and includes a clear action. Blank means unrecorded, not low or absent. Suggestions are examples, not inferred answers. Show selected states in text and to screen readers, and allow chip rows to wrap at larger text sizes.
+Every single-choice group starts unselected. It is one segmented control: tapping a choice selects it, and tapping it again clears it. While a choice is selected, a round "×" beside the control, named "Clear sweetness" and so on, also clears it. Blank means unrecorded, not low or absent. The suggestions for flavor and mouthfeel are separate blocks in even columns, filled when on; they are examples, not inferred answers. Selected states are given to screen readers. On a narrow screen or with large text the segments stack in one column and the blocks drop to two columns.
 
 Keep the roaster's expected notes behind "View roaster's notes" during entry, so the user's own impressions come first. Opening them shows a separately labeled reference and never fills the journal. Include a brief reminder: "Your notes don't need to match the bag."
 
