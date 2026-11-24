@@ -219,6 +219,33 @@ class ScaleJourneyTest {
         assertEquals(ScaleStep.BREWER, draft.scaleStep)
     }
 
+    @Test fun `the scale can be tared again before the dose is chosen`() {
+        open(paired = true)
+        tap("Tare")
+        // Rinsing the filter left water in the server, which is not coffee.
+        live = ScaleLive(connected = true, grams = 4.1, steady = true)
+        shows("Use 4.1 g")
+        tap("Tare")
+        assertEquals(2, tares)
+        assertEquals(ScaleStep.COFFEE, repository.state.value.draft!!.scaleStep)
+        // Until the scale reads 0 g, the old weight is no dose, and the step stays where it is.
+        live = ScaleLive(connected = true, grams = 4.1, steady = true, taring = true)
+        compose.onNodeWithContentDescription("Taring, 4.1 grams, plan 15 grams").assertExists()
+        shows("Brewer tared")
+        compose.onNodeWithText("Taring the brewer").assertDoesNotExist()
+        listOf("Tare", "Keep 15 g", "Use dose").forEach { compose.onNodeWithText(it).assertIsNotEnabled() }
+        live = ScaleLive(connected = true, grams = 0.0, steady = true)
+        compose.onNodeWithContentDescription("Add your coffee, 0.0 grams, plan 15 grams").assertExists()
+        compose.onNodeWithText("Tare").assertIsEnabled()
+        tap("Tare")
+        assertEquals(3, tares)
+        live = ScaleLive(connected = true, grams = 15.23, steady = true)
+        tap("Use 15.2 g")
+        assertEquals(4, tares)
+        assertEquals(15.2, repository.state.value.draft!!.scale!!.weighedDose!!, 0.0)
+        assertEquals(ScaleStep.ARMED, repository.state.value.draft!!.scaleStep)
+    }
+
     @Test fun `a dose cannot be used while the brewer's tare is pending`() {
         open(paired = true)
         tap("Tare")
