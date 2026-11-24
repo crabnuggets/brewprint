@@ -19,7 +19,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.brewprint.data.BrewRepository
+import com.brewprint.data.LOG_TAG
 import com.brewprint.data.ScaleProtocol
 import com.brewprint.data.scaleBrewRunning
 import com.brewprint.timer.BrewTimerService
@@ -53,6 +55,7 @@ object ScaleLink {
     private var writing = false
     private var retries = 0
     private val silence = Runnable { brew?.lose(System.currentTimeMillis()) }
+    private val timing = LinkTiming { Log.i(LOG_TAG, it) }
     private val arrivals = Arrivals<BluetoothGatt>(post = { handler.post(it) }) { source, at, value -> if (source == gatt) read(value, at) }
 
     fun brew(context: Context): ScaleBrew = brew ?: ScaleBrew(BrewRepository.get(context), ::write).also {
@@ -100,6 +103,7 @@ object ScaleLink {
         address = null
         pending.clear()
         writing = false
+        timing.reset()
         brew?.connected(false, System.currentTimeMillis())
     }
 
@@ -153,6 +157,7 @@ object ScaleLink {
                 is ScaleProtocol.Reading -> {
                     handler.removeCallbacks(silence)
                     handler.postDelayed(silence, SILENCE_MILLIS)
+                    timing.add(now, System.currentTimeMillis())
                     brew.reading(now, frame.grams, frame.flow, frame.overload)
                 }
                 is ScaleProtocol.Battery -> brew.battery(frame.percent)
@@ -168,6 +173,7 @@ object ScaleLink {
                 else {
                     pending.clear()
                     writing = false
+                    timing.reset()
                     brew?.connected(false, System.currentTimeMillis())
                     // Wait for the scale to come back, as the first connection did.
                     changed.connect()
@@ -191,7 +197,11 @@ object ScaleLink {
         override fun onDescriptorWrite(source: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
             handler.post {
                 if (source != gatt) return@post
-                if (status == BluetoothGatt.GATT_SUCCESS) brew?.connected(true, System.currentTimeMillis()) else source.disconnect()
+                if (status != BluetoothGatt.GATT_SUCCESS) { source.disconnect(); return@post }
+                // Android's usual interval holds a reading back by up to 50 ms; the short one, by up to 15 ms.
+                val short = source.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                Log.i(LOG_TAG, "Scale connected, short connection interval " + if (short) "requested" else "refused")
+                brew?.connected(true, System.currentTimeMillis())
             }
         }
 
