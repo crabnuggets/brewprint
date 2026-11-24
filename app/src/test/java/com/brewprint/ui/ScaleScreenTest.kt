@@ -155,15 +155,26 @@ class ScaleScreenTest {
         capture("scale-live-blueprint")
     }
 
-    @Config(qualifiers = "w360dp-h640dp-xxhdpi")
+    @Test fun `resuming a brew from the scale screen keeps the screen on`() {
+        open(brewing = true, draft = { it.copy(scale = ScaleData(), scaleStep = ScaleStep.ARMED) })
+        live = ScaleLive(connected = true, grams = 0.0, steady = true, zeroed = true)
+        compose.onNodeWithContentDescription("Scale, TIMEMORE Dot, 0.0 grams").performScrollTo().performClick()
+        compose.onNodeWithText("Resume brew").performClick()
+        shows("Waiting for the first pour")
+        // The armed sheet holds the screen on, and the scale screen leaving does not let go of it.
+        compose.runOnIdle { assert(compose.activity.window.decorView.findViewById<android.view.View>(android.R.id.content).let { content -> generateSequence(content) { (it as? android.view.ViewGroup)?.getChildAt(0) }.any { it.keepScreenOn } }) }
+    }
+
+    @Config(qualifiers = "w320dp-h640dp-xxhdpi")
     @Test fun `a long reading fits a small phone at the largest text`() {
         RuntimeEnvironment.setFontScale(2f)
         live = ScaleLive(connected = true, grams = 1952.6, steady = true)
         open()
         compose.onNodeWithContentDescription("Scale, TIMEMORE Dot, 1952.6 grams").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        // The digits and the unit sit on one line inside the screen, with room to spare on both sides.
         val reading = compose.onNodeWithContentDescription("On scale, 1952.6 grams").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        assert(reading.left >= 0f && reading.right <= screen.right) { "$reading in $screen" }
+        assert(reading.left > 0f && reading.right < screen.right && reading.width < screen.width * .9f) { "$reading in $screen" }
         compose.onNodeWithText("Tare").assertIsDisplayed()
         capture("scale-small-largest")
     }

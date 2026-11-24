@@ -230,15 +230,18 @@ internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, 
                 Icon(icon, null, Modifier.size(64.dp).background(colors.soft, MaterialTheme.shapes.medium).padding(18.dp))
                 Spacer(Modifier.height(20.dp))
             }
-            if (grams != null) {
-                // Already far larger than body text, so it keeps one size at every text scale and always fits the screen.
-                val size = with(androidx.compose.ui.platform.LocalDensity.current) { (if (configuration.screenWidthDp < 380) 88.dp else 112.dp).toSp() }
+            if (grams != null) BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                // Already far larger than body text, so it ignores the text scale and is sized to fit its digits and
+                // the unit on one line: a tabular digit is about 0.58 of the font size wide.
+                val fit = (maxWidth - 44.dp) / (tenths(grams).length * .58f)
+                val size = with(androidx.compose.ui.platform.LocalDensity.current) { minOf(112.dp, fit).toSp() }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Column(Modifier.clearAndSetSemantics { contentDescription = "On scale, ${tenths(grams)} grams" }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("On scale", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(tenths(grams), modifier = Modifier.alignByBaseline(), color = if (live.taring) colors.onSurfaceVariant else colors.onSurface, maxLines = 1, softWrap = false,
                             style = MaterialTheme.typography.headlineLarge.copy(fontSize = size, lineHeight = size * 1.07f, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.03f).em).tabular())
-                        Text("g", Modifier.alignByBaseline(), color = colors.onSurfaceVariant, style = MaterialTheme.typography.headlineMedium)
+                        Text("g", Modifier.alignByBaseline(), color = colors.onSurfaceVariant, maxLines = 1, softWrap = false, style = MaterialTheme.typography.headlineMedium.copy(fontSize = size / 4))
                     }
                 }
                 Box(Modifier.heightIn(min = 80.dp).padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
@@ -247,6 +250,7 @@ internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, 
                         live.taring -> message("Taring", null, busy = true)
                         live.tareFailed -> message("The scale didn't tare", "Tap Tare again, or press the scale's tare button.")
                     }
+                }
                 }
             } else when {
                 !allowed -> { tile(Icons.Outlined.BluetoothDisabled); message("Blocked by Android", "Nearby devices is turned off for Brewprint.") }
