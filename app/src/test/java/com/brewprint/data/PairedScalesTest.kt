@@ -76,6 +76,9 @@ class PairedScalesTest {
         repository.forgetScale(home.address).getOrThrow()
         assertNull(state.scale)
         assertEquals(listOf(office), state.pairedScales)
+        // Nor is a scale paired now.
+        repository.pairScale(home).getOrThrow()
+        assertNull(state.scale)
         repository.discardDraft().getOrThrow()
         assertEquals(office, state.scaleToSwitchTo(setOf(office.address)))
     }

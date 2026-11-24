@@ -259,11 +259,14 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
         current.copy(timerSettings = settings) to Unit
     }
 
-    /** Adds a scale chosen in Android's picker. One already paired keeps its name; with none in use, the new one is. */
+    /**
+     * Adds a scale chosen in Android's picker. One already paired keeps its name; with none in use, the new one is,
+     * unless a brew holds a scale that was forgotten: that brew stays on the clock.
+     */
     fun pairScale(scale: PairedScale): Result<Unit> = change { current ->
         val paired = current.pairedScales
         val all = if (paired.any { it.address == scale.address }) paired else paired + scale
-        current.copy(scales = all, scale = current.scale ?: all.first { it.address == scale.address }) to Unit
+        current.copy(scales = all, scale = current.scale ?: all.first { it.address == scale.address }.takeUnless { current.scaleHeldByBrew }) to Unit
     }
 
     /**
