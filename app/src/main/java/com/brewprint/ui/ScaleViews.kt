@@ -252,7 +252,9 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Coffee added before the tare reads as 0 g, so tapping the weight lets it be typed instead.
                     Box(Modifier.weight(1f)) {
-                        Reading(if (live.taring) "Taring" else if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null || live.taring, dim = live.taring, busy = live.taring, onType = { typing = formatAmount(coffee ?: plannedDose) })
+                        Reading(if (live.taring) "Taring" else if (coffee != null) "Dose ready" else "Add your coffee", live.grams, plannedDose, announce = coffee != null || live.taring, dim = live.taring, busy = live.taring,
+                            // No weight is typed against a zero the scale has not reached yet.
+                            onType = if (live.taring) null else ({ typing = formatAmount(coffee ?: plannedDose) }))
                     }
                     // The scale can be zeroed again at will, for a rinsed filter or a dosing cup, before the dose is chosen.
                     SoftButton(onClick = { retare = true; onTare() }, enabled = !live.taring, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Tare") }
@@ -260,7 +262,7 @@ internal fun ScalePrep(step: ScaleStep, live: ScaleLive, plannedDose: Double, ra
                 // The weighed dose rescales this brew's pours; say so before the choice, not after.
                 if (coffee != null && coffee != plannedDose) Text("Using ${formatAmount(coffee)} g adjusts the pours to keep 1:${formatRatio(ratio)}.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SoftTextButton(onClick = onSkip, enabled = coffee != null && !live.taring, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
+                    SoftTextButton(onClick = onSkip, enabled = coffee != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Keep ${formatAmount(plannedDose)} g") }
                     PrimaryButton(onClick = { coffee?.let(onUse) }, enabled = coffee != null, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)) {
                         Text(if (coffee != null) "Use ${formatAmount(coffee)} g" else "Use dose")
                     }

@@ -230,7 +230,7 @@ class ScaleJourneyTest {
         assertEquals(ScaleStep.COFFEE, repository.state.value.draft!!.scaleStep)
         // Until the scale reads 0 g, the old weight is no dose, and the step stays where it is.
         live = ScaleLive(connected = true, grams = 4.1, steady = true, taring = true)
-        compose.onNodeWithContentDescription("Taring, 4.1 grams, plan 15 grams").assertExists()
+        compose.onNodeWithContentDescription("Taring, 4.1 grams, plan 15 grams").assertHasNoClickAction()
         shows("Brewer tared")
         compose.onNodeWithText("Taring the brewer").assertDoesNotExist()
         listOf("Tare", "Keep 15 g", "Use dose").forEach { compose.onNodeWithText(it).assertIsNotEnabled() }
