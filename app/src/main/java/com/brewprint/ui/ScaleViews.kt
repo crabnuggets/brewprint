@@ -64,6 +64,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.onClick
@@ -610,11 +611,11 @@ private fun ScaleStatus.line(inUse: Boolean): String = if (!on) "Not connected" 
 
 /** One paired scale as a choice: a radio, its name, and its status. A scale that is not on is dimmed and can't be chosen. */
 @Composable
-private fun ScaleChoice(scale: PairedScale, status: ScaleStatus, inUse: Boolean, radio: Boolean, modifier: Modifier = Modifier, onUse: () -> Unit) {
+private fun ScaleChoice(scale: PairedScale, status: ScaleStatus, inUse: Boolean, radio: Boolean, modifier: Modifier = Modifier, enabled: Boolean = status.on, onUse: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val choice = if (radio) Modifier.selectable(selected = inUse, enabled = status.on, role = Role.RadioButton, onClick = onUse) else Modifier.semantics(mergeDescendants = true) { }
+    val choice = if (radio) Modifier.selectable(selected = inUse, enabled = enabled, role = Role.RadioButton, onClick = onUse) else Modifier.semantics(mergeDescendants = true) { }
     Row(modifier.then(choice).heightIn(min = 60.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (radio) RadioButton(selected = inUse, onClick = null, enabled = status.on)
+        if (radio) RadioButton(selected = inUse, onClick = null, enabled = enabled)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(scale.name, color = if (status.on) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
             Text(status.line(inUse), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
@@ -654,7 +655,8 @@ internal fun ScaleChooserList(scales: List<PairedScale>, inUse: PairedScale, sca
             ChooserHead(inUse.name, turn, Modifier.fillMaxWidth().clickable(onClickLabel = "Close", role = Role.Button, onClick = onClose)) {
                 Text("Choose a scale", Modifier.weight(1f).graphicsLayer { alpha = rows }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
             }
-            Column(Modifier.graphicsLayer { alpha = rows }.selectableGroup()) {
+            // With many scales, a short screen or large text, the list scrolls inside the surface.
+            Column(Modifier.graphicsLayer { alpha = rows }.heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * .6f).dp).verticalScroll(androidx.compose.foundation.rememberScrollState()).selectableGroup()) {
                 scales.forEach { paired ->
                     ScaleChoice(paired, scale.status(paired.address, paired.address == inUse.address), paired.address == inUse.address, radio = true, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp)) {
                         onClose()
@@ -710,7 +712,7 @@ internal fun ScaleHeaderChip(state: AppState, scale: ScaleUi, connected: Boolean
  * tapping a scale that is on uses it. "More actions" on a row renames it in place or forgets it.
  */
 @Composable
-internal fun ScaleSettings(scales: List<PairedScale>, inUse: String?, scale: ScaleUi, onAdd: () -> Unit, onUse: (String) -> Unit, onRename: (String, String) -> Unit, onForget: (PairedScale) -> Unit, allowedCheck: (Context) -> Boolean = ScaleLink::allowed) {
+internal fun ScaleSettings(scales: List<PairedScale>, inUse: String?, scale: ScaleUi, onAdd: () -> Unit, onUse: (String) -> Unit, onRename: (String, String) -> Unit, onForget: (PairedScale) -> Unit, held: Boolean = false, allowedCheck: (Context) -> Boolean = ScaleLink::allowed) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(allowedCheck(context)) }
@@ -742,7 +744,8 @@ internal fun ScaleSettings(scales: List<PairedScale>, inUse: String?, scale: Sca
                         FilledIconButton({ onRename(paired.address, typed); renaming = null }, Modifier.padding(top = 8.dp).size(40.dp), enabled = typed.isNotBlank(),
                             colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.primary, contentColor = colors.onPrimary)) { Icon(Icons.Outlined.Check, "Save name", Modifier.size(18.dp)) }
                     } else Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ScaleChoice(paired, status, using, radio = many, modifier = Modifier.weight(1f)) { if (!using) onUse(paired.address) }
+                        // While a brew holds the scale in use ([held]), no other scale can be chosen.
+                        ScaleChoice(paired, status, using, radio = many, modifier = Modifier.weight(1f), enabled = status.on && (using || !held)) { if (!using) onUse(paired.address) }
                         Box {
                             IconButton({ menu = paired.address }) { Icon(Icons.Outlined.MoreVert, "More actions for ${paired.name}", Modifier.size(20.dp)) }
                             DropdownMenu(menu == paired.address, { menu = null }, shape = MaterialTheme.shapes.small, containerColor = colors.surfaceContainerHigh) {

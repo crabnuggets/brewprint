@@ -266,15 +266,19 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
         current.copy(scales = all, scale = current.scale ?: all.first { it.address == scale.address }) to Unit
     }
 
-    /** Forgets a paired scale. If it was the one in use, the first one left takes its place. */
+    /**
+     * Forgets a paired scale. If it was the one in use, the first one left takes its place, unless a brew holds the
+     * scale: that brew follows the clock, and no other scale's readings are taken for its own.
+     */
     fun forgetScale(address: String): Result<Unit> = change { current ->
         val rest = current.pairedScales.filterNot { it.address == address }
-        current.copy(scales = rest, scale = if (current.scale?.address == address) rest.firstOrNull() else current.scale) to Unit
+        current.copy(scales = rest, scale = if (current.scale?.address == address) rest.firstOrNull().takeUnless { current.scaleHeldByBrew } else current.scale) to Unit
     }
 
-    /** Makes a paired scale the one in use. */
+    /** Makes a paired scale the one in use. A brew that holds the scale keeps it. */
     fun useScale(address: String): Result<Unit> = change { current ->
         val scale = requireNotNull(current.pairedScales.find { it.address == address }) { "That scale is no longer paired." }
+        require(scale.address == current.scale?.address || !current.scaleHeldByBrew) { "A brew is using the scale. Finish the brew first." }
         current.copy(scales = current.pairedScales, scale = scale) to Unit
     }
 

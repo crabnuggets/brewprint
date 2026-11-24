@@ -18,6 +18,9 @@ data class ScaleStatus(val on: Boolean = false, val battery: Int? = null)
 /** Every paired scale, in the order paired. Data saved when only one could be paired holds just the scale in use. */
 val AppState.pairedScales: List<PairedScale> get() = scales.ifEmpty { listOfNotNull(scale) }
 
+/** A brew on its sheet whose scale steps have begun: its tare, and then its water, belong to the scale in use. */
+val AppState.scaleHeldByBrew: Boolean get() = draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true
+
 /**
  * The scale to use in place of the one in use, which is not on: the first paired scale that is. Null to stay, as when
  * the scale in use is on, no other is, or a brew's scale steps have begun, whose tare belongs to the scale it has.

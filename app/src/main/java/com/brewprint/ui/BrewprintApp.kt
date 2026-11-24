@@ -203,7 +203,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                 "scale" -> state.scale?.let { paired ->
                     val scale = LocalScale.current
                     // A brew whose scale steps have begun, or whose timer runs by weight, depends on the scale's zero.
-                    val brewing = state.draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true
+                    val brewing = state.scaleHeldByBrew
                     // While a brew is using the scale, the scale can't be changed from here.
                     ScaleScreen(paired, scale.live, brewing, onTare = scale.tare, onResumeBrew = { resumeDraft() },
                         chip = { connected, reading -> ScaleHeaderChip(state, scale, connected, reading, onChoose = useScale.takeIf { !brewing }) }) { route = null }
@@ -217,7 +217,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                     "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(onError) },
                         experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } },
                         about = { AboutSettings(repository, onError) }) {
-                        ScaleSettings(state.pairedScales, state.scale?.address, LocalScale.current, pairScale, useScale,
+                        ScaleSettings(state.pairedScales, state.scale?.address, LocalScale.current, pairScale, useScale, held = state.scaleHeldByBrew,
                             onRename = { address, name -> repository.renameScale(address, name).onFailure { failure -> onError(failure.message ?: "Couldn't rename the scale.") } },
                             onForget = { forgotten ->
                                 forgetScale(context, forgotten)

@@ -63,6 +63,23 @@ class PairedScalesTest {
         assertTrue(repository.useScale(home.address).isFailure)
     }
 
+    @Test fun `a brew that holds the scale keeps it`() {
+        repository.pairScale(home).getOrThrow()
+        repository.pairScale(office).getOrThrow()
+        repository.startDraft().getOrThrow()
+        repository.changeDraft { it.copy(scale = ScaleData(), stage = DraftStage.SHEET) }
+        assertTrue(repository.useScale(office.address).isFailure)
+        assertEquals(home, state.scale)
+        // Choosing the scale already in use is no change, so it is allowed.
+        repository.useScale(home.address).getOrThrow()
+        // Forgetting it mid-brew leaves the brew to the clock: the other scale's readings are not taken for its own.
+        repository.forgetScale(home.address).getOrThrow()
+        assertNull(state.scale)
+        assertEquals(listOf(office), state.pairedScales)
+        repository.discardDraft().getOrThrow()
+        assertEquals(office, state.scaleToSwitchTo(setOf(office.address)))
+    }
+
     @Test fun `data saved when one scale could be paired still has its scale`() {
         val saved = Json { ignoreUnknownKeys = true }.decodeFromString(AppState.serializer(), """{"scale":{"address":"AA:AA:AA:AA:AA:AA","name":"TIMEMORE Dot"}}""")
         assertEquals(listOf(home), saved.pairedScales)

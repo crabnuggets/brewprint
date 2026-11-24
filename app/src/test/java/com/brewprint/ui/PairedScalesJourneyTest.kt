@@ -104,6 +104,16 @@ class PairedScalesJourneyTest {
         assertEquals(office.address, inUse?.address)
     }
 
+    @Test fun `while a brew holds the scale, Settings offers no other`() {
+        open(home, office, brewing = true)
+        compose.runOnIdle { repository.changeDraft { it.copy(scale = ScaleData(), scaleStep = ScaleStep.ARMED) } }
+        settings()
+        val other = compose.onNode(hasText("TIMEMORE Basic3 Link") and hasText("On · Battery 64%"))
+        other.assertIsNotEnabled()
+        other.performClick()
+        assertEquals(home.address, inUse?.address)
+    }
+
     @Test fun `a scale is renamed in place and can be forgotten`() {
         open(home, office)
         settings()

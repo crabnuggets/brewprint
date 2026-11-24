@@ -129,6 +129,8 @@ object ScaleLink {
             handler.postDelayed(silence, CONNECT_MILLIS)
         }
         publish()
+        // The scale in use may have just changed to one that is off, as after forgetting the last one used.
+        choose()
     }
 
     /** Makes [address] the scale in use: the brew hears that the old one is gone, then the new one if it is on. */
@@ -150,7 +152,10 @@ object ScaleLink {
 
     private fun close(address: String) {
         val link = links.remove(address) ?: return
-        link.gatt?.run { disconnect(); close() }
+        // Its callbacks compare against this, so one already on its way is ignored instead of acting on a closed connection.
+        val gatt = link.gatt
+        link.gatt = null
+        gatt?.run { disconnect(); close() }
         if (address == active) dropActive()
     }
 
