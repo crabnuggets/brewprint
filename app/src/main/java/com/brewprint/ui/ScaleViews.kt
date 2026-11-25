@@ -28,7 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BluetoothDisabled
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Scale
 import androidx.compose.material3.*
@@ -55,7 +60,18 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -66,7 +82,7 @@ import kotlin.math.abs
 import java.util.regex.Pattern
 
 /** The live scale and its one command. Tests replace it. */
-class ScaleUi(val live: ScaleLive = ScaleLive(), val tare: () -> Unit = {})
+class ScaleUi(val live: ScaleLive = ScaleLive(), val statuses: Map<String, ScaleStatus> = emptyMap(), val tare: () -> Unit = {})
 
 val LocalScale = compositionLocalOf { ScaleUi() }
 
@@ -201,7 +217,7 @@ internal fun ScaleHomeCard(scale: PairedScale, live: ScaleLive, onClick: () -> U
  * saved. While a brew is using the scale ([brewing]) a tare would move its targets, so the screen offers the brew instead.
  */
 @Composable
-internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, onTare: () -> Unit, onResumeBrew: () -> Unit, allowedCheck: (Context) -> Boolean = ScaleLink::allowed, onClose: () -> Unit) {
+internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, onTare: () -> Unit, onResumeBrew: () -> Unit, allowedCheck: (Context) -> Boolean = ScaleLink::allowed, chip: (@Composable (connected: Boolean, reading: Boolean) -> Unit)? = null, onClose: () -> Unit) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     var allowed by remember { mutableStateOf(allowedCheck(context)) }
@@ -209,7 +225,10 @@ internal fun ScaleScreen(scale: PairedScale, live: ScaleLive, brewing: Boolean, 
     androidx.activity.compose.BackHandler(LocalScreenActive.current) { onClose() }
     KeepScreenOn(true)
     val grams = live.grams?.takeIf { allowed && live.connected && !live.silent }
-    Page("Scale", onClose, actions = { ScaleChip(scale.name, allowed && live.connected, reading = grams != null) }, footer = {
+    Page("Scale", onClose, actions = {
+        if (chip != null) chip(allowed && live.connected, grams != null) else ScaleChip(scale.name, allowed && live.connected, reading = grams != null)
+        Spacer(Modifier.width(8.dp))
+    }, footer = {
         when {
             !allowed -> SecondaryAction("Open Android settings") { openAppSettings(context) }
             brewing -> PrimaryAction("Resume brew", onClick = onResumeBrew)
@@ -585,32 +604,171 @@ internal fun LiftOffer(timer: BrewTimer, data: ScaleData, onUse: (Int) -> Unit) 
 }
 
 /** Settings → Coffee scale. */
+/** A paired scale's status. Where the link reports none, as in tests, only the scale in use has one, from its live reading. */
+internal fun ScaleUi.status(address: String, inUse: Boolean): ScaleStatus = statuses[address] ?: if (inUse) ScaleStatus(live.connected, live.battery) else ScaleStatus()
+
+private fun ScaleStatus.line(inUse: Boolean): String = if (!on) "Not connected" else (if (inUse) "In use" else "On") + (battery?.let { " · Battery $it%" } ?: "")
+
+/** One paired scale as a choice: a radio, its name, and its status. A scale that is not on is dimmed and can't be chosen. */
 @Composable
-internal fun ScaleSettings(scale: PairedScale?, live: ScaleLive, onAdd: () -> Unit, onForget: () -> Unit) {
+private fun ScaleChoice(scale: PairedScale, status: ScaleStatus, inUse: Boolean, radio: Boolean, modifier: Modifier = Modifier, enabled: Boolean = status.on, onUse: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val choice = if (radio) Modifier.selectable(selected = inUse, enabled = enabled, role = Role.RadioButton, onClick = onUse) else Modifier.semantics(mergeDescendants = true) { }
+    Row(modifier.then(choice).heightIn(min = 60.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (radio) RadioButton(selected = inUse, onClick = null, enabled = enabled)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(scale.name, color = if (status.on) colors.onSurface else colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+            Text(status.line(inUse), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** The chip's own row: the scale icon, the name of the scale in use, and an arrow that turns over as the list opens. */
+@Composable
+private fun ChooserHead(name: String, turn: Float, modifier: Modifier = Modifier, title: (@Composable RowScope.() -> Unit)? = null) {
+    Row(modifier.heightIn(min = 40.dp).padding(start = 16.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        title?.invoke(this)
+        Icon(Icons.Outlined.Scale, null, Modifier.size(16.dp))
+        Text(name, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp).graphicsLayer { rotationZ = turn })
+    }
+}
+
+/**
+ * "Choose a scale" as the chip grown into a list: the same surface, anchored at its top right, with the icon and
+ * name where they were. [grown] is where its size is heading: over about 320 ms it grows from the chip to the list
+ * or back, and the rows fade in a little after it starts to grow.
+ */
+@Composable
+internal fun ScaleChooserList(scales: List<PairedScale>, inUse: PairedScale, scale: ScaleUi, note: String?, grown: Boolean, onClose: () -> Unit, onChoose: (String) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val ease = androidx.compose.animation.core.CubicBezierEasing(.2f, .7f, .2f, 1f)
+    val turn by androidx.compose.animation.core.animateFloatAsState(if (grown) 180f else 0f, androidx.compose.animation.core.tween(320, easing = ease), label = "chooser arrow")
+    val corner by androidx.compose.animation.core.animateDpAsState(if (grown) 16.dp else 10.dp, androidx.compose.animation.core.tween(320), label = "chooser corner")
+    val lift by androidx.compose.animation.core.animateDpAsState(if (grown) 8.dp else 0.dp, androidx.compose.animation.core.tween(320), label = "chooser shadow")
+    val rows by androidx.compose.animation.core.animateFloatAsState(if (grown) 1f else 0f, if (grown) androidx.compose.animation.core.tween(200, delayMillis = 120) else androidx.compose.animation.core.tween(120), label = "chooser rows")
+    // The size animates inside the surface, so its rounded shape and shadow follow the growing edge.
+    Surface(shape = RoundedCornerShape(corner), color = colors.soft, shadowElevation = lift, modifier = Modifier.semantics { paneTitle = "Choose a scale" }) {
+      Box(Modifier.animateContentSize(androidx.compose.animation.core.tween(320, easing = ease), alignment = Alignment.TopEnd)) {
+        if (!grown) ChooserHead(inUse.name, turn)
+        else Column(Modifier.width(288.dp)) {
+            ChooserHead(inUse.name, turn, Modifier.fillMaxWidth().clickable(onClickLabel = "Close", role = Role.Button, onClick = onClose)) {
+                Text("Choose a scale", Modifier.weight(1f).graphicsLayer { alpha = rows }, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            }
+            // With many scales, a short screen or large text, the list scrolls inside the surface.
+            Column(Modifier.graphicsLayer { alpha = rows }.heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * .6f).dp).verticalScroll(androidx.compose.foundation.rememberScrollState()).selectableGroup()) {
+                scales.forEach { paired ->
+                    ScaleChoice(paired, scale.status(paired.address, paired.address == inUse.address), paired.address == inUse.address, radio = true, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp)) {
+                        onClose()
+                        if (paired.address != inUse.address) onChoose(paired.address)
+                    }
+                }
+                if (note != null) Text(note, Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 14.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+      }
+    }
+}
+
+/**
+ * The scale in use as a button beside a screen's title, while another paired scale is on. Tapping it opens
+ * "Choose a scale" over the chip itself. [note] says what choosing does on this screen.
+ */
+@Composable
+internal fun ScaleChooser(scales: List<PairedScale>, inUse: PairedScale, scale: ScaleUi, note: String? = null, onChoose: (String) -> Unit) {
+    // [open] holds the list on screen; [grown] is where its size is heading, so it shrinks back before it goes.
+    var open by remember { mutableStateOf(false) }
+    var grown by remember { mutableStateOf(false) }
+    LaunchedEffect(open, grown) {
+        if (open && !grown) { kotlinx.coroutines.delay(340); open = false }
+    }
+    Box {
+        Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.soft,
+            modifier = Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * .42f).dp).clip(RoundedCornerShape(10.dp))
+                .clickable(onClickLabel = "Choose a scale", role = Role.Button) { open = true }.clearAndSetSemantics { contentDescription = "${inUse.name}, in use. Choose a scale" }) {
+            ChooserHead(inUse.name, 0f)
+        }
+        if (open) Popup(alignment = Alignment.TopEnd, onDismissRequest = { grown = false }, properties = PopupProperties(focusable = true)) {
+            // It starts at the chip's size, over the chip, and grows from there.
+            LaunchedEffect(Unit) { grown = true }
+            ScaleChooserList(scales, inUse, scale, note, grown, onClose = { grown = false }, onChoose = onChoose)
+        }
+    }
+}
+
+/**
+ * The scale's name beside a screen's title. While another paired scale is on and [onChoose] is given, it is the
+ * button to choose between them; otherwise it only says how the scale in use is.
+ */
+@Composable
+internal fun ScaleHeaderChip(state: AppState, scale: ScaleUi, connected: Boolean, reading: Boolean, note: String? = null, onChoose: ((String) -> Unit)?) {
+    val inUse = state.scale ?: return
+    val others = state.pairedScales.any { it.address != inUse.address && scale.status(it.address, false).on }
+    if (onChoose != null && others) ScaleChooser(state.pairedScales, inUse, scale, note, onChoose) else ScaleChip(inUse.name, connected, reading)
+}
+
+/**
+ * Settings → "Coffee scale": every paired scale with its status. With more than one, the list is a radio group and
+ * tapping a scale that is on uses it. "More actions" on a row renames it in place or forgets it.
+ */
+@Composable
+internal fun ScaleSettings(scales: List<PairedScale>, inUse: String?, scale: ScaleUi, onAdd: () -> Unit, onUse: (String) -> Unit, onRename: (String, String) -> Unit, onForget: (PairedScale) -> Unit, held: Boolean = false, allowedCheck: (Context) -> Boolean = ScaleLink::allowed) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
-    var allowed by remember { mutableStateOf(ScaleLink.allowed(context)) }
-    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { allowed = ScaleLink.allowed(context); ScaleLink.sync(context) }
+    var allowed by remember { mutableStateOf(allowedCheck(context)) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { allowed = allowedCheck(context); ScaleLink.sync(context) }
+    // The address of the scale being renamed, and the name as typed so far.
+    var renaming by rememberSaveable { mutableStateOf<String?>(null) }
+    var typed by rememberSaveable { mutableStateOf("") }
+    var menu by remember { mutableStateOf<String?>(null) }
     SectionTitle("Coffee scale")
-    Panel {
-        if (scale == null) {
-            Text("Pair a Bluetooth scale to start the timer at your first pour and end each pour at its target.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-            SoftButton(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Add a scale") }
-        } else {
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.align(Alignment.CenterVertically)) {
-                    Text(scale.name, style = MaterialTheme.typography.titleMedium)
-                    Text(if (live.connected) "Connected" + (live.battery?.let { " · Battery $it%" } ?: "") else "Not connected", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    if (scales.isEmpty()) return Panel {
+        Text("Pair a Bluetooth scale to start the timer at your first pour and end each pour at its target.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        SoftButton(onClick = onAdd, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Add a scale") }
+    }
+    val many = scales.size > 1
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
+        Column {
+            Column(if (many) Modifier.selectableGroup() else Modifier) {
+                scales.forEachIndexed { index, paired ->
+                    if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = colors.outlineVariant)
+                    val using = paired.address == inUse
+                    val status = scale.status(paired.address, using)
+                    if (renaming == paired.address) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 12.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (many) RadioButton(selected = using, onClick = null, enabled = false, modifier = Modifier.padding(top = 18.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LibraryField(typed, { typed = it }, "Name", error = if (typed.isBlank()) "Enter a name." else null)
+                            Text(paired.model ?: paired.name, Modifier.padding(start = 16.dp), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        IconAction(Icons.Outlined.Close, "Cancel", Modifier.padding(top = 8.dp)) { renaming = null }
+                        FilledIconButton({ onRename(paired.address, typed); renaming = null }, Modifier.padding(top = 8.dp).size(40.dp), enabled = typed.isNotBlank(),
+                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.primary, contentColor = colors.onPrimary)) { Icon(Icons.Outlined.Check, "Save name", Modifier.size(18.dp)) }
+                    } else Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // While a brew holds the scale in use ([held]), no other scale can be chosen.
+                        ScaleChoice(paired, status, using, radio = many, modifier = Modifier.weight(1f), enabled = status.on && (using || !held)) { if (!using) onUse(paired.address) }
+                        Box {
+                            IconButton({ menu = paired.address }) { Icon(Icons.Outlined.MoreVert, "More actions for ${paired.name}", Modifier.size(20.dp)) }
+                            DropdownMenu(menu == paired.address, { menu = null }, shape = MaterialTheme.shapes.small, containerColor = colors.surfaceContainerHigh) {
+                                DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = null; typed = paired.name; renaming = paired.address })
+                                DropdownMenuItem(text = { Text("Forget") }, leadingIcon = { Icon(Icons.Outlined.RemoveCircleOutline, null) }, onClick = { menu = null; onForget(paired) })
+                            }
+                        }
+                    }
                 }
-                SoftButton(onClick = onForget, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("Forget") }
             }
-            if (!allowed) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Outlined.BluetoothDisabled, null, Modifier.size(20.dp))
-                    Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
+            HorizontalDivider(color = colors.outlineVariant)
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SoftButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) {
+                    Icon(Icons.Outlined.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("Add a scale")
                 }
-                Text("Nearby devices is turned off for Brewprint. Brews are timed by the clock.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = { openAppSettings(context) }) { Text("Open Android settings") }
+                if (!allowed) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Outlined.BluetoothDisabled, null, Modifier.size(20.dp))
+                        Text("Blocked by Android", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Text("Nearby devices is turned off for Brewprint. Brews are timed by the clock.", color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    SoftButton(shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp), onClick = { openAppSettings(context) }) { Text("Open Android settings") }
+                }
             }
         }
     }

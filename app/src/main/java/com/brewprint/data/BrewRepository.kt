@@ -259,8 +259,37 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
         current.copy(timerSettings = settings) to Unit
     }
 
-    fun setScale(scale: PairedScale?): Result<Unit> = change { current ->
-        current.copy(scale = scale) to Unit
+    /**
+     * Adds a scale chosen in Android's picker. One already paired keeps its name; with none in use, the new one is,
+     * unless a brew holds a scale that was forgotten: that brew stays on the clock.
+     */
+    fun pairScale(scale: PairedScale): Result<Unit> = change { current ->
+        val paired = current.pairedScales
+        val all = if (paired.any { it.address == scale.address }) paired else paired + scale
+        current.copy(scales = all, scale = current.scale ?: all.first { it.address == scale.address }.takeUnless { current.scaleHeldByBrew }) to Unit
+    }
+
+    /**
+     * Forgets a paired scale. If it was the one in use, the first one left takes its place, unless a brew holds the
+     * scale: that brew follows the clock, and no other scale's readings are taken for its own.
+     */
+    fun forgetScale(address: String): Result<Unit> = change { current ->
+        val rest = current.pairedScales.filterNot { it.address == address }
+        current.copy(scales = rest, scale = if (current.scale?.address == address) rest.firstOrNull().takeUnless { current.scaleHeldByBrew } else current.scale) to Unit
+    }
+
+    /** Makes a paired scale the one in use. A brew that holds the scale keeps it. */
+    fun useScale(address: String): Result<Unit> = change { current ->
+        val scale = requireNotNull(current.pairedScales.find { it.address == address }) { "That scale is no longer paired." }
+        require(scale.address == current.scale?.address || !current.scaleHeldByBrew) { "A brew is using the scale. Finish the brew first." }
+        current.copy(scales = current.pairedScales, scale = scale) to Unit
+    }
+
+    /** Gives a paired scale the user's own name, keeping the scale's own name as its model. */
+    fun renameScale(address: String, name: String): Result<Unit> = change { current ->
+        require(name.isNotBlank()) { "Enter a name." }
+        val all = current.pairedScales.map { if (it.address == address) it.copy(name = name.trim(), model = it.model ?: it.name) else it }
+        current.copy(scales = all, scale = all.find { it.address == current.scale?.address }) to Unit
     }
 
     fun dismissScaleOffer(): Result<Unit> = change { current ->

@@ -36,7 +36,7 @@ class ScaleBrewTest {
         repository.upsertBeans(beans).getOrThrow()
         repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 24)).getOrThrow()
         repository.upsertRecipe(recipe).getOrThrow()
-        repository.setScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
+        repository.pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
         repository.updateDraft(repository.startDraft().getOrThrow().copy(beans = beans, recipe = recipe, stage = DraftStage.SHEET, scale = ScaleData(), scaleStep = ScaleStep.ARMED)).getOrThrow()
         brew = ScaleBrew(repository) { sent += it }
     }
@@ -341,7 +341,7 @@ class ScaleBrewTest {
 
     @Test fun `forgetting the scale mid-brew hands the brew to the clock`() {
         startBrew()
-        repository.setScale(null).getOrThrow()
+        repository.forgetScale("AA:BB:CC:DD:EE:FF").getOrThrow()
         brew.connected(false, now)
         assertFalse(timer.byWeight)
     }

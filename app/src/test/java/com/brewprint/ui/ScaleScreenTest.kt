@@ -43,7 +43,7 @@ class ScaleScreenTest {
         repository.upsertBeans(beans).getOrThrow()
         repository.upsertGrinder(Grinder(name = "Hand grinder", lastSetting = 24)).getOrThrow()
         repository.upsertRecipe(recipe).getOrThrow()
-        if (paired) repository.setScale(PairedScale("AA:BB:CC:DD:EE:FF", "TIMEMORE Dot")).getOrThrow()
+        if (paired) repository.pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "TIMEMORE Dot")).getOrThrow()
         if (brewing) repository.updateDraft(draft(repository.startDraft().getOrThrow().copy(beans = beans, recipe = recipe, stage = DraftStage.SHEET))).getOrThrow()
         compose.setContent {
             val state by repository.state.collectAsState()

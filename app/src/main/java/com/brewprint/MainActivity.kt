@@ -51,7 +51,8 @@ class MainActivity : ComponentActivity() {
             val brew = ScaleLink.brew(this@MainActivity)
             val live by brew.live.collectAsStateWithLifecycle()
             // The tare's deadline is checked on time even if the scale sends nothing more.
-            CompositionLocalProvider(LocalScale provides ScaleUi(live) {
+            val statuses by ScaleLink.status.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalScale provides ScaleUi(live, statuses) {
                 brew.tare(System.currentTimeMillis())
                 handler.postDelayed({ brew.expireTare(System.currentTimeMillis()) }, TARE_MILLIS + 50)
             }) {

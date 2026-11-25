@@ -74,6 +74,9 @@ _Avoid_: Pour time, extraction time
 A Bluetooth scale that reports weight and flow to the app during a brew. Optional; a brew without one is timed by the clock alone.
 _Avoid_: Smart scale
 
+**Scale in use**:
+The paired coffee scale whose readings count and which "Tare" zeroes. With several paired, the one used last, or the only one that is on.
+
 **Weighed dose**:
 The dose read from the coffee scale before a brew, or typed on the scale card when the scale can't weigh the coffee. Using it rescales that brew's pulses to keep the recipe's brew ratio; the recipe itself is unchanged.
 

@@ -56,7 +56,7 @@ class BrewStartCaptureTest {
         val draft = startDraft().getOrThrow().copy(beans = beans, recipe = recipe, startedAt = morning - 86_400_000L, journal = Journal(impression = "Smells like cocoa; lighter than I expected", nextTime = "Try one tick finer"))
         updateDraft(draft).getOrThrow()
         saveBrew(draft.id).getOrThrow()
-        if (paired) setScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
+        if (paired) pairScale(PairedScale("AA:BB:CC:DD:EE:FF", "Dotty")).getOrThrow()
     }
 
     private fun show(repository: BrewRepository) = compose.setContent {

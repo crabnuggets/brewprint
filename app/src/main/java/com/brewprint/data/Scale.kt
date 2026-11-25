@@ -5,9 +5,28 @@ import java.math.RoundingMode
 
 import kotlinx.serialization.Serializable
 
-/** The Bluetooth coffee scale chosen in Android's device picker. */
+/**
+ * A Bluetooth coffee scale chosen in Android's device picker. [name] is what the app shows: the scale's own name until
+ * the user renames it, after which [model] keeps the scale's own name.
+ */
 @Serializable
-data class PairedScale(val address: String, val name: String)
+data class PairedScale(val address: String, val name: String, val model: String? = null)
+
+/** Whether a paired scale is on and connected, and its battery where it has said. Not saved. */
+data class ScaleStatus(val on: Boolean = false, val battery: Int? = null)
+
+/** Every paired scale, in the order paired. Data saved when only one could be paired holds just the scale in use. */
+val AppState.pairedScales: List<PairedScale> get() = scales.ifEmpty { listOfNotNull(scale) }
+
+/** A brew on its sheet whose scale steps have begun: its tare, and then its water, belong to the scale in use. */
+val AppState.scaleHeldByBrew: Boolean get() = draft?.let { it.scale != null && it.stage == DraftStage.SHEET } == true
+
+/**
+ * The scale to use in place of the one in use, which is not on: the first paired scale that is. Null to stay, as when
+ * the scale in use is on, no other is, or a brew's scale steps have begun, whose tare belongs to the scale it has.
+ */
+fun AppState.scaleToSwitchTo(on: Set<String>): PairedScale? =
+    if (scale?.address in on || draft?.scale != null) null else pairedScales.firstOrNull { it.address in on }
 
 /** Where a scale brew stands before the first pour. */
 @Serializable enum class ScaleStep { BREWER, COFFEE, ARMED }
