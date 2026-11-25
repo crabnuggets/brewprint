@@ -44,12 +44,13 @@ class ExportTest {
 
     @Test fun `an export holds the app's details, its data and its log`() {
         val output = ByteArrayOutputStream()
-        writeExport(output, "Brewprint 0.1.0 (1)\n", """{"beans":[]}""".toByteArray(), "11-24 08:30:00.000 W Brewprint: Sync failed\n")
+        writeExport(output, "Brewprint 0.1.0 (1)\n", """{"beans":[]}""".toByteArray(), "11-24 08:30:00.000 W Brewprint: Sync failed\n", "2026-11-24 08:30:00.000 Scale 38:68 (in use) connected, status 0\n")
         val files = unzip(output.toByteArray())
-        assertEquals(listOf("about.txt", "data.json", "log.txt"), files.keys.toList())
+        assertEquals(listOf("about.txt", "data.json", "log.txt", "scale-log.txt"), files.keys.toList())
         assertEquals("Brewprint 0.1.0 (1)\n", files["about.txt"])
         assertEquals("""{"beans":[]}""", files["data.json"])
         assertEquals("11-24 08:30:00.000 W Brewprint: Sync failed\n", files["log.txt"])
+        assertEquals("2026-11-24 08:30:00.000 Scale 38:68 (in use) connected, status 0\n", files["scale-log.txt"])
         assertEquals("brewprint-export-2026-11-24.zip", exportFileName(LocalDate.of(2026, 11, 24)))
     }
 
@@ -76,7 +77,7 @@ class ExportTest {
         assertTrue("sb_publishable_abc" in redacted)
 
         val output = ByteArrayOutputStream()
-        writeExport(output, "", ByteArray(0), log)
+        writeExport(output, "", ByteArray(0), log, "")
         assertFalse(jwt in unzip(output.toByteArray()).getValue("log.txt"))
     }
 
