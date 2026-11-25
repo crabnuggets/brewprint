@@ -15,6 +15,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.brewprint.cloud.CloudSync
+import com.brewprint.cloud.DraftNotifications
+import com.brewprint.cloud.EXTRA_REVIEW_ID
+import com.brewprint.cloud.EXTRA_REVIEW_KIND
+import androidx.compose.runtime.mutableStateOf
+import com.brewprint.ui.ReviewRequest
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.Appearance
 import com.brewprint.timer.BrewTimerService
@@ -32,6 +37,8 @@ import com.brewprint.ui.ScaleUi
 class MainActivity : ComponentActivity() {
     /** Counts requests from the live notification to show the brew in progress. */
     private var openDraft by mutableIntStateOf(0)
+    /** The draft a notification from Claude asked to review. */
+    private var review by mutableStateOf<ReviewRequest?>(null)
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +47,9 @@ class MainActivity : ComponentActivity() {
         val repository = BrewRepository.get(applicationContext)
         CloudSync.start(applicationContext)
         Updater.start(applicationContext, repository.state.value.betaReleases)
+        DraftNotifications.createChannel(applicationContext)
         if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_OPEN_DRAFT, false)) openDraft++
+        if (savedInstanceState == null) reviewFrom(intent)
         setContent {
             val state by repository.state.collectAsStateWithLifecycle()
             val dark = state.appearance == Appearance.DARK || state.appearance == Appearance.SYSTEM && isSystemInDarkTheme()
@@ -58,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 brew.tare(System.currentTimeMillis())
                 handler.postDelayed({ brew.expireTare(System.currentTimeMillis()) }, TARE_MILLIS + 50)
             }) {
-                BrewprintTheme(state.appearance, state.experiments.theme) { BrewprintApp(state, repository, openDraft) }
+                BrewprintTheme(state.appearance, state.experiments.theme) { BrewprintApp(state, repository, openDraft, review) }
             }
         }
     }
@@ -66,11 +75,19 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_DRAFT, false)) openDraft++
+        reviewFrom(intent)
+    }
+
+    private fun reviewFrom(intent: Intent) {
+        val kind = intent.getStringExtra(EXTRA_REVIEW_KIND) ?: return
+        val id = intent.getStringExtra(EXTRA_REVIEW_ID) ?: return
+        review = ReviewRequest(kind, id, (review?.number ?: 0) + 1)
     }
 
     override fun onStart() {
         super.onStart()
         BrewTimerService.appOpen = true
+        DraftNotifications.appVisible = true
         BrewTimerService.clearFinished(this)
         BrewTimerService.sync(this)
         ScaleLink.sync(this)
@@ -84,6 +101,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         BrewTimerService.appOpen = false
+        DraftNotifications.appVisible = false
         ScaleLink.sync(this)
         super.onStop()
     }

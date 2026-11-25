@@ -296,6 +296,15 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
         current.copy(scales = all, scale = all.find { it.address == current.scale?.address }) to Unit
     }
 
+    /** Turns draft notifications on or off. Either way, the offer on Brew has had its answer. */
+    fun setDraftNotifications(on: Boolean): Result<Unit> = change { current ->
+        current.copy(draftNotifications = on, draftNotificationOfferDismissed = true) to Unit
+    }
+
+    fun dismissDraftNotificationOffer(): Result<Unit> = change { current ->
+        current.copy(draftNotificationOfferDismissed = true) to Unit
+    }
+
     fun dismissScaleOffer(): Result<Unit> = change { current ->
         current.copy(scaleOfferDismissed = true) to Unit
     }

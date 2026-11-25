@@ -69,3 +69,4 @@ Label these PRs like any other: `release: feature` for something people will not
 1. Authentication → URL Configuration: Site URL `https://crabnuggets.github.io/brewprint`.
 2. Authentication → OAuth Server: turn it on, set the authorization path to `/oauth/consent.html`, and allow dynamic client registration.
 3. In Google Cloud, add `https://crabnuggets.github.io` to the Web OAuth client's authorized JavaScript origins, so the consent page can sign in with Google.
+4. Edge Functions → Secrets: `FIREBASE_SERVICE_ACCOUNT`, the whole JSON key of a service account in the Firebase project (Firebase console → Project settings → Service accounts → Generate new private key). `brewprint-mcp` uses it to tell phones their drafts changed ([ADR 0006](../adr/0006-the-server-tells-phones-when-drafts-change.md)); without it, drafts still wait in the app. The app's `app/google-services.json` names the same Firebase project.

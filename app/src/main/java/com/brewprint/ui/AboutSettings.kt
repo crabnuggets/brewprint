@@ -169,7 +169,7 @@ internal fun VersionPanel(
         RowDivider()
         UpdateStatus(update, brewing, installAllowed, onCheck, onUpdate, onNotes)
         RowDivider()
-        SwitchRow("Beta releases", "Try new features early. Betas may have problems.", betas, onBetas)
+        SwitchRow("Beta releases", "Try new features early. Betas may have problems.", betas, onChange = onBetas)
     }
 }
 

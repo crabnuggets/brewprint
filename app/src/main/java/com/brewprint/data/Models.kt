@@ -272,5 +272,9 @@ data class AppState(
     val scales: List<PairedScale> = emptyList(),
     /** "Not now" on the pairing card hides it for good. */
     val scaleOfferDismissed: Boolean = false,
+    /** Settings → Account → "Drafts from Claude": a notification for each draft Claude makes. */
+    val draftNotifications: Boolean = false,
+    /** Either answer to the offer on Brew's drafts card hides it for good. */
+    val draftNotificationOfferDismissed: Boolean = false,
     val sync: SyncState = SyncState(),
 )

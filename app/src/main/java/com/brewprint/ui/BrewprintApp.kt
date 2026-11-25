@@ -63,8 +63,11 @@ private fun screenDepth(screen: String) = when (screen) {
     else -> 0
 }
 
+/** A notification asked to review Claude's draft [id] of [kind]: "beans", "recipes" or "journals". [number] counts requests. */
+data class ReviewRequest(val kind: String, val id: String, val number: Int)
+
 @Composable
-fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: Int = 0) {
+fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: Int = 0, reviewRequest: ReviewRequest? = null) {
     var tab by rememberSaveable { mutableStateOf("Brew") }
     var route by rememberSaveable { mutableStateOf<String?>(null) }
     var recordId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -87,6 +90,20 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
             // Going Back to the Brew screen leaves a timed draft on setup; the notification should open its sheet.
             if (draft.timer != null && draft.stage == DraftStage.SETUP) repository.updateDraft(draft.copy(stage = DraftStage.SHEET))
             if (route != "draft") { draftReturn = null; draftFresh = false; route = "draft" }
+        }
+    }
+    // A notification from Claude opens the draft's review, or where the draft was when it is already gone.
+    LaunchedEffect(reviewRequest) {
+        val request = reviewRequest ?: return@LaunchedEffect
+        if (request.kind == "journals") {
+            if (state.brews.none { it.id == request.id }) { route = null; tab = "Brew"; return@LaunchedEffect }
+            recordId = request.id
+            if (state.journalDrafts.any { it.brewId == request.id }) { notesReturn = "record"; route = "notes" } else route = "record"
+        } else {
+            route = null
+            tab = "Library"
+            libraryNav.reset()
+            libraryNav.draftRequest = request.id
         }
     }
     state.draft?.let { draft -> if (draft.timer != null && draft.recipe != null && (state.timerSettings.vibrate || state.timerSettings.sound)) StepCue(draft.recipe, draft.timer, state.timerSettings) }
@@ -214,7 +231,7 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                             repository.startDraftWith(beansId, recipeId).onSuccess { draftReturn = null; draftFresh = true; route = "draft" }.onFailure { onError(it.message ?: "Couldn't start brew.") }
                         }, onResumeBrew = { resumeDraft() })
                     "History" -> HistoryScreen(shown.brews, state.draft == null, { openRecord(it) }, { repeat(it) }, { delete(it) })
-                    "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(onError) },
+                    "Settings" -> SettingsScreen(state.appearance, state.timerSettings, { repository.setAppearance(it).onFailure { failure -> onError(failure.message ?: "Couldn't save appearance.") } }, { repository.setTimerSettings(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } }, account = { AccountSettings(state.draftNotifications, onDraftNotifications = draftNotificationsSwitch(repository, onError), onError = onError) },
                         experiments = state.experiments, onExperiments = { repository.setExperiments(it).onFailure { failure -> onError(failure.message ?: "Couldn't save settings.") } },
                         about = { AboutSettings(repository, onError) }) {
                         ScaleSettings(state.pairedScales, state.scale?.address, LocalScale.current, pairScale, useScale, held = state.scaleHeldByBrew,
@@ -224,7 +241,9 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
                                 repository.forgetScale(forgotten.address).onSuccess { com.brewprint.scale.ScaleLink.sync(context) }.onFailure { failure -> onError(failure.message ?: "Couldn't forget the scale.") }
                             })
                     }
-                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" }, { route = "scale" })
+                    else -> BrewHome(shown, { resumeDraft() }, { openRecord(it) }, { repeat(it) }, { recordId = it; notesReturn = null; route = "notes" }, { libraryNav.reset(); tab = "Library" }, { route = "scale" },
+                        onNotify = draftNotificationsSwitch(repository, onError),
+                        onNotNow = { repository.dismissDraftNotificationOffer().onFailure { onError(it.message ?: "Couldn't save settings.") } })
                 } }
             }
             } }
@@ -273,22 +292,26 @@ fun BrewprintApp(state: AppState, repository: BrewRepository, openDraftRequest: 
  * is the floating action over this screen. Every theme shows the same things in the same order.
  */
 @Composable
-private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onDrafts: () -> Unit, onScale: () -> Unit) {
+private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -> Unit, onRepeat: (String) -> Unit, onNotes: (String) -> Unit, onDrafts: () -> Unit, onScale: () -> Unit, onNotify: (Boolean) -> Unit = {}, onNotNow: () -> Unit = {}) {
     Page("Brew") {
         state.draft?.let { draft -> InProgressCard(draft, onResume) }
         val drafts = state.libraryDrafts
+        val recent = state.brews.maxByOrNull { it.startedAt }
+        // Claude's notes for the most recent brew are reviewed from its card; older brews get a card each.
+        val olderNotes = state.journalDrafts.mapNotNull { draft -> state.brews.find { it.id == draft.brewId && it.id != recent?.id } }
+        // Until answered, the first draft card offers notifications, while signed in with them off.
+        var offered = state.sync.userId == null || state.draftNotifications || state.draftNotificationOfferDismissed
+        val offer: @Composable () -> Unit = { DraftNotificationOffer({ onNotify(true) }, onNotNow) }
+        fun nextOffer(): (@Composable () -> Unit)? = if (offered) null else { offered = true; offer }
         if (drafts.isNotEmpty()) HomeBanner(
             Icons.Outlined.Inbox,
             if (drafts.size == 1) "Review 1 draft from Claude" else "Review ${drafts.size} drafts from Claude",
             drafts.joinToString(" · ") { draft -> draft.beans?.let { "${it.name} beans" } ?: "${draft.recipe?.name} recipe" },
+            extra = nextOffer(),
             onClick = onDrafts,
         )
-        val recent = state.brews.maxByOrNull { it.startedAt }
-        // Claude's notes for the most recent brew are reviewed from its card; older brews get a card each.
-        state.journalDrafts.forEach { draft ->
-            state.brews.find { it.id == draft.brewId && it.id != recent?.id }?.let { brew ->
-                HomeBanner(Icons.Outlined.EditNote, "Review tasting notes from Claude", "${brew.beans.name} · ${dateTime(brew.startedAt)}") { onNotes(brew.id) }
-            }
+        olderNotes.forEach { brew ->
+            HomeBanner(Icons.Outlined.EditNote, "Review tasting notes from Claude", "${brew.beans.name} · ${dateTime(brew.startedAt)}", extra = nextOffer()) { onNotes(brew.id) }
         }
         // A paired scale can weigh without a brew: its line shows the reading and opens the Scale screen.
         state.scale?.let { ScaleHomeCard(it, LocalScale.current.live, onScale) }
@@ -299,6 +322,8 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 Text("Save the beans, recipe, grinder setting, and your tasting notes.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         } else {
+            // Claude's notes for this brew have no card of their own, so the offer stands alone above it.
+            if (state.journalDrafts.any { it.brewId == recent.id }) nextOffer()?.let { offer -> Panel { offer() } }
             SectionTitle("Most recent brew")
             Taped { Panel {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -379,11 +404,12 @@ private fun InProgressCard(draft: BrewDraft, onResume: () -> Unit) {
 
 /** A card on Brew that opens something waiting: a brew in progress, or drafts from Claude. */
 @Composable
-private fun HomeBanner(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, emphasized: Boolean = false, onClickLabel: String? = null, below: String? = null, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+private fun HomeBanner(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, emphasized: Boolean = false, onClickLabel: String? = null, below: String? = null, trailing: (@Composable () -> Unit)? = null, extra: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Surface(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(onClickLabel = onClickLabel, onClick = onClick), shape = MaterialTheme.shapes.medium, color = colors.surface,
+    Surface(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium), shape = MaterialTheme.shapes.medium, color = colors.surface,
         border = BorderStroke(if (emphasized) 1.5.dp else 1.dp, if (emphasized) colors.onSurface else colors.outlineVariant)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Column {
+        Column(Modifier.clickable(onClickLabel = onClickLabel, onClick = onClick).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Icon(icon, null, Modifier.size(40.dp).background(if (emphasized) colors.primary else colors.soft, CircleShape).padding(10.dp), tint = if (emphasized) colors.onPrimary else colors.onSecondaryContainer)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -393,6 +419,35 @@ private fun HomeBanner(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
                 if (trailing != null) trailing() else Icon(Icons.Outlined.ChevronRight, null, tint = colors.onSurfaceVariant)
             }
             if (below != null) Text(below, style = MaterialTheme.typography.bodyMedium)
+        }
+        // Its own actions sit below the card's tappable part, so they never open what the card opens.
+        if (extra != null) Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HorizontalDivider(color = colors.outlineVariant)
+            extra()
+        }
+      }
+    }
+}
+
+/** Offered once, under the first draft card on Brew. Either answer hides it for good. */
+@Composable
+private fun DraftNotificationOffer(onTurnOn: () -> Unit, onNotNow: () -> Unit) {
+    Text("Get a notification when Claude drafts something?", style = MaterialTheme.typography.bodyMedium)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SoftTextButton(onClick = onNotNow, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Not now") }
+        PrimaryButton(onClick = onTurnOn, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Turn on") }
+    }
+}
+
+/** Turns "Drafts from Claude" on or off, asking Android for the notification permission when turning it on. */
+@Composable
+internal fun draftNotificationsSwitch(repository: BrewRepository, onError: (String) -> Unit): (Boolean) -> Unit {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prompt = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+    return { on ->
+        repository.setDraftNotifications(on).onFailure { onError(it.message ?: "Couldn't save settings.") }
+        if (on && android.os.Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            prompt.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
@@ -870,7 +925,7 @@ private fun PlanSchedule(recipe: Recipe, facts: Boolean = true) {
 
 private val entryFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(ResolverStyle.STRICT)
 private fun dateInput(value: Long) = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault()).format(entryFormat)
-private fun dateTime(value: Long): String {
+internal fun dateTime(value: Long): String {
     val date = Instant.ofEpochMilli(value).atZone(ZoneId.systemDefault())
     val day = when (date.toLocalDate()) {
         LocalDate.now() -> "Today"

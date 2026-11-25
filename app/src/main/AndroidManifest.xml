@@ -48,5 +48,19 @@
         <receiver
             android:name=".update.UpdateReceiver"
             android:exported="false" />
+        <!-- The server's "drafts changed" message. Firebase gets no token until "Drafts from Claude" is turned on. -->
+        <service
+            android:name=".cloud.DraftMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
     </application>
 </manifest>
