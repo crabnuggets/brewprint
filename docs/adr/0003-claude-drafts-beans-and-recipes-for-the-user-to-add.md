@@ -1,6 +1,6 @@
 # Claude drafts beans and recipes for the user to add
 
-Claude may now also draft tasting notes for a brew, in the same table. See [ADR 0004](0004-claude-drafts-tasting-notes-on-a-brew.md).
+Claude may now also draft tasting notes for a brew, in the same table. See [ADR 0004](0004-claude-drafts-tasting-notes-on-a-brew.md). Drafts no longer wait for the app to open: the server tells phones when they change. See [ADR 0006](0006-the-server-tells-phones-when-drafts-change.md).
 
 Claude can now propose beans and recipes, for example from a roaster's product page, a photo of a bag or a recipe someone posted. Its MCP tools (`draft_beans`, `draft_recipe`, `discard_draft`) write to a separate table, `drafts`, which row-level security opens to any of the user's tokens, Claude's included. `records` stays read-only to Claude, as [ADR 0002](0002-claude-reads-brews-through-a-read-only-mcp-server.md) set out. The app fetches every draft on each sync and lists them in the Library under "Drafts from Claude". Reviewing one opens the usual beans or recipe form, filled in. "Add to Library" saves it as a library item with the draft's id, and the draft is then deleted from the account, as is a draft the user discards. Until then Claude can correct a draft by its id, in the same conversation or a later one.
 

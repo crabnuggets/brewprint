@@ -69,6 +69,8 @@ private data class LibraryView(val section: String?, val detailId: String?, val 
 class LibraryNav(section: String? = null, detailId: String? = null) {
     var section by mutableStateOf(section)
     var detailId by mutableStateOf(detailId)
+    /** A draft a notification asked to review; the Library opens it, or stays on its hub when the draft is gone. */
+    var draftRequest by mutableStateOf<String?>(null)
 
     /** Back to the hub. */
     fun reset() { section = null; detailId = null }
@@ -123,6 +125,11 @@ fun LibraryScreen(
     val editKind = libraryDraft?.let { if (it.beans != null) "beans" else "recipes" } ?: kind
     // Added on another phone or discarded by Claude while under review: there is nothing left to add.
     if (draftId != null && libraryDraft == null) LaunchedEffect(Unit) { leaveEditor() }
+    LaunchedEffect(place.draftRequest) {
+        val requested = place.draftRequest ?: return@LaunchedEffect
+        place.draftRequest = null
+        if (state.libraryDrafts.any { it.id == requested }) { draftId = requested; place.detailId = null; editing = true }
+    }
     val closeDetail = { place.detailId = null; editing = false; archive = false; delete = false; Unit }
     // Beans deleted on another phone while open here: there is nothing left to show or edit.
     if (kind == "beans" && detailId != null && beans == null) LaunchedEffect(Unit) { closeDetail() }
@@ -636,7 +643,7 @@ private fun SwipeRow(onOpen: () -> Unit, short: SwipeAction, onDelete: () -> Uni
     }
 }
 
-private fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatRatio(recipe.computedRatio)} · ${formatAmount(recipe.totalWater)} g"
+internal fun recipeSummary(recipe: Recipe) = "${formatAmount(recipe.dose)} g · 1:${formatRatio(recipe.computedRatio)} · ${formatAmount(recipe.totalWater)} g"
 
 /** The header action that discards a draft from Claude under review, after asking. */
 @Composable

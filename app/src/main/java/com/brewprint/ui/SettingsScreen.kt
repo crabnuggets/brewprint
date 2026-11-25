@@ -42,7 +42,7 @@ internal fun notificationsAllowed(context: Context): Boolean =
 internal fun liveUpdatesAllowed(context: Context): Boolean =
     Build.VERSION.SDK_INT < 36 || context.getSystemService(NotificationManager::class.java)?.canPostPromotedNotifications() != false
 
-private fun openNotificationSettings(context: Context, action: String = Settings.ACTION_APP_NOTIFICATION_SETTINGS) {
+internal fun openNotificationSettings(context: Context, action: String = Settings.ACTION_APP_NOTIFICATION_SETTINGS) {
     val intent = Intent(action).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     try { context.startActivity(intent) } catch (_: ActivityNotFoundException) {
         // Some phones have no page for one setting; the app's notification page holds it too.
@@ -135,8 +135,8 @@ private fun Choice(label: String, detail: String?, selected: Boolean, onSelect: 
 }
 
 @Composable
-internal fun SwitchRow(label: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange).heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+internal fun SwitchRow(label: String, detail: String?, checked: Boolean, inset: androidx.compose.ui.unit.Dp = 20.dp, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange).heightIn(min = 64.dp).padding(horizontal = inset, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             if (detail != null) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
@@ -147,8 +147,8 @@ internal fun SwitchRow(label: String, detail: String?, checked: Boolean, onChang
 
 /** A setting Android holds for the app, with a way to change it. */
 @Composable
-private fun AndroidNotice(title: String, text: String, onOpen: () -> Unit) {
-    Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+internal fun AndroidNotice(title: String, text: String, inset: androidx.compose.ui.unit.Dp = 20.dp, onOpen: () -> Unit) {
+    Column(Modifier.padding(start = inset, end = inset, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Outlined.NotificationsOff, null, Modifier.size(20.dp))
             Text(title, style = MaterialTheme.typography.titleMedium)

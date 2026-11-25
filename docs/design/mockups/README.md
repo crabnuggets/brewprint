@@ -81,6 +81,14 @@ The owner accepted the v2 screens on 2026-11-23 after three rounds of council re
 
 The owner accepted these screens on 2026-11-24. They are pages 7 to 11 of the same canvas, [Brewprint logo](https://claude.ai/artifact/FdiWCE989aXrtCL1MLZsmw): the Scale screen and its card on Brew, more than one paired scale with "Choose a scale", "Tare" on the coffee step, the tasting journal's choices, and "Discard changes" on saved tasting notes. The pages are still titled "proposed"; every board on them is the chosen design. Boards 8o and 10f are interactive and hold the intended animation timings. Behavior is defined in [UX journeys](../../ux.md), which supersedes the canvas where they differ.
 
+## Draft notifications
+
+The owner accepted the [draft notifications board](draft-notifications/index.html) on 2026-11-25. It is hand-written HTML rendered to PNG in light appearance, in the style of the brew timer boards. Behavior is defined in [UX journeys](../../ux.md#notifications-for-drafts-from-claude), which supersedes the board where they differ.
+
+| Reference | Screens |
+| --- | --- |
+| [Drafts from Claude, as notifications](draft-notifications/n1.png) | One draft on the lock screen, several drafts grouped, the one-time offer on Brew, the Settings switch with permission blocked |
+
 ## Coverage and revisions
 
 Library, recipe editing, guided tasting fields, appearance settings, empty states, draft resumption, validation, and failure states are not illustrated. Build those from the written docs using the same visual language. A missing control or state in a mockup does not remove a written requirement.

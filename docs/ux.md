@@ -116,6 +116,21 @@ The Library's hub shows them first, in a "Drafts from Claude" card, each as its 
 
 Opening a draft shows the usual beans or recipe form, filled in and titled "Review beans" or "Review recipe", with the same validation. "Add to Library" saves it, with any edits, and opens it as a Library item. Back leaves the draft waiting; unsaved edits ask "Discard changes?" first. The header's red trash action, "Discard draft", asks "Discard this draft?" with "It won't be added to your Library.", "Discard" and "Keep draft". To have Claude fix a draft instead, ask it in the conversation; its correction replaces the draft on the next sync, including on an open review the user hasn't edited. A review whose draft was added on another phone or discarded closes.
 
+### Notifications for drafts from Claude
+
+With "Drafts from Claude" on in Settings, each draft Claude makes, beans, a recipe, or tasting notes, shows as an Android notification on a "Drafts from Claude" channel, separate from the brew timer's. The server tells the phone when drafts change, so it arrives while the app is closed (see [ADR 0006](adr/0006-the-server-tells-phones-when-drafts-change.md)).
+
+- **Content.** "Review beans from Claude" with the beans' name and roaster beneath; "Review recipe from Claude" with the recipe's name and "[dose] g · 1:[ratio] · [water] g"; "Review tasting notes from Claude" with the beans' name and the brew's date and time.
+- **Tapping** opens that draft's review: "Review beans", "Review recipe" or "Review tasting notes". Back from the review goes where it would have gone if the user had opened it in the app: the Library's hub for beans and recipes, the brew record for tasting notes. A draft already added or discarded, for example on another phone, opens the Library or the brew instead. A notification has no actions, so nothing is added or discarded unseen.
+- **Several drafts** join one group, "[n] drafts from Claude", with their names beneath.
+- **Corrections.** When Claude corrects a draft, its notification changes in place, with no sound or vibration.
+- **Going away.** Adding, saving or discarding a draft, on any phone signed in to the account, removes its notification. So does deleting the brew whose notes are waiting.
+- **App open.** While Brewprint is on screen, nothing is posted; the cards on Brew already show the drafts.
+
+The switch sits in the Account card, beneath the sync status, and only while signed in: "Drafts from Claude", "Notifies you when Claude drafts something to review". It is off by default. Turning it on asks for Android's notification permission if Brewprint doesn't have it. If notifications, or the "Drafts from Claude" channel, are blocked, a "Blocked by Android" notice appears under the switch: "Notifications for Brewprint are turned off. Drafts still wait in the app.", with "Open Android settings". Signing out removes the switch and cancels any draft notifications.
+
+The first time a draft waits on Brew while the switch is off, its card offers "Get a notification when Claude drafts something?" with "Not now" and "Turn on". "Turn on" turns the switch on, as in Settings. Either choice hides the offer for good.
+
 ## Brew sheet and timing
 
 The brew sheet presents a static schedule with elapsed start times, per-pulse amounts, cumulative amounts, pour durations, and waits. Start time zero means the start of the first pour. Each following start time equals the previous start plus its pour duration plus its wait.
@@ -147,7 +162,7 @@ An "Experimental" section near the end of Settings holds features still being tr
 
 "Support" ends Settings. "Export data" opens Android's save dialog with "brewprint-export-<date>.zip" filled in. The file holds `about.txt` (the app's version, the Android version, the phone's model, and when it was exported), `data.json` (everything the app keeps on the phone: beans, grinders, recipes, brews, the brew draft, Claude's drafts and settings, or the saved file as it is if the app couldn't read it), and `log.txt` (the app's recent lines from Android's log, which Android keeps only until it needs the room). Sign-in tokens are removed from the log. Once saved, "Export saved" shows under the button; a failure says "Couldn't export your data. Try again, or save it somewhere else." Cancelling the save dialog says nothing. "Report a problem" opens a new issue on Brewprint's GitHub page in the browser, where the export can be attached.
 
-Turning "Live notification" on is the only moment the Android notification permission prompt appears. If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
+Turning "Live notification" on is one of two moments the Android notification permission prompt appears; the other is turning on [notifications for drafts from Claude](#notifications-for-drafts-from-claude). If notifications are refused or turned off, a "Blocked by Android" notice appears under the switch with "Open Android settings". The in-app timer works the same either way.
 
 On Android 16, the user can also turn off Live Updates for Brewprint alone. ColorOS calls this "Show Live Updates on Live Alerts". If notifications are allowed but Live Updates are off, a "Live Updates are off" notice appears under the switch instead. Its "Open Android settings" opens Brewprint's Live Updates setting, or its notification settings on phones without that page. The brew still shows as a normal notification.
 
@@ -278,7 +293,7 @@ For example, the user saves a brew before tasting, returns from the Brew screen,
 
 Settings opens with "Account". Signed out, it explains what signing in keeps and offers "Sign in with Google", which shows Android's Google account picker. Cancelling the picker says nothing; a failure says "Couldn't sign in. Check your connection and try again."
 
-Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
+Signed in, it shows the account's email, a sync status ("Syncing…", "Synced 5 minutes ago", or "Couldn't sync. It will try again."), the "Drafts from Claude" switch (see [Notifications for drafts from Claude](#notifications-for-drafts-from-claude)), and "Sign out". "Sign out" asks first: "Sign out?" with "Your beans, grinders, recipes and brews will be removed from this phone. They stay in your Google account.", and "Sign out" and "Cancel".
 
 - **What syncs.** Beans, grinders, recipes, and brew records, one item at a time. The brew draft, unsaved note edits, appearance, theme, timer settings, "Beta releases", and the paired scales stay on the phone. Each sync also fetches Claude's drafts, beans, recipes and tasting notes; adding, saving or discarding one deletes it from the account.
 - **When.** On sign-in, when the app opens, and a couple of seconds after each change. Offline changes wait and go up next time.
@@ -314,6 +329,9 @@ Use numeric keyboards for quantities and durations, readable unit labels, and in
 - A 15-second pause delays later pulses by 15 seconds and adds 15 seconds to the total.
 - A brew left alone stops after 15 minutes and saves with no total unless one is entered.
 - With "Live notification" off and no scale brew, no notification or permission prompt appears.
+- With "Drafts from Claude" on and the app closed, a recipe Claude drafts shows as a notification within seconds, and tapping it opens "Review recipe".
+- A draft added on one phone loses its notification on another phone signed in to the same account.
+- Claude correcting a draft updates its notification without a sound.
 - Weighing 15.2 g of coffee for a 15 g, 1:16 recipe rescales this brew to 243.2 g and leaves the Library recipe at 15 g.
 - Pouring from the armed sheet starts the timer at the first pour; lifting and replacing the brewer does not.
 - A pour that reaches its target early lengthens the wait; one that overruns moves later pulses later.

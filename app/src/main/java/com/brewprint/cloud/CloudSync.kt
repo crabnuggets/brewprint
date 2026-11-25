@@ -24,6 +24,8 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
+import io.github.jan.supabase.functions.functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
@@ -43,6 +45,10 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -68,6 +74,10 @@ private data class RecordRow(
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 
+/** A phone that wants to hear when the account's drafts change. See docs/adr/0006. */
+@Serializable
+private data class DeviceRow(@SerialName("user_id") val userId: String, val token: String)
+
 /** A library draft or tasting notes Claude wrote to the account. */
 @Serializable
 private data class DraftRow(val id: String, val kind: String, val data: JsonElement)
@@ -81,10 +91,12 @@ object CloudSync {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private lateinit var repository: BrewRepository
+    private lateinit var context: Context
     private val client: SupabaseClient by lazy {
         createSupabaseClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_KEY) {
             install(Auth)
             install(Postgrest)
+            install(Functions)
         }
     }
 
@@ -92,6 +104,7 @@ object CloudSync {
     @OptIn(FlowPreview::class)
     fun start(context: Context) {
         if (::repository.isInitialized || BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()) return
+        this.context = context.applicationContext
         repository = BrewRepository.get(context)
         mutable.update { it.copy(available = true) }
         scope.launch {
@@ -104,6 +117,7 @@ object CloudSync {
                     if (!bound) return@collect
                     mutable.update { it.copy(email = user.email) }
                     sync()
+                    registerDevice()
                 } else if (status is SessionStatus.NotAuthenticated) {
                     mutable.update { CloudState(available = true) }
                 }
@@ -114,7 +128,57 @@ object CloudSync {
             repository.state.distinctUntilChanged { a, b -> a.beans === b.beans && a.grinders === b.grinders && a.recipes === b.recipes && a.brews === b.brews && a.sync.pending == b.sync.pending }
                 .debounce(2_000).filter { it.sync.pending.isNotEmpty() }.collect { sync() }
         }
+        scope.launch {
+            // Drafts arrive, change and go with each sync and each review, here or on another phone.
+            repository.state.distinctUntilChanged { a, b -> a.libraryDrafts === b.libraryDrafts && a.journalDrafts === b.journalDrafts && a.brews === b.brews && a.draftNotifications == b.draftNotifications && a.sync.userId == b.sync.userId }
+                .collect { DraftNotifications.update(this@CloudSync.context, it) }
+        }
+        scope.launch {
+            // Turning "Drafts from Claude" on or off tells the server whether to reach this phone.
+            repository.state.map { it.draftNotifications }.distinctUntilChanged().collect { registerDevice() }
+        }
     }
+
+    /** Syncs at once and waits for it, for a message from the server while the app may be closed. */
+    suspend fun syncNow(context: Context) {
+        start(context)
+        if (!::repository.isInitialized) return
+        client.auth.awaitInitialization()
+        sync()
+    }
+
+    /** Firebase gave this phone a new token; the server needs it to keep reaching the phone. */
+    fun tokenChanged(context: Context) {
+        start(context)
+        if (::repository.isInitialized) scope.launch { registerDevice() }
+    }
+
+    /**
+     * Gives the server this phone's Firebase token while "Drafts from Claude" is on and an account is signed in, and takes
+     * it back when the switch is turned off. Firebase has no token for the phone until then. Failures wait for the next try.
+     */
+    private suspend fun registerDevice() = runCatching {
+        client.auth.awaitInitialization()
+        val user = client.auth.currentUserOrNull() ?: return@runCatching
+        val state = repository.state.value
+        if (state.sync.userId != user.id) return@runCatching
+        val messaging = FirebaseMessaging.getInstance()
+        if (state.draftNotifications) {
+            messaging.isAutoInitEnabled = true
+            val token = messaging.token.awaitResult()
+            client.from("devices").upsert(DeviceRow(user.id, token)) { onConflict = "user_id,token" }
+            devices().edit().putString(TOKEN, token).apply()
+        } else {
+            val token = devices().getString(TOKEN, null) ?: return@runCatching
+            client.from("devices").delete { filter { eq("token", token) } }
+            messaging.isAutoInitEnabled = false
+            messaging.deleteToken().awaitResult()
+            devices().edit().remove(TOKEN).apply()
+        }
+    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Log.w(LOG_TAG, "Couldn't update this phone's draft notifications", it) }
+
+    private const val TOKEN = "token"
+    private fun devices() = context.getSharedPreferences("device", Context.MODE_PRIVATE)
 
     /** Uploads local changes, then merges the server's. Failures are retried on the next change or app start. */
     fun requestSync() {
@@ -154,6 +218,9 @@ object CloudSync {
             client.from("drafts").delete { filter { isIn("id", ids) } }
         }
         repository.markPushed(drafts.associate { it.toPair() }).getOrThrow()
+        // The account's other phones take down the notifications for drafts resolved here.
+        if (drafts.isNotEmpty()) runCatching { client.functions.invoke("brewprint-mcp/drafts-changed") }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Log.w(LOG_TAG, "Couldn't tell other phones about drafts", it) }
     }
 
     private suspend fun pull() {
@@ -213,6 +280,8 @@ object CloudSync {
         syncLocked()
         // Checking for unsent changes and removing the data is one step, so an edit can't slip in between.
         repository.signedOut().exceptionOrNull()?.let { return it.message ?: "Couldn't sign out. Try again." }
+        // The account stops reaching this phone; the data's gone, so its notifications went with it.
+        devices().getString(TOKEN, null)?.let { token -> runCatching { client.from("devices").delete { filter { eq("token", token) } } } }
         endSession(context)
         null
     }
@@ -240,5 +309,15 @@ internal suspend fun <R> pullPages(since: String?, page: Long, updatedAt: (R) ->
         // A full page that doesn't move forward would repeat forever; uploads come in batches of 500, so this can't skip rows.
         if (batch.size < page || newest == null || newest == from) return rows
         from = newest
+    }
+}
+
+/** The result of a Play services task, without blocking a thread. */
+private suspend fun <T> com.google.android.gms.tasks.Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
+    addOnCompleteListener { task ->
+        val error = task.exception
+        if (error != null) continuation.resumeWithException(error)
+        else if (task.isCanceled) continuation.cancel()
+        else @Suppress("UNCHECKED_CAST") continuation.resume(task.result as T)
     }
 }

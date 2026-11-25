@@ -1,7 +1,8 @@
 // Brewprint's MCP server: lets Claude read the signed-in user's beans, grinders, recipes and brews, draft beans and
 // recipes for the user to add in the app, and draft tasting notes on a brew for the user to save. Claude signs in
 // through Supabase Auth's OAuth server; row-level security keeps it to that user's rows, lets it only read records
-// (20261121090000_read_only_oauth_clients.sql) and lets it write drafts (20261121120000_drafts.sql).
+// (20261121090000_read_only_oauth_clients.sql) and lets it write drafts (20261121120000_drafts.sql). After a draft
+// changes, the user's phones are told to sync (push.ts, docs/adr/0006); the app asks for the same at /drafts-changed.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -36,6 +37,7 @@ import {
   MOUTHFEEL_TAGS,
   type RecipeInput,
 } from "./drafts.ts";
+import { type Devices, messengerFromEnv, notifyDraftsChanged } from "./push.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 // Inside the local stack SUPABASE_URL is an internal address, so links handed to clients can come from here instead.
@@ -43,6 +45,10 @@ const PUBLIC_URL = (Deno.env.get("BREWPRINT_PUBLIC_URL") ?? SUPABASE_URL).replac
 const API_KEY = Deno.env.get("SUPABASE_ANON_KEY") ??
   Object.values(JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}"))[0] as string;
 const RESOURCE = `${PUBLIC_URL}/functions/v1/brewprint-mcp`;
+// The service role reads the phones' tokens, which no user token can: see 20261125120000_devices.sql.
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+  Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"))[0] as string | undefined;
+const MESSENGER = messengerFromEnv(Deno.env.get("FIREBASE_SERVICE_ACCOUNT"));
 const RESOURCE_METADATA = `${RESOURCE}/.well-known/oauth-protected-resource`;
 
 const CORS = {
@@ -75,8 +81,11 @@ function unauthorized(error?: string) {
   });
 }
 
-/** A client that acts as the token's user, so row-level security decides what it sees. Null when the token is not valid. */
-async function userClient(request: Request): Promise<SupabaseClient | null> {
+/**
+ * A client that acts as the token's user, so row-level security decides what it sees, with that user's id.
+ * Null when the token is not valid.
+ */
+async function userClient(request: Request): Promise<{ client: SupabaseClient; userId: string } | null> {
   const token = request.headers.get("Authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) return null;
   const client = createClient(SUPABASE_URL, API_KEY, {
@@ -84,7 +93,33 @@ async function userClient(request: Request): Promise<SupabaseClient | null> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await client.auth.getClaims(token);
-  return !error && data?.claims?.sub ? client : null;
+  const userId = data?.claims?.sub;
+  return !error && userId ? { client, userId } : null;
+}
+
+const devices: Devices = {
+  async tokens(userId) {
+    if (!SERVICE_KEY) return [];
+    const { data, error } = await admin().from("devices").select("token").eq("user_id", userId);
+    if (error) throw new Error(`Couldn't read the phones: ${error.message}`);
+    return data.map((row) => row.token as string);
+  },
+  async forget(userId, tokens) {
+    const { error } = await admin().from("devices").delete().eq("user_id", userId).in("token", tokens);
+    if (error) throw new Error(`Couldn't forget the phones: ${error.message}`);
+  },
+};
+
+let adminClient: SupabaseClient | undefined;
+const admin = () =>
+  adminClient ??= createClient(SUPABASE_URL, SERVICE_KEY!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+/** Tells [userId]'s phones their drafts changed, after the response if the runtime allows, so no tool waits on it. */
+function draftsChanged(userId: string) {
+  const sending = notifyDraftsChanged(userId, devices, MESSENGER);
+  (globalThis as { EdgeRuntime?: { waitUntil(promise: Promise<unknown>): void } }).EdgeRuntime?.waitUntil(sending);
 }
 
 async function readRows(client: SupabaseClient): Promise<Row[]> {
@@ -128,10 +163,12 @@ async function readJournalDraft(client: SupabaseClient, brewId: string): Promise
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }] });
 const failure = (message: string) => ({ ...text({ error: message }), isError: true });
 
-const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it.";
+const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it. " +
+  "If they turned on notifications for drafts, their phone shows one now.";
 const NOTES_WAITING =
   "Waiting on the brew in Brewprint. The user saves these notes, after editing them if they like, " +
-  "or discards them; until then the brew keeps its own notes.";
+  "or discards them; until then the brew keeps its own notes. If they turned on notifications for drafts, their " +
+  "phone shows one now.";
 const GONE = "isn't waiting any more: the user may have added or discarded it. get_library shows what's there.";
 
 /**
@@ -140,6 +177,7 @@ const GONE = "isn't waiting any more: the user may have added or discarded it. g
  */
 async function saveDraft<T extends Beans | Recipe>(
   client: SupabaseClient,
+  changed: () => void,
   kind: DraftKind,
   draftId: string | undefined,
   build: (id: string, existing?: T) => Built<T>,
@@ -163,10 +201,11 @@ async function saveDraft<T extends Beans | Recipe>(
     const { error } = await client.from("drafts").insert({ id: item.id, kind, data: item });
     if (error) throw new Error(`Couldn't save the draft: ${error.message}`);
   }
+  changed();
   return text({ draftId: item.id, status: WAITING, draft: item });
 }
 
-function server(client: SupabaseClient) {
+function server(client: SupabaseClient, changed: () => void) {
   const mcp = new McpServer({ name: "brewprint", version: "0.1.0" }, { instructions: INSTRUCTIONS });
   const read = { readOnlyHint: true, openWorldHint: false };
 
@@ -271,7 +310,7 @@ function server(client: SupabaseClient) {
       annotations: write,
     },
     ({ draftId, ...input }: BeansInput & { draftId?: string }) =>
-      saveDraft<Beans>(client, "beans", draftId, (id, existing) => buildBeans(id, input, existing)),
+      saveDraft<Beans>(client, changed, "beans", draftId, (id, existing) => buildBeans(id, input, existing)),
   );
 
   mcp.registerTool(
@@ -324,7 +363,7 @@ function server(client: SupabaseClient) {
       annotations: write,
     },
     ({ draftId, ...input }: RecipeInput & { draftId?: string }) =>
-      saveDraft<Recipe>(client, "recipes", draftId, (id, existing) => buildRecipe(id, input, existing)),
+      saveDraft<Recipe>(client, changed, "recipes", draftId, (id, existing) => buildRecipe(id, input, existing)),
   );
 
   const words = (description: string) => z.string().nullable().optional().describe(description);
@@ -372,6 +411,7 @@ function server(client: SupabaseClient) {
       // One draft per brew, with the brew's id, so drafting again corrects it.
       const { error } = await client.from("drafts").upsert({ id: brewId, kind: "journals", data: built.item });
       if (error) throw new Error(`Couldn't save the tasting notes: ${error.message}`);
+      changed();
       return text({ brewId, status: NOTES_WAITING, tastingNotes: tasting(built.item) });
     },
   );
@@ -386,6 +426,7 @@ function server(client: SupabaseClient) {
   }, async ({ draftId }: { draftId: string }) => {
     const { data, error } = await client.from("drafts").delete().eq("id", draftId).select("id");
     if (error) throw new Error(`Couldn't discard the draft: ${error.message}`);
+    if (data.length) changed();
     return data.length ? text({ discarded: draftId }) : failure(`Draft ${draftId} ${GONE}`);
   });
 
@@ -403,15 +444,20 @@ Deno.serve(async (request) => {
     }, { headers: CORS });
   }
   if (!request.headers.has("Authorization")) return unauthorized();
-  const client = await userClient(request);
-  if (!client) return unauthorized("invalid_token");
+  const user = await userClient(request);
+  if (!user) return unauthorized("invalid_token");
+  // The app resolved drafts on one phone; the account's other phones take their notifications down.
+  if (request.method === "POST" && new URL(request.url).pathname.endsWith("/drafts-changed")) {
+    draftsChanged(user.userId);
+    return new Response(null, { status: 204, headers: CORS });
+  }
 
   // Stateless: each request gets its own server and transport, so nothing is shared between users.
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
-  await server(client).connect(transport);
+  await server(user.client, () => draftsChanged(user.userId)).connect(transport);
   const response = await transport.handleRequest(request);
   Object.entries(CORS).forEach(([name, value]) => response.headers.set(name, value));
   return response;
