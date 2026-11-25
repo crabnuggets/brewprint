@@ -264,6 +264,8 @@ data class AppState(
     val appearance: Appearance = Appearance.SYSTEM,
     val experiments: Experiments = Experiments(),
     val timerSettings: TimerSettings = TimerSettings(),
+    /** Offer beta releases as updates, as well as full releases. */
+    val betaReleases: Boolean = false,
     /** The scale in use: the one whose readings count. One of [scales]. */
     val scale: PairedScale? = null,
     /** Every paired scale; see [pairedScales]. */

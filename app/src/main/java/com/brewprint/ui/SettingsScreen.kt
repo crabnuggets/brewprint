@@ -113,7 +113,7 @@ internal fun SettingsScreen(appearance: Appearance, timer: TimerSettings, onAppe
 
 /** One card holding a section's rows, split by dividers. */
 @Composable
-private fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant)) {
         Column(modifier.padding(vertical = 4.dp), content = content)
@@ -121,7 +121,7 @@ private fun SettingsCard(modifier: Modifier = Modifier, content: @Composable Col
 }
 
 @Composable
-private fun RowDivider() = HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
+internal fun RowDivider() = HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
 @Composable
 private fun Choice(label: String, detail: String?, selected: Boolean, onSelect: () -> Unit) {
@@ -135,7 +135,7 @@ private fun Choice(label: String, detail: String?, selected: Boolean, onSelect: 
 }
 
 @Composable
-private fun SwitchRow(label: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(label: String, detail: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange).heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)

@@ -259,6 +259,10 @@ class BrewRepository(context: Context, private val writes: Executor = WRITES) {
         current.copy(timerSettings = settings) to Unit
     }
 
+    fun setBetaReleases(on: Boolean): Result<Unit> = change { current ->
+        current.copy(betaReleases = on) to Unit
+    }
+
     /**
      * Adds a scale chosen in Android's picker. One already paired keeps its name; with none in use, the new one is,
      * unless a brew holds a scale that was forgotten: that brew stays on the clock.

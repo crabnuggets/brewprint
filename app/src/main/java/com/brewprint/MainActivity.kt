@@ -18,6 +18,7 @@ import com.brewprint.cloud.CloudSync
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.Appearance
 import com.brewprint.timer.BrewTimerService
+import com.brewprint.update.Updater
 import com.brewprint.timer.EXTRA_OPEN_DRAFT
 import com.brewprint.scale.ScaleLink
 import com.brewprint.scale.TARE_MILLIS
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val repository = BrewRepository.get(applicationContext)
         CloudSync.start(applicationContext)
+        Updater.start(applicationContext, repository.state.value.betaReleases)
         if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_OPEN_DRAFT, false)) openDraft++
         setContent {
             val state by repository.state.collectAsStateWithLifecycle()
@@ -73,6 +75,11 @@ class MainActivity : ComponentActivity() {
         BrewTimerService.sync(this)
         ScaleLink.sync(this)
         CloudSync.requestSync()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Updater.resumed()
     }
 
     override fun onStop() {

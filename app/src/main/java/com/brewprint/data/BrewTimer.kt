@@ -201,6 +201,13 @@ fun parseDuration(text: String): Int? {
 
 enum class TimerPhase { POUR, WAIT, DRAWDOWN, FINISHED, STOPPED }
 
+/** A brew's timer is running: started, and neither finished nor stopped after being left alone. */
+fun AppState.timerRunning(now: Long): Boolean {
+    val timer = draft?.timer ?: return false
+    val recipe = draft.recipe ?: return false
+    return TimerNow(recipe, timer, now).active
+}
+
 /** The timer as it stands at one moment, with the wording shared by the brew sheet and the live notification. */
 class TimerNow(val recipe: Recipe, initial: BrewTimer, val now: Long) {
     val timer: BrewTimer = initial.advanced(recipe, now)

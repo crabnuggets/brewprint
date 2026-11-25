@@ -14,6 +14,8 @@ Brewprint stays on `0.x` until the owner calls it 1.0.
 
 A build for testing before a release adds `-beta.N`: `v0.3.0-beta.1`, then `v0.3.0-beta.2`, then `v0.3.0`. Beta releases are marked as pre-releases on GitHub.
 
+The app finds releases through GitHub's releases API and offers the newest one in Settings → Version ([ADR 0005](../adr/0005-the-app-updates-itself-from-github-releases.md)). It offers a pre-release, or a tag with `-beta.N`, only to phones with "Beta releases" on. It installs a release's one `.apk` asset, after checking its size and the SHA-256 GitHub lists, so keep exactly one APK on each release and don't edit a published release's assets.
+
 The tag sets both numbers in the APK. `versionName` is the tag without its `v`. `versionCode` is the release workflow's run number, which only goes up, so each release installs over the previous one. Local builds are `0.1.0` with code 1.
 
 ## Labeling every PR
@@ -48,7 +50,7 @@ The workflow rejects a tag that isn't in the format above, isn't on `main`, or i
 
 ## After a release
 
-Install the APK from the GitHub Release over the previous release on a phone. Check that it updates without uninstalling, and that "Sign in with Google" still works. Release builds are signed with a different key from debug builds, so a debug build must be uninstalled before a release can be installed, which deletes its local data. Sign in on the debug build and let it sync first.
+On a phone with the previous release, open Settings → Version, tap "Update", and confirm Android's dialog. Check that it updates without uninstalling, that Settings then shows the new version as "Up to date", and that "Sign in with Google" still works. For a beta, turn on "Beta releases" first. Release builds are signed with a different key from debug builds, so a debug build must be uninstalled before a release can be installed, which deletes its local data. Sign in on the debug build and let it sync first.
 
 ## The Claude plugin and its server
 
