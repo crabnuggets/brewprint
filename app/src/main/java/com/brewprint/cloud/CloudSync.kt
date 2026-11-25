@@ -169,17 +169,18 @@ object CloudSync {
         if (state.sync.userId != user.id) return@runCatching
         val messaging = FirebaseMessaging.getInstance()
         if (state.draftNotifications) {
+            // Noted before Firebase is involved, so turning the switch off cleans up after any step that got this far.
+            devices().edit().putBoolean(ACTIVE, true).commit()
             messaging.isAutoInitEnabled = true
             val token = messaging.token.awaitResult()
-            // Kept first, so turning the switch off can take it back even if the upload fails.
             devices().edit().putString(TOKEN, token).apply()
             client.from("devices").upsert(DeviceRow(user.id, token)) { onConflict = "user_id,token" }
         } else {
+            if (!devices().getBoolean(ACTIVE, false)) return@runCatching
             messaging.isAutoInitEnabled = false
-            val token = devices().getString(TOKEN, null) ?: return@runCatching
-            client.from("devices").delete { filter { eq("token", token) } }
+            devices().getString(TOKEN, null)?.let { token -> client.from("devices").delete { filter { eq("token", token) } } }
             messaging.deleteToken().awaitResult()
-            devices().edit().remove(TOKEN).apply()
+            devices().edit().remove(TOKEN).remove(ACTIVE).apply()
         }
     }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Log.w(LOG_TAG, "Couldn't update this phone's draft notifications", it) } }
 
@@ -187,6 +188,8 @@ object CloudSync {
     private val deviceLock = Mutex()
 
     private const val TOKEN = "token"
+    /** Firebase has been given this phone since the switch was last turned off. */
+    private const val ACTIVE = "active"
     private fun devices() = context.getSharedPreferences("device", Context.MODE_PRIVATE)
 
     /** Uploads local changes, then merges the server's. Failures are retried on the next change or app start. */
