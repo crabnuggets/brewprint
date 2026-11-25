@@ -139,12 +139,17 @@ object CloudSync {
         }
     }
 
-    /** Syncs at once and waits for it, for a message from the server while the app may be closed. */
-    suspend fun syncNow(context: Context) {
+    /**
+     * Syncs at once, for a message from the server while the app may be closed. The sync runs on even if its caller
+     * stops waiting, and the notifications follow it once it's done.
+     */
+    fun syncNow(context: Context): kotlinx.coroutines.Job? {
         start(context)
-        if (!::repository.isInitialized) return
-        client.auth.awaitInitialization()
-        sync()
+        if (!::repository.isInitialized) return null
+        return scope.launch {
+            client.auth.awaitInitialization()
+            sync()
+        }
     }
 
     /** Firebase gave this phone a new token; the server needs it to keep reaching the phone. */
@@ -157,7 +162,7 @@ object CloudSync {
      * Gives the server this phone's Firebase token while "Drafts from Claude" is on and an account is signed in, and takes
      * it back when the switch is turned off. Firebase has no token for the phone until then. Failures wait for the next try.
      */
-    private suspend fun registerDevice() = runCatching {
+    private suspend fun registerDevice() = deviceLock.withLock { runCatching {
         client.auth.awaitInitialization()
         val user = client.auth.currentUserOrNull() ?: return@runCatching
         val state = repository.state.value
@@ -166,16 +171,20 @@ object CloudSync {
         if (state.draftNotifications) {
             messaging.isAutoInitEnabled = true
             val token = messaging.token.awaitResult()
-            client.from("devices").upsert(DeviceRow(user.id, token)) { onConflict = "user_id,token" }
+            // Kept first, so turning the switch off can take it back even if the upload fails.
             devices().edit().putString(TOKEN, token).apply()
+            client.from("devices").upsert(DeviceRow(user.id, token)) { onConflict = "user_id,token" }
         } else {
+            messaging.isAutoInitEnabled = false
             val token = devices().getString(TOKEN, null) ?: return@runCatching
             client.from("devices").delete { filter { eq("token", token) } }
-            messaging.isAutoInitEnabled = false
             messaging.deleteToken().awaitResult()
             devices().edit().remove(TOKEN).apply()
         }
-    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Log.w(LOG_TAG, "Couldn't update this phone's draft notifications", it) }
+    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; Log.w(LOG_TAG, "Couldn't update this phone's draft notifications", it) } }
+
+    /** One registration at a time, so turning the switch on and off quickly ends as the switch does. */
+    private val deviceLock = Mutex()
 
     private const val TOKEN = "token"
     private fun devices() = context.getSharedPreferences("device", Context.MODE_PRIVATE)

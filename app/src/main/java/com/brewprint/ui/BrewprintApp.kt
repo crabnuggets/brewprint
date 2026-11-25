@@ -322,6 +322,8 @@ private fun BrewHome(state: AppState, onResume: () -> Unit, onRecord: (String) -
                 Text("Save the beans, recipe, grinder setting, and your tasting notes.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         } else {
+            // Claude's notes for this brew have no card of their own, so the offer stands alone above it.
+            if (state.journalDrafts.any { it.brewId == recent.id }) nextOffer()?.let { offer -> Panel { offer() } }
             SectionTitle("Most recent brew")
             Taped { Panel {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

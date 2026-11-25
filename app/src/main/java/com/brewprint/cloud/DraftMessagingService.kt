@@ -15,8 +15,10 @@ class DraftMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         if (message.data["type"] != "drafts") return
-        // Android gives a message about 20 seconds; a sync that takes longer finishes in the background.
-        runBlocking { withTimeoutOrNull(15_000) { CloudSync.syncNow(applicationContext) } }
+        // Android gives a message about 20 seconds. A sync that takes longer runs on, and its drafts are announced
+        // when it's done, for as long as Android keeps the app's process.
+        val sync = CloudSync.syncNow(applicationContext)
+        runBlocking { withTimeoutOrNull(15_000) { sync?.join() } }
         DraftNotifications.update(applicationContext, BrewRepository.get(applicationContext).state.value)
     }
 }

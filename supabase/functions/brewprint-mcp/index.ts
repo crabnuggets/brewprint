@@ -163,12 +163,10 @@ async function readJournalDraft(client: SupabaseClient, brewId: string): Promise
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 1) }] });
 const failure = (message: string) => ({ ...text({ error: message }), isError: true });
 
-const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it. " +
-  "If they turned on notifications for drafts, their phone shows one now.";
+const WAITING = "Waiting in the Brewprint Library. The user adds it, after editing it if they like, or discards it.";
 const NOTES_WAITING =
   "Waiting on the brew in Brewprint. The user saves these notes, after editing them if they like, " +
-  "or discards them; until then the brew keeps its own notes. If they turned on notifications for drafts, their " +
-  "phone shows one now.";
+  "or discards them; until then the brew keeps its own notes.";
 const GONE = "isn't waiting any more: the user may have added or discarded it. get_library shows what's there.";
 
 /**

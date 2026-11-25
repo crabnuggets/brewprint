@@ -33,6 +33,7 @@ class DraftNotificationJourneyTest {
     private val summer = Recipe(name = "Summer V60", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 40)))
     private val grinder = Grinder(name = "Comandante", lastSetting = 24)
     private lateinit var older: BrewRecord
+    private lateinit var recent: BrewRecord
 
     private fun repository(signedIn: Boolean = true): BrewRepository {
         val data = temporary.newFolder("data")
@@ -50,7 +51,7 @@ class DraftNotificationJourneyTest {
             return repository.saveBrew(draft.id).getOrThrow()
         }
         older = brew(now - 86_400_000L)
-        brew(now)
+        recent = brew(now)
         repository.applyDrafts(listOf(LibraryDraft(summer.id, recipe = summer)), listOf(JournalDraft(older.id, Journal(impression = "Peachy")))).getOrThrow()
         return repository
     }
@@ -114,6 +115,15 @@ class DraftNotificationJourneyTest {
         // The card still opens the drafts.
         compose.onNodeWithText("Review 1 draft from Claude").performClick()
         compose.onNodeWithText("Drafts from Claude").assertIsDisplayed()
+    }
+
+    @Test fun `notes waiting on the most recent brew carry the offer too`() {
+        val repository = repository()
+        repository.applyDrafts(emptyList(), listOf(JournalDraft(recent.id, Journal(impression = "Juicy")))).getOrThrow()
+        show(repository)
+        compose.onNodeWithText("Review 1 draft from Claude").assertDoesNotExist()
+        compose.onNodeWithText("Get a notification when Claude drafts something?").assertIsDisplayed()
+        compose.onAllNodesWithText("Turn on").assertCountEquals(1)
     }
 
     @Test fun `Turn on turns the switch on`() {
