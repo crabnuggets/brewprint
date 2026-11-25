@@ -170,7 +170,7 @@ object CloudSync {
         val messaging = FirebaseMessaging.getInstance()
         if (state.draftNotifications) {
             // Noted before Firebase is involved, so turning the switch off cleans up after any step that got this far.
-            devices().edit().putBoolean(ACTIVE, true).commit()
+            check(devices().edit().putBoolean(ACTIVE, true).commit()) { "Couldn't note that Firebase is in use" }
             messaging.isAutoInitEnabled = true
             val token = messaging.token.awaitResult()
             devices().edit().putString(TOKEN, token).apply()
