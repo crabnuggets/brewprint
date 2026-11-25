@@ -45,6 +45,14 @@ private const val SILENCE_MILLIS = 1_000L
 private const val CONNECT_MILLIS = 5_000L
 private const val WRITE_GAP_MILLIS = 150L
 private const val WRITE_RETRIES = 3
+/**
+ * The packet size asked for before readings are switched on, as the TIMEMORE app does. At Android's default of 23 a
+ * packet carries 20 bytes, barely more than one 17-byte reading, so anything else the scale sends leaves readings
+ * waiting in the scale and the weight falls further and further behind.
+ */
+private const val PACKET_BYTES = 247
+/** How long to wait for the scale's answer about the packet size before switching readings on anyway. */
+private const val PACKET_MILLIS = 2_000L
 
 /**
  * The Bluetooth connections to the paired scales. While the app is on screen every paired scale is connected, so the
@@ -59,6 +67,14 @@ object ScaleLink {
         var gatt: BluetoothGatt? = null
         var ready = false
         var battery: Int? = null
+        /** Switches readings on once the packet size is settled, or after [PACKET_MILLIS] without an answer. */
+        var subscribe: Runnable? = null
+
+        /** The connection dropped or was released: nothing is waiting to switch its readings on. */
+        fun forget(handler: Handler) {
+            subscribe?.let(handler::removeCallbacks)
+            subscribe = null
+        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -143,10 +159,9 @@ object ScaleLink {
 
     /** Makes [address] the scale in use: the brew hears that the old one is gone, then the new one if it is on. */
     private fun use(address: String?) {
-        links[active]?.let { priority(it, high = false) }
         dropActive()
         active = address
-        links[address]?.takeIf { it.ready }?.let { ready -> priority(ready, high = true); brew?.connected(true, System.currentTimeMillis()) }
+        if (links[address]?.ready == true) brew?.connected(true, System.currentTimeMillis())
     }
 
     /** The scale in use is gone, or no longer the one in use: nothing queued or timed belongs to the next one. */
@@ -163,14 +178,9 @@ object ScaleLink {
         // Its callbacks compare against this, so one already on its way is ignored instead of acting on a closed connection.
         val gatt = link.gatt
         link.gatt = null
+        link.forget(handler)
         gatt?.run { disconnect(); close() }
         if (address == active) dropActive()
-    }
-
-    /** Android's usual interval holds a reading back by up to 50 ms; the short one, by up to 15 ms. Only the scale in use needs it. */
-    private fun priority(link: Link, high: Boolean) {
-        val asked = link.gatt?.requestConnectionPriority(if (high) BluetoothGatt.CONNECTION_PRIORITY_HIGH else BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
-        if (high) note("${link.label()} ready, short connection interval " + if (asked == true) "requested" else "refused")
     }
 
     private fun publish() {
@@ -257,6 +267,7 @@ object ScaleLink {
                 note("${link.label()} " + (if (newState == BluetoothProfile.STATE_CONNECTED) "connected" else "disconnected") + ", status $status")
                 if (newState == BluetoothProfile.STATE_CONNECTED) changed.discoverServices()
                 else {
+                    link.forget(handler)
                     link.ready = false
                     link.battery = null
                     if (link.address == active) dropActive()
@@ -268,17 +279,39 @@ object ScaleLink {
             }
         }
 
+        /** The packet size is asked for first, so that readings start in packets with room to spare. Android and the scale settle the size between them. */
         override fun onServicesDiscovered(discovered: BluetoothGatt, status: Int) {
             handler.post {
                 if (discovered != link.gatt) return@post
-                val notify = discovered.getService(SERVICE)?.getCharacteristic(NOTIFY)
-                val config = notify?.getDescriptor(CONFIG)
-                val started = notify != null && config != null && discovered.setCharacteristicNotification(notify, true) &&
-                    if (Build.VERSION.SDK_INT >= 33) discovered.writeDescriptor(config, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
-                    else notifyBefore33(discovered, config)
-                // Without readings the scale is of no use; dropping the link makes the automatic connection try again.
-                if (!started) discovered.disconnect()
+                link.forget(handler)
+                val subscribe = Runnable { link.subscribe = null; subscribe(discovered) }
+                if (discovered.requestMtu(PACKET_BYTES)) {
+                    link.subscribe = subscribe
+                    handler.postDelayed(subscribe, PACKET_MILLIS)
+                } else {
+                    note("${link.label()} packet size request refused")
+                    subscribe.run()
+                }
             }
+        }
+
+        override fun onMtuChanged(changed: BluetoothGatt, mtu: Int, status: Int) {
+            handler.post {
+                if (changed != link.gatt) return@post
+                note("${link.label()} packet size $mtu, status $status")
+                link.subscribe?.let { handler.removeCallbacks(it); it.run() }
+            }
+        }
+
+        private fun subscribe(discovered: BluetoothGatt) {
+            if (discovered != link.gatt) return
+            val notify = discovered.getService(SERVICE)?.getCharacteristic(NOTIFY)
+            val config = notify?.getDescriptor(CONFIG)
+            val started = notify != null && config != null && discovered.setCharacteristicNotification(notify, true) &&
+                if (Build.VERSION.SDK_INT >= 33) discovered.writeDescriptor(config, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothStatusCodes.SUCCESS
+                else notifyBefore33(discovered, config)
+            // Without readings the scale is of no use; dropping the link makes the automatic connection try again.
+            if (!started) discovered.disconnect()
         }
 
         override fun onDescriptorWrite(source: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
@@ -287,10 +320,8 @@ object ScaleLink {
                 if (status != BluetoothGatt.GATT_SUCCESS) { source.disconnect(); return@post }
                 link.ready = true
                 publish()
-                if (link.address == active) {
-                    priority(link, high = true)
-                    brew?.connected(true, System.currentTimeMillis())
-                } else choose()
+                note("${link.label()} ready")
+                if (link.address == active) brew?.connected(true, System.currentTimeMillis()) else choose()
             }
         }
 
