@@ -26,6 +26,15 @@ import com.brewprint.data.Beans
 import com.brewprint.data.BrewRepository
 import com.brewprint.data.TimerSettings
 import com.brewprint.data.unzip
+import com.brewprint.update.Release
+import com.brewprint.update.UpdateState
+import com.brewprint.update.Version
+import android.provider.Settings
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.onNodeWithContentDescription
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.robolectric.Shadows
 import java.io.File
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -58,15 +67,18 @@ class AboutSettingsTest {
         }
     }
 
-    private fun show(dialog: SaveDialog, readLog: () -> String = { "W Brewprint: Sync failed" }, theme: com.brewprint.data.Theme = com.brewprint.data.Theme.MONOCHROME): BrewRepository {
+    private val updates = MutableStateFlow<UpdateState>(UpdateState.UpToDate)
+    private val release = Release(Version(1, 2, 0), beta = false, apkUrl = "https://example.com/brewprint-v1.2.0.apk", apkSize = 1, sha256 = null, pageUrl = "https://github.com/crabnuggets/brewprint/releases/tag/v1.2.0")
+
+    private fun show(dialog: SaveDialog, readLog: () -> String = { "W Brewprint: Sync failed" }, theme: com.brewprint.data.Theme = com.brewprint.data.Theme.MONOCHROME, appearance: Appearance = Appearance.LIGHT): BrewRepository {
         val data = temporary.newFolder()
         val context: Context = object : ContextWrapper(RuntimeEnvironment.getApplication()) { override fun getFilesDir(): File = data }
         val repository = BrewRepository(context)
         repository.upsertBeans(Beans(name = "Ethiopia", roaster = "Sample")).getOrThrow()
         compose.setContent {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner { override val activityResultRegistry = dialog }) {
-                BrewprintTheme(Appearance.LIGHT, theme) {
-                    SettingsScreen(Appearance.SYSTEM, TimerSettings(), {}, {}, liveUpdatesCheck = { true }, about = { AboutSettings(repository, { errors += it }, readLog) })
+                BrewprintTheme(appearance, theme) {
+                    SettingsScreen(Appearance.SYSTEM, TimerSettings(), {}, {}, liveUpdatesCheck = { true }, about = { AboutSettings(repository, { errors += it }, readLog, updates) })
                 }
             }
         }
@@ -77,8 +89,10 @@ class AboutSettingsTest {
         val saved = File(temporary.root, "export.zip")
         val dialog = SaveDialog { Uri.fromFile(saved) }
         val repository = show(dialog)
-        compose.onNodeWithText("About and support").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Brewprint ${BuildConfig.VERSION_NAME}").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Build ${BuildConfig.VERSION_CODE}").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Up to date").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Support").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Report a problem").performScrollTo().assertIsDisplayed()
 
         compose.onNodeWithText("Export data").performScrollTo().performClick()
@@ -116,6 +130,79 @@ class AboutSettingsTest {
         show(SaveDialog { null }, theme = com.brewprint.data.Theme.BLUEPRINT)
         compose.onNodeWithText("Export data").performScrollTo().assertIsDisplayed()
         capture("blueprint")
+    }
+
+    @Test fun `Version says whether an update is out, in each state`() {
+        show(SaveDialog { null })
+        fun state(name: String, update: UpdateState, vararg texts: String) {
+            compose.runOnIdle { updates.value = update }
+            texts.forEach { compose.onNodeWithText(it).performScrollTo().assertIsDisplayed() }
+            compose.onNodeWithText("Beta releases").performScrollTo()
+            capture("version-$name")
+        }
+        state("checking", UpdateState.Checking, "Checking for updates…")
+        state("up-to-date", UpdateState.UpToDate, "Up to date")
+        compose.onNodeWithContentDescription("Check for updates").assertIsDisplayed()
+        state("check-failed", UpdateState.CheckFailed, "Couldn't check for updates", "Check your connection and try again.")
+        state("available", UpdateState.Available(release), "Brewprint 1.2.0 is available", "Android will ask you to allow Brewprint to install updates.", "What's new", "Update")
+        state("beta", UpdateState.Available(release.copy(version = Version(1, 2, 0, 1), beta = true)), "Brewprint 1.2.0-beta.1 is available", "Beta release")
+        state("downloading", UpdateState.Available(release, UpdateState.Step.DOWNLOADING, progress = .42f), "Downloading… 42%")
+        state("installing", UpdateState.Available(release, UpdateState.Step.INSTALLING), "Installing… Brewprint closes while it updates.")
+        state("install-failed", UpdateState.Available(release, problem = "Couldn't install the update. Try again."), "Couldn't install the update. Try again.")
+        state("debug", UpdateState.Unavailable, "Updates are off in debug builds")
+    }
+
+    @Test fun `an update in dark appearance`() {
+        updates.value = UpdateState.Available(release)
+        show(SaveDialog { null }, appearance = Appearance.DARK)
+        compose.onNodeWithText("Update").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Beta releases").performScrollTo()
+        capture("version-available-dark")
+    }
+
+    @Test fun `the blueprint theme shows the update too`() {
+        updates.value = UpdateState.Available(release)
+        show(SaveDialog { null }, theme = com.brewprint.data.Theme.BLUEPRINT)
+        compose.onNodeWithText("Update").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Beta releases").performScrollTo()
+        capture("version-available-blueprint")
+    }
+
+    @Test fun `turning on beta releases is saved`() {
+        val repository = show(SaveDialog { null })
+        compose.onNode(hasText("Beta releases") and hasClickAction(), useUnmergedTree = false).performScrollTo().performClick()
+        compose.waitForIdle()
+        assertTrue(repository.state.value.betaReleases)
+    }
+
+    @Test fun `Update first asks Android to allow installs from Brewprint`() {
+        updates.value = UpdateState.Available(release)
+        show(SaveDialog { null })
+        compose.onNodeWithText("Update").performScrollTo().performClick()
+        val opened = Shadows.shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity
+        assertEquals(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, opened.action)
+        assertEquals("package:${RuntimeEnvironment.getApplication().packageName}", opened.dataString)
+    }
+
+    @Test fun `What's new opens the release on GitHub`() {
+        updates.value = UpdateState.Available(release)
+        show(SaveDialog { null })
+        compose.onNodeWithText("What's new").performScrollTo().performClick()
+        assertEquals(release.pageUrl, Shadows.shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity.dataString)
+    }
+
+    @Test fun `a running brew holds the update`() {
+        var updated = false
+        compose.setContent {
+            BrewprintTheme(Appearance.LIGHT) {
+                androidx.compose.foundation.layout.Column {
+                    VersionPanel("1.1.0", 40, UpdateState.Available(release), betas = false, brewing = true, installAllowed = true, onCheck = {}, onUpdate = { updated = true }, onNotes = {}, onBetas = {})
+                }
+            }
+        }
+        compose.onNodeWithText("Finish your brew first. Brewprint closes while it updates.").assertIsDisplayed()
+        compose.onNodeWithText("Update").assertIsNotEnabled().performClick()
+        assertFalse(updated)
     }
 
     private fun capture(name: String) {
