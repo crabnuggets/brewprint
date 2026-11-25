@@ -279,7 +279,7 @@ object ScaleLink {
             }
         }
 
-        /** The packet size comes first, so the scale never sends readings in packets too small to keep up. */
+        /** The packet size is asked for first, so that readings start in packets with room to spare. Android and the scale settle the size between them. */
         override fun onServicesDiscovered(discovered: BluetoothGatt, status: Int) {
             handler.post {
                 if (discovered != link.gatt) return@post
