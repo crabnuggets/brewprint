@@ -58,6 +58,7 @@ import com.brewprint.data.exportFileName
 import com.brewprint.data.readAppLog
 import com.brewprint.data.timerRunning
 import com.brewprint.data.writeExport
+import com.brewprint.scale.readScaleLog
 import com.brewprint.update.UpdateState
 import com.brewprint.update.Updater
 import java.time.LocalDate
@@ -83,7 +84,7 @@ private fun installAllowed(context: Context) = context.packageManager.canRequest
 
 /** Settings → Version and Support: the app's version and its updates, then a way to report a problem with an export of the app's data and log. */
 @Composable
-internal fun AboutSettings(repository: BrewRepository, onError: (String) -> Unit, readLog: () -> String = ::readAppLog, updates: StateFlow<UpdateState> = Updater.state) {
+internal fun AboutSettings(repository: BrewRepository, onError: (String) -> Unit, readLog: () -> String = ::readAppLog, updates: StateFlow<UpdateState> = Updater.state, scaleLog: (Context) -> String = ::readScaleLog) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by repository.state.collectAsState()
@@ -116,7 +117,7 @@ internal fun AboutSettings(repository: BrewRepository, onError: (String) -> Unit
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val output = requireNotNull(context.contentResolver.openOutputStream(uri))
-                    output.use { writeExport(it, aboutText(), repository.exportData(), readLog()) }
+                    output.use { writeExport(it, aboutText(), repository.exportData(), readLog(), scaleLog(context)) }
                 }
             }
             busy = false

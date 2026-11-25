@@ -83,6 +83,30 @@ class PairedScalesTest {
         assertEquals(office, state.scaleToSwitchTo(setOf(office.address)))
     }
 
+    @Test fun `a running scale brew holds only its own scale`() {
+        repository.pairScale(home).getOrThrow()
+        repository.pairScale(office).getOrThrow()
+        val now = 1_000_000L
+        // With the app on screen every paired scale is held, so the app knows which are on; in the background, none.
+        assertEquals(listOf(home, office), state.scalesToHold(appOpen = true, now))
+        assertEquals(emptyList<PairedScale>(), state.scalesToHold(appOpen = false, now))
+        // Weighing the coffee before the first pour still listens for the other scale, which can take over until the timer runs.
+        val recipe = Recipe(name = "V60", dose = 15.0, pulses = listOf(Pulse(water = 240.0, pourSeconds = 30)))
+        repository.startDraft().getOrThrow()
+        repository.changeDraft { it.copy(recipe = recipe, scale = ScaleData(), stage = DraftStage.SHEET) }
+        assertEquals(listOf(home, office), state.scalesToHold(appOpen = true, now))
+        // Once the timer runs, only the brew's scale, with the app on screen or not.
+        repository.changeDraft { it.copy(timer = BrewTimer(startedAt = now, byWeight = true)) }
+        assertEquals(listOf(home), state.scalesToHold(appOpen = true, now + 5_000))
+        assertEquals(listOf(home), state.scalesToHold(appOpen = false, now + 5_000))
+        // A brew timed by the clock alone holds no scale of its own.
+        repository.changeDraft { it.copy(scale = null) }
+        assertEquals(listOf(home, office), state.scalesToHold(appOpen = true, now + 5_000))
+        // After Finish brew the others are listened for again.
+        repository.changeDraft { it.copy(scale = ScaleData(), timer = it.timer?.finish(recipe, now + 60_000)) }
+        assertEquals(listOf(home, office), state.scalesToHold(appOpen = true, now + 61_000))
+    }
+
     @Test fun `data saved when one scale could be paired still has its scale`() {
         val saved = Json { ignoreUnknownKeys = true }.decodeFromString(AppState.serializer(), """{"scale":{"address":"AA:AA:AA:AA:AA:AA","name":"TIMEMORE Dot"}}""")
         assertEquals(listOf(home), saved.pairedScales)

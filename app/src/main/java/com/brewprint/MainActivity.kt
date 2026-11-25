@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             LaunchedEffect(state.draft?.timer, state.timerSettings) { BrewTimerService.sync(this@MainActivity) }
-            LaunchedEffect(state.scale) { ScaleLink.sync(this@MainActivity) }
+            // A scale brew's timer starting or ending changes which scales are held.
+            LaunchedEffect(state.scale, state.draft?.timer) { ScaleLink.sync(this@MainActivity) }
             val brew = ScaleLink.brew(this@MainActivity)
             val live by brew.live.collectAsStateWithLifecycle()
             // The tare's deadline is checked on time even if the scale sends nothing more.

@@ -24,8 +24,8 @@ import com.brewprint.data.BrewRepository
 import com.brewprint.data.LOG_TAG
 import com.brewprint.data.ScaleProtocol
 import com.brewprint.data.ScaleStatus
-import com.brewprint.data.pairedScales
 import com.brewprint.data.scaleBrewRunning
+import com.brewprint.data.scalesToHold
 import com.brewprint.data.scaleToSwitchTo
 import com.brewprint.timer.BrewTimerService
 import java.util.UUID
@@ -48,9 +48,9 @@ private const val WRITE_RETRIES = 3
 
 /**
  * The Bluetooth connections to the paired scales. While the app is on screen every paired scale is connected, so the
- * app knows which are on; the scale in use is the one whose readings and commands count. With the app in the
- * background only a running scale brew holds a connection, to its own scale. Everything else is released, so the
- * TIMEMORE app can use the scales. Everything runs on the main thread.
+ * app knows which are on; the scale in use is the one whose readings and commands count. A running scale brew holds
+ * only its own scale, with the app on screen or in the background. Everything else is released, so the TIMEMORE app
+ * can use the scales. Everything runs on the main thread.
  */
 @SuppressLint("MissingPermission") // Every Bluetooth call happens after allowed() is checked in sync().
 object ScaleLink {
@@ -72,11 +72,21 @@ object ScaleLink {
     private var writing = false
     private var retries = 0
     private val silence = Runnable { brew?.lose(System.currentTimeMillis()) }
-    private val timing = LinkTiming { Log.i(LOG_TAG, it) }
+    private var log: ScaleLog? = null
+    private val timing = LinkTiming(log = ::note)
     private val arrivals = Arrivals<BluetoothGatt>(post = { handler.post(it) }) { source, at, value -> links.values.find { it.gatt == source }?.let { read(it, value, at) } }
     private val mutableStatus = MutableStateFlow<Map<String, ScaleStatus>>(emptyMap())
     /** Which paired scales are on, by address, with their battery where known. */
     val status: StateFlow<Map<String, ScaleStatus>> = mutableStatus.asStateFlow()
+
+    /** One line for Android's log and for the scale log that "Export data" includes. */
+    private fun note(line: String) {
+        Log.i(LOG_TAG, line)
+        log?.add(line)
+    }
+
+    /** A scale in the log: the end of its address, as Android's own log lines give it, and whether it is the one in use. */
+    private fun Link.label() = "Scale " + address.takeLast(5) + if (address == active) " (in use)" else ""
 
     fun brew(context: Context): ScaleBrew = brew ?: ScaleBrew(BrewRepository.get(context), ::write).also {
         brew = it
@@ -100,18 +110,15 @@ object ScaleLink {
     fun sync(context: Context) {
         val app = context.applicationContext
         this.app = app
+        if (log == null) log = ScaleLog.get(app)
         val state = BrewRepository.get(app).state.value
         val inUse = state.scale
-        val brewing = state.scaleBrewRunning(System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val brewing = state.scaleBrewRunning(now)
         // The reader exists before any early return, so the watchdog can fall back to the clock and Bluetooth turning on is heard.
         if (inUse != null) brew(app)
         val adapter = app.getSystemService(BluetoothManager::class.java)?.adapter?.takeIf { it.isEnabled && allowed(app) }
-        val wanted = when {
-            adapter == null -> emptyList()
-            BrewTimerService.appOpen -> state.pairedScales
-            brewing -> listOfNotNull(inUse)
-            else -> emptyList()
-        }.map { it.address }
+        val wanted = if (adapter == null) emptyList() else state.scalesToHold(BrewTimerService.appOpen, now).map { it.address }
         var changed = false
         links.keys.filter { it !in wanted }.forEach { close(it); changed = true }
         wanted.filter { it !in links }.forEach { address ->
@@ -123,6 +130,7 @@ object ScaleLink {
             changed = true
         }
         if (inUse?.address != active) { use(inUse?.address); changed = true }
+        if (changed) note("Scales held: " + links.values.joinToString { it.label() }.ifEmpty { "none" })
         // A brew whose scale is not there yet follows the clock after a short wait for it.
         if (changed && brewing && links[active]?.ready != true) {
             handler.removeCallbacks(silence)
@@ -162,7 +170,7 @@ object ScaleLink {
     /** Android's usual interval holds a reading back by up to 50 ms; the short one, by up to 15 ms. Only the scale in use needs it. */
     private fun priority(link: Link, high: Boolean) {
         val asked = link.gatt?.requestConnectionPriority(if (high) BluetoothGatt.CONNECTION_PRIORITY_HIGH else BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
-        if (high) Log.i(LOG_TAG, "Scale in use connected, short connection interval " + if (asked == true) "requested" else "refused")
+        if (high) note("${link.label()} ready, short connection interval " + if (asked == true) "requested" else "refused")
     }
 
     private fun publish() {
@@ -246,6 +254,7 @@ object ScaleLink {
         override fun onConnectionStateChange(changed: BluetoothGatt, status: Int, newState: Int) {
             handler.post {
                 if (changed != link.gatt) return@post
+                note("${link.label()} " + (if (newState == BluetoothProfile.STATE_CONNECTED) "connected" else "disconnected") + ", status $status")
                 if (newState == BluetoothProfile.STATE_CONNECTED) changed.discoverServices()
                 else {
                     link.ready = false
@@ -291,6 +300,18 @@ object ScaleLink {
 
         override fun onCharacteristicChanged(source: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
             arrivals.add(source, value)
+        }
+
+        /**
+         * The connection interval the phone and the scale settled on, each time it changes: what the link really runs
+         * at, whatever was requested. Android calls this, though it is not in the SDK this app is built against, so it
+         * can't be marked as an override.
+         */
+        @Suppress("unused")
+        fun onConnectionUpdated(updated: BluetoothGatt, interval: Int, latency: Int, timeout: Int, status: Int) {
+            handler.post {
+                if (updated == link.gatt) note("${link.label()} connection interval ${interval * 1.25} ms, latency $latency, timeout ${timeout * 10} ms, status $status")
+            }
         }
 
         @Deprecated("Called instead of the overload above before Android 13")

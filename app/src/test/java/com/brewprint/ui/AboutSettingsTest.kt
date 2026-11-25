@@ -78,7 +78,7 @@ class AboutSettingsTest {
         compose.setContent {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides object : ActivityResultRegistryOwner { override val activityResultRegistry = dialog }) {
                 BrewprintTheme(appearance, theme) {
-                    SettingsScreen(Appearance.SYSTEM, TimerSettings(), {}, {}, liveUpdatesCheck = { true }, about = { AboutSettings(repository, { errors += it }, readLog, updates) })
+                    SettingsScreen(Appearance.SYSTEM, TimerSettings(), {}, {}, liveUpdatesCheck = { true }, about = { AboutSettings(repository, { errors += it }, readLog, updates, scaleLog = { "Scale 38:68 (in use) connected, status 0" }) })
                 }
             }
         }
@@ -102,11 +102,12 @@ class AboutSettingsTest {
 
         assertEquals(listOf("brewprint-export-${LocalDate.now()}.zip"), dialog.offered)
         val files = unzip(saved.readBytes())
-        assertEquals(setOf("about.txt", "data.json", "log.txt"), files.keys)
+        assertEquals(setOf("about.txt", "data.json", "log.txt", "scale-log.txt"), files.keys)
         assertTrue(files.getValue("about.txt"), files.getValue("about.txt").startsWith("Brewprint ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\nAndroid "))
         assertEquals(String(repository.exportData()), files.getValue("data.json"))
         assertTrue("Ethiopia" in files.getValue("data.json"))
         assertEquals("W Brewprint: Sync failed", files.getValue("log.txt"))
+        assertEquals("Scale 38:68 (in use) connected, status 0", files.getValue("scale-log.txt"))
         assertEquals(emptyList<String>(), errors)
     }
 

@@ -12,12 +12,12 @@ const val LOG_TAG = "Brewprint"
 fun exportFileName(day: LocalDate): String = "brewprint-export-$day.zip"
 
 /**
- * Settings → "Export data": one zip with what the app knows about itself, everything it keeps on this phone, and its
- * recent log, for the user to keep or attach to a problem report.
+ * Settings → "Export data": one zip with what the app knows about itself, everything it keeps on this phone, its
+ * recent log, and its own log of the scale's link, for the user to keep or attach to a problem report.
  */
-fun writeExport(output: OutputStream, about: String, data: ByteArray, log: String) {
+fun writeExport(output: OutputStream, about: String, data: ByteArray, log: String, scaleLog: String) {
     ZipOutputStream(output).use { zip ->
-        listOf("about.txt" to about.toByteArray(), "data.json" to data, "log.txt" to redactSecrets(log).toByteArray()).forEach { (name, bytes) ->
+        listOf("about.txt" to about.toByteArray(), "data.json" to data, "log.txt" to redactSecrets(log).toByteArray(), "scale-log.txt" to scaleLog.toByteArray()).forEach { (name, bytes) ->
             zip.putNextEntry(ZipEntry(name))
             zip.write(bytes)
             zip.closeEntry()

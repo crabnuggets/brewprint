@@ -28,6 +28,16 @@ val AppState.scaleHeldByBrew: Boolean get() = draft?.let { it.scale != null && i
 fun AppState.scaleToSwitchTo(on: Set<String>): PairedScale? =
     if (scale?.address in on || draft?.scale != null) null else pairedScales.firstOrNull { it.address in on }
 
+/**
+ * The paired scales to stay connected to. A running scale brew holds only its own scale, so listening for the others
+ * takes no radio time from it. Otherwise, with the app on screen, every paired scale, so the app knows which are on.
+ */
+fun AppState.scalesToHold(appOpen: Boolean, now: Long): List<PairedScale> = when {
+    scaleBrewRunning(now) -> listOfNotNull(scale)
+    appOpen -> pairedScales
+    else -> emptyList()
+}
+
 /** Where a scale brew stands before the first pour. */
 @Serializable enum class ScaleStep { BREWER, COFFEE, ARMED }
 
