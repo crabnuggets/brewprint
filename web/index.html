@@ -61,6 +61,7 @@ fieldset{border:0;padding:0;min-width:0}
 .top nav{display:flex;gap:28px;font-size:var(--t-s);font-weight:500}
 .top nav a{text-decoration:none;opacity:.8;transition:opacity .16s var(--ease)}
 .top nav a:hover{opacity:1}
+.foot .legal{flex-basis:100%}
 .foot{padding:40px 0 24px;font-size:var(--t-s);color:var(--mut);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 /* ---------- phone and app parts ---------- */
@@ -296,7 +297,7 @@ $$('[data-top]').forEach(h => { const n = h.dataset.top;
   h.innerHTML = `<a class="brand" href="#" aria-label="Brewprint">${mark()}<span><b>brew</b>print</span></a><nav aria-label="Sections"><a href="#v${n}-timer">Timer</a><a href="#v${n}-scale">Scale</a><a href="#v${n}-journal">Tasting notes</a><a href="#v${n}-claude">Claude</a></nav>`; });
 $$('[data-mark]').forEach(e => e.innerHTML = mark());
 $$('[data-dl]').forEach(a => a.href = RELEASES);
-$$('[data-foot]').forEach(f => f.innerHTML = `<span>Brewprint for Android. Open source under Apache 2.0.</span><a href="${REPO}">Source on GitHub</a>`);
+$$('[data-foot]').forEach(f => f.innerHTML = `<span>Brewprint for Android. Open source under Apache 2.0.</span><a href="${REPO}">Source on GitHub</a><span class="legal">Claude is a trademark of Anthropic, PBC. Brewprint is an independent project and is not affiliated with, sponsored by or endorsed by Anthropic.</span>`);
 
 /* ---------- app parts ---------- */
 const focus = a => `<div class="prow"><div><div class="pstate" ${a}="state">Pour</div><div class="pm" ${a}="pulse">Pulse 2 of 4</div></div><div class="r"><div class="pm">Brew time</div><b class="tn" ${a}="time">0:26</b></div></div>
