@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brewprint: a filter coffee journal for Android</title>
+<meta name="description" content="Brewprint times your pours, reads your scale and keeps your tasting notes beside the recipe that made the cup. A free, open source filter coffee journal for Android.">
+<meta name="theme-color" content="#F3F3F6">
+<link rel="canonical" href="https://crabnuggets.github.io/brewprint/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Brewprint">
+<meta property="og:title" content="Brewprint: remember every brew, repeat the good ones">
+<meta property="og:description" content="Brewprint times your pours, reads your scale and keeps your tasting notes beside the recipe that made the cup. A free, open source filter coffee journal for Android.">
+<meta property="og:url" content="https://crabnuggets.github.io/brewprint/">
+<meta property="og:image" content="https://crabnuggets.github.io/brewprint/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Brewprint: Remember every brew. Repeat the good ones.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="fonts/inter-tight-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Inter Tight";font-style:normal;font-weight:100 900;font-display:swap;src:url(fonts/inter-tight-latin-wght.woff2) format("woff2")}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{overflow-x:hidden;background:#F3F3F6}
+a{color:inherit}
+fieldset{border:0;padding:0;min-width:0}
+
+/* ---------- shared scaffolding ---------- */
+.v{position:relative;overflow-x:clip;min-height:100vh;
+  --t-h:clamp(2rem,4.2vw,3.5rem);--t-b:1.0625rem;--t-s:.875rem;--ease:cubic-bezier(.22,1,.36,1);
+  font-family:var(--font);font-size:var(--t-b);line-height:1.5;background:var(--bg);color:var(--ink)}
+.v h2{font-size:var(--t-h);line-height:1.02;letter-spacing:-.03em;font-weight:var(--hw,700);text-wrap:balance}
+.v h3{font-size:var(--t-b);font-weight:700}
+.v p{max-width:60ch;text-wrap:pretty}
+.mut{color:var(--mut)}
+.sm{font-size:var(--t-s)}
+.tn{font-variant-numeric:tabular-nums}
+.wrap{width:min(1200px,100% - 48px);margin-inline:auto}
+.sec{padding:clamp(72px,11vw,150px) 0}
+.split{display:grid;grid-template-columns:5fr 6fr;gap:clamp(32px,6vw,96px);align-items:center}
+.split.rev{grid-template-columns:6fr 5fr}
+.stack>*+*{margin-top:20px}
+.rows>div{padding:18px 0;border-top:1px solid var(--line)}
+.rows>div:last-child{border-bottom:1px solid var(--line)}
+.rows p{color:var(--mut)}
+.cols{display:grid;grid-template-columns:repeat(var(--n,3),1fr)}
+.cols>div{padding:8px 28px;border-left:1px solid var(--line)}
+.cols>div:first-child{padding-left:0;border-left:0}
+.cols p{color:var(--mut);margin-top:6px}
+.btn{display:inline-flex;align-items:center;padding:.9em 1.5em;border-radius:var(--br,16px);background:var(--btn);color:var(--on-btn);font-weight:600;text-decoration:none;transition:transform .18s var(--ease),opacity .18s var(--ease)}
+.btn:hover{opacity:.88}.btn:active{transform:scale(.97)}
+.btn:focus-visible,.clr:focus-visible,.seg label:has(:focus-visible),.blocks label:has(:focus-visible){outline:2px solid currentColor;outline-offset:3px}
+
+.top{position:absolute;inset:0 0 auto 0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px clamp(20px,3vw,40px);white-space:nowrap}
+.brand{display:flex;align-items:center;gap:10px;font-size:1.6rem;letter-spacing:-.03em;font-weight:400;text-decoration:none}
+.brand b{font-weight:700}
+.brand svg{width:1.5em;height:1.5em}
+.top nav{display:flex;gap:28px;font-size:var(--t-s);font-weight:500}
+.top nav a{text-decoration:none;opacity:.8;transition:opacity .16s var(--ease)}
+.top nav a:hover{opacity:1}
+.foot{padding:40px 0 24px;font-size:var(--t-s);color:var(--mut);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* ---------- phone and app parts ---------- */
+.phone{--pw:300px;width:var(--pw);aspect-ratio:9/19;flex:none;font-size:calc(var(--pw)/23);line-height:1.35;text-align:left;
+  font-family:var(--ph-font,inherit);letter-spacing:0;background:var(--ph-bg);color:var(--ph-ink);border:.55em solid var(--ph-frame,#121316);
+  border-radius:3em;padding:2.8em 1.1em 1.1em;display:flex;flex-direction:column;gap:.8em;overflow:hidden;position:relative;
+  box-shadow:0 40px 70px -30px rgba(0,0,0,.45)}
+.phone::before{content:"";position:absolute;top:.9em;left:50%;width:.8em;height:.8em;margin-left:-.4em;border-radius:50%;background:var(--ph-frame,#121316)}
+.pc{background:var(--ph-card);border-radius:1.3em;padding:1em;box-shadow:0 0 0 1px var(--ph-line)}
+.pm{color:var(--ph-mut);font-size:.86em}
+.prow{display:flex;justify-content:space-between;align-items:flex-end;gap:.6em}
+.prow .r{text-align:right}
+.ptitle{font-size:1.7em;font-weight:700;letter-spacing:-.03em}
+.phead{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:1.15em}
+.phead span{font-size:.75em;font-weight:500;color:var(--ph-mut)}
+.pstate{font-size:1.9em;font-weight:700;letter-spacing:-.03em;line-height:1.05}
+.pnum{font-size:2.5em;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pnum i{font-size:.4em;font-style:normal;font-weight:500;letter-spacing:0;color:var(--ph-mut);margin-left:.15em}
+.pnum.dim{font-weight:500;color:var(--ph-acc,var(--ph-mut))}
+.pbar{height:.32em;border-radius:1em;background:var(--ph-soft);overflow:hidden;margin:.9em 0 .5em}
+.pbar span{display:block;height:100%;background:var(--ph-ink);transform-origin:left;transform:scaleX(.6);transition:transform .14s linear}
+.pstrip{display:flex;align-items:center;gap:.22em;height:1.05em}
+.pstrip i{height:1.05em;border-radius:.22em;background:linear-gradient(90deg,var(--ph-ink) calc(var(--f,0)*100%),var(--ph-soft) 0)}
+.pstrip i.wait{height:.3em}
+.pfoot{margin-top:auto;display:flex;gap:.6em}
+.pbtn{flex:1;text-align:center;background:var(--ph-soft);border-radius:1.1em;padding:.8em .4em;font-weight:600;margin-top:.6em;display:block}
+.pbtn.pri{background:var(--ph-ink);color:var(--ph-bg)}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:.9em .8em}
+.pgrid b{display:block}
+.hand{font-family:var(--hand,inherit);font-style:var(--hand-style,normal)}
+
+.chart{position:relative;height:7em;--cl:3.6em}
+.chart .plot{position:absolute;inset:0 var(--cl) 0 0}
+.chart svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.chart path,.chart line{fill:none;vector-effect:non-scaling-stroke}
+.c-plan{stroke:var(--ph-mut);opacity:.35;stroke-width:1}
+.c-total{stroke:var(--ph-mut);stroke-dasharray:1 4;stroke-width:1.2}
+.c-target{stroke:var(--ph-acc,var(--ph-ink));stroke-dasharray:6 4;stroke-width:1.5}
+.c-curve{stroke:var(--ph-ink);stroke-width:var(--cw,2);stroke-linejoin:round;stroke-linecap:round}
+.c-dot{position:absolute;width:.6em;height:.6em;border-radius:50%;background:var(--ph-ink);transform:translate(-50%,50%)}
+.c-lab{position:absolute;right:0;transform:translateY(50%);font-size:.82em;color:var(--ph-mut);font-variant-numeric:tabular-nums}
+.c-lab.c-tl{color:var(--ph-acc,var(--ph-ink));font-weight:700}
+.c-axis{position:absolute;inset:auto 0 -1.9em 0;font-size:.82em;color:var(--ph-mut);font-variant-numeric:tabular-nums}
+.c-axis span{position:absolute;transform:translateX(-50%)}
+.c-axis span:first-child{transform:none}
+.fx{font-size:clamp(14px,1.55vw,21px);font-family:var(--ph-font,inherit)}
+.fx .pc{padding:1.5em;border-radius:1.6em}
+
+/* tasting widget */
+.taste{display:grid;gap:18px}
+.taste legend{font-size:var(--t-s);color:var(--mut);margin-bottom:6px;padding:0}
+.taste input{position:absolute;opacity:0;pointer-events:none}
+.segrow{display:flex;align-items:center}
+.seg{flex:1;position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--soft);border-radius:14px;padding:4px}
+.seg .thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px)/3);border-radius:11px;background:var(--ink);opacity:0;
+  transform:translateX(calc(var(--i,0)*100%));transition:transform .28s cubic-bezier(.3,0,.2,1),opacity .2s ease}
+.segrow.has .thumb{opacity:1}
+.seg.jump .thumb{transition:none}
+.seg label,.blocks label{position:relative;text-align:center;padding:10px 6px;border-radius:11px;font-size:var(--t-s);font-weight:600;cursor:pointer;transition:background-color .2s var(--ease),color .28s var(--ease)}
+.seg label:has(:checked),.blocks label:has(:checked){color:var(--bg)}
+.blocks label:has(:checked){background:var(--ink)}
+.clr{flex:none;width:0;height:40px;margin-left:0;padding:0;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;overflow:hidden;opacity:0;visibility:hidden;
+  display:grid;place-items:center;transition:width .3s var(--ease),margin-left .3s var(--ease),opacity .3s var(--ease),visibility 0s .3s}
+.clr svg{width:14px;height:14px;flex:none}
+.segrow.has .clr{width:40px;margin-left:8px;opacity:1;visibility:visible;transition:width .3s var(--ease),margin-left .3s var(--ease),opacity .3s var(--ease)}
+.blocks{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.blocks label{background:var(--soft);padding:12px 6px}
+.note{font-size:var(--t-b)}
+
+/* claude exchange */
+#vh-claude{position:relative}
+#vh-claude>.wrap{position:relative;z-index:1}
+.sparks{position:absolute;left:0;right:0;bottom:0;top:calc(-1*clamp(72px,11vw,150px));width:100%;height:calc(100% + clamp(72px,11vw,150px));pointer-events:none;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.chat{display:grid;gap:12px;position:relative}
+.chat.play>*{opacity:0;transform:translateY(12px)}
+.chat.play>.in{opacity:1;transform:none;transition:opacity .5s ease,transform .5s var(--ease)}
+.chat.play .w{opacity:0;transition:opacity .35s ease calc(var(--n)*45ms)}
+.chat.play .in .w{opacity:1}
+.chat .typing{position:absolute;left:0;display:none;gap:5px;padding:16px 18px;border-radius:20px;border-bottom-left-radius:6px;background:var(--soft)}
+.chat.play .typing{display:flex}
+.chat .typing i{width:7px;height:7px;border-radius:50%;background:var(--mut);animation:typing 1s ease-in-out infinite}
+.chat .typing i:nth-child(2){animation-delay:.15s}.chat .typing i:nth-child(3){animation-delay:.3s}
+@keyframes typing{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.chat p{padding:14px 18px;border-radius:20px;max-width:46ch}
+.chat .me{justify-self:end;background:var(--btn);color:var(--on-btn);border-bottom-right-radius:6px}
+.chat .ai{background:var(--soft);border-bottom-left-radius:6px}
+.chat .draft{display:flex;gap:14px;align-items:center;padding:14px 18px;border-radius:20px;background:var(--card);box-shadow:0 0 0 1px var(--line);max-width:46ch}
+.chat .draft svg{width:34px;height:34px;flex:none}
+.chat .draft span{display:block;color:var(--mut);font-size:var(--t-s)}
+
+/* ================= theme and sections ================= */
+.v1{--font:"Inter Tight",system-ui,sans-serif;--bg:#F3F3F6;--card:#fff;--ink:#121316;--mut:#5C5E67;--line:#DCDCE2;--soft:#E8E8ED;--btn:#121316;--on-btn:#FAFAFC;
+  --ph-bg:#F6F6F8;--ph-card:#fff;--ph-ink:#121316;--ph-mut:#70727B;--ph-soft:#E8E8ED;--ph-line:#E4E4EA}
+.v1 .hero{padding:clamp(120px,17vh,190px) 24px 0;text-align:center;background:radial-gradient(90% 55% at 50% 0,#fff 0,transparent 75%)}
+.v1 h1{font-size:clamp(2.75rem,7.4vw,7.25rem);line-height:.94;letter-spacing:-.045em;font-weight:700;max-width:11.5em;margin:0 auto;text-wrap:balance}
+.v1 .hero p{margin:28px auto;max-width:46ch;color:var(--mut)}
+.v1 .stage{margin-top:64px;height:560px;overflow:hidden;display:flex;justify-content:center;align-items:flex-start;gap:36px;
+  -webkit-mask-image:linear-gradient(#000 82%,transparent);mask-image:linear-gradient(#000 82%,transparent)}
+.v1 .stage .phone{--pw:262px;margin-top:56px}
+.v1 .stage .phone:nth-child(2){--pw:304px;margin-top:0}
+.v1 .glassy{padding:clamp(16px,2.5vw,36px);border-radius:36px;background:linear-gradient(140deg,rgba(255,255,255,.9),rgba(255,255,255,.35));box-shadow:0 0 0 1px #fff inset,0 50px 90px -50px rgba(18,19,22,.35)}
+.v1 .band{background:#121316;color:#FAFAFC;--mut:#A4A6AF;--line:#2C2E34;--ph-ink:#FAFAFC;--ph-mut:#9395A0;--ph-soft:#2A2C31}
+.v1 .band .chart{height:clamp(220px,32vw,420px);margin:56px 0 72px;font-size:16px;--cw:3}
+.v1 .panel{background:var(--card);border-radius:28px;padding:clamp(20px,3vw,36px);box-shadow:0 0 0 1px var(--line)}
+.v1 .end{text-align:center}
+.v1 .end h2{margin:0 auto 32px;max-width:14em}
+
+/* ---------- hero field and the pinned, stepped focus card ---------- */
+.vh{--t-m:clamp(1.375rem,2.1vw,1.875rem)}
+.vh .hero{position:relative}
+.vh .hero>*{position:relative;z-index:1}
+.vh .hero .field{position:absolute;inset:0;z-index:0;width:100%;height:100%;pointer-events:none;
+  -webkit-mask-image:linear-gradient(#000 50%,transparent 92%);mask-image:linear-gradient(#000 50%,transparent 92%)}
+.vh .track{height:300vh}
+.vh .pinned{position:sticky;top:0;height:100vh;height:100svh;display:flex;flex-direction:column;justify-content:center;gap:clamp(28px,5vh,56px)}
+.vh .scene{display:grid;grid-template-columns:6fr 5fr;gap:clamp(32px,6vw,96px);align-items:center}
+.vh .cards,.vh .texts{display:grid}
+.vh .cards>*,.vh .texts>*{grid-area:1/1;opacity:0;transform:translateY(16px);filter:blur(8px);
+  transition:opacity .5s ease,transform .5s ease,filter .5s ease}
+.vh .cards>.on,.vh .texts>.on{opacity:1;transform:none;filter:none;
+  transition:opacity .9s var(--ease) .25s,transform .9s var(--ease) .25s,filter .9s var(--ease) .25s}
+.vh .texts h3{font-size:var(--t-m);line-height:1.12;letter-spacing:-.025em;text-wrap:balance}
+.vh .texts p{color:var(--mut);margin-top:12px;max-width:44ch}
+.vh .rail{display:flex;gap:6px;margin-top:28px}
+.vh .rail i{width:36px;height:3px;border-radius:2px;background:var(--line);transition:background-color .6s ease}
+.vh .rail i.on{background:var(--ink)}
+.vh .after{padding:0 0 clamp(72px,11vw,150px)}
+.vh .after .cols{--n:2}
+@media (max-height:700px){.vh .pinned>.stack>p{display:none}}
+
+/* ---------- small screens ---------- */
+@media (max-width:860px){
+  .split,.split.rev,.vh .scene{grid-template-columns:1fr}
+  .vh .scene{gap:24px}
+  .vh .pinned{justify-content:flex-start;padding-top:84px;gap:20px}
+  .vh .pinned>.stack>p{display:none}
+  .cols{grid-template-columns:1fr}
+  .cols>div{padding:18px 0;border-left:0;border-top:1px solid var(--line)}
+  .cols>div:first-child{border-top:0}
+  .top nav{display:none}
+  .v1 .stage{height:500px}.v1 .stage .phone{display:none}.v1 .stage .phone:nth-child(2){display:flex;--pw:270px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div class="v v1 vh">
+  <header class="top" data-top="h"></header>
+  <section class="hero">
+    <canvas class="field" aria-hidden="true"></canvas>
+    <h1>Remember every brew. Repeat the good ones.</h1>
+    <p>Brewprint times your pours, reads your scale and keeps your tasting notes beside the recipe that made the cup.</p>
+    <a class="btn" data-dl>Download for Android</a>
+    <div class="stage"><div class="phone" data-phone="home"></div><div class="phone" data-phone="pour"></div><div class="phone" data-phone="record"></div></div>
+  </section>
+
+  <section id="vh-timer">
+    <div class="track"><div class="pinned wrap">
+      <div class="stack">
+        <h2>A timer that already knows your recipe</h2>
+        <p class="mut">Save a recipe once, with each pour and wait. Brewprint walks you through it and shows one thing at a time: how much to pour and how long you have.</p>
+      </div>
+      <div class="scene">
+        <div class="glassy"><div class="fx cards" role="img" aria-label="The brew timer's focus card, showing the current step"><div class="pc"></div><div class="pc"></div><div class="pc"></div></div></div>
+        <div>
+          <div class="texts">
+            <div><h3>Pour to a number, not a guess</h3><p>Every pour shows the scale reading to stop at. The bar fills by grams, so you see what is left and how fast the water is going in.</p></div>
+            <div><h3>Wait, and know what comes next</h3><p>The card counts down to the next pulse and already shows the reading you will pour to.</p></div>
+            <div><h3>Finish when the bed has drained</h3><p>Brew time keeps counting through drawdown. You decide when the brew is done, and the total is saved with it.</p></div>
+          </div>
+          <div class="rail" aria-hidden="true"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="after"><div class="wrap cols">
+      <div><h3>Poured early or late?</h3><p>Tap "Pour done" and the rest of the schedule moves with you. Undo is there for 5 seconds.</p></div>
+      <div><h3>Hands full?</h3><p>A vibration and a tone mark each step, and the screen stays on.</p></div>
+    </div></div>
+  </section>
+
+  <section class="sec band" id="vh-scale"><div class="wrap">
+    <div class="stack"><h2>Start pouring and the timer starts itself</h2>
+    <p class="mut">Pair a TIMEMORE Dot or Basic3 Link. Brewprint sees the first drops land, starts the clock from that moment and draws your pour as it happens.</p></div>
+    <div class="chart" data-widget="chart" data-axis data-fast></div>
+    <div class="cols">
+      <div><h3>Weigh the dose, keep the ratio</h3><p>Ground 15.2 g instead of 15? One tap adjusts every pour for this brew.</p></div>
+      <div><h3>The clock takes over if the scale drops out</h3><p>Guidance comes back when the reading does.</p></div>
+      <div><h3>See the whole pour afterwards</h3><p>The curve is saved with the brew, next to what you planned.</p></div>
+    </div>
+  </div></section>
+
+  <section class="sec" id="vh-journal"><div class="wrap split rev">
+    <div class="panel" data-widget="taste"></div>
+    <div class="stack">
+      <h2>Describe the cup in your own words</h2>
+      <p class="mut">Write one line, or open the guided prompts for sweetness, acidity, body and finish. Nothing is required and there is no score. Try it here.</p>
+      <p class="mut">Add a "Next time" reminder, and it is waiting on the Brew screen when you come back to those beans.</p>
+    </div>
+  </div></section>
+
+  <section class="sec" id="vh-claude" style="padding-top:0"><canvas class="sparks" aria-hidden="true"></canvas><div class="wrap split">
+    <div class="stack">
+            <h2>Talk a cup through with Claude</h2>
+      <p class="mut">Connect Brewprint to Claude and it can read your brews, draft tasting notes from a conversation, and draft beans or a recipe from a bag photo or a link.</p>
+      <p class="mut">Drafts wait in the app. Nothing is saved until you check it and say so.</p>
+    </div>
+    <div data-widget="claude"></div>
+  </div></section>
+
+  <section class="sec end" style="padding-top:0"><div class="wrap">
+    <h2>Your next cup starts from your last one</h2>
+    <a class="btn" data-dl>Download for Android</a>
+    <div class="foot" data-foot></div>
+  </div></section>
+</div>
+
+<script>
+(() => {
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const RELEASES = 'https://github.com/crabnuggets/brewprint/releases/latest';
+const REPO = 'https://github.com/crabnuggets/brewprint';
+
+/* ---------- brand mark ---------- */
+let mk = 0;
+const mark = () => { const id = 'mk' + mk++; return `<svg viewBox="19 19 62 62" aria-hidden="true"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/><path transform="translate(50 50) rotate(-35)" d="M-36 4.5C-12 -11 12 11 36 -4.5" fill="none" stroke="#000" stroke-width="5"/></mask></defs><g mask="url(#${id})"><g transform="translate(50 50) rotate(-35)" fill="none" stroke="currentColor" stroke-width="4.5"><ellipse rx="30" ry="22.5"/><ellipse rx="19.5" ry="13.5"/><ellipse rx="9" ry="4.5"/></g></g></svg>`; };
+
+$$('[data-top]').forEach(h => { const n = h.dataset.top;
+  h.innerHTML = `<a class="brand" href="#" aria-label="Brewprint">${mark()}<span><b>brew</b>print</span></a><nav aria-label="Sections"><a href="#v${n}-timer">Timer</a><a href="#v${n}-scale">Scale</a><a href="#v${n}-journal">Tasting notes</a><a href="#v${n}-claude">Claude</a></nav>`; });
+$$('[data-mark]').forEach(e => e.innerHTML = mark());
+$$('[data-dl]').forEach(a => a.href = RELEASES);
+$$('[data-foot]').forEach(f => f.innerHTML = `<span>Brewprint for Android. Open source under Apache 2.0.</span><a href="${REPO}">Source on GitHub</a>`);
+
+/* ---------- app parts ---------- */
+const focus = a => `<div class="prow"><div><div class="pstate" ${a}="state">Pour</div><div class="pm" ${a}="pulse">Pulse 2 of 4</div></div><div class="r"><div class="pm">Brew time</div><b class="tn" ${a}="time">0:26</b></div></div>
+<div class="prow" style="margin-top:1em"><div><div class="pm" ${a}="tlabel">Pour to</div><div class="pnum dim"><span ${a}="target">120</span><i>g</i></div></div><div class="r"><div class="pm" ${a}="rlabel">On scale</div><div class="pnum"><span ${a}="reading">104.6</span><i ${a}="runit">g</i></div></div></div>
+<div class="pbar"><span ${a}="bar"></span></div><div class="prow pm"><span ${a}="detail">15.4 g to go · 6.2 g/s</span><span ${a}="left">3 s left</span></div>`;
+
+const phones = {
+  pour: `<div class="phead">Brew sheet<span>Dotty</span></div><div class="pc">${focus('data-s')}</div>
+<div class="pstrip" data-s="strip"></div>
+<div class="pc"><div class="pm">Ratio <b data-s="ratio">1:7.0</b> → 1:16</div><div class="chart" data-widget="chart" style="margin-top:.6em"></div></div>
+<div class="pfoot"><span class="pbtn">Pause</span><span class="pbtn" data-s="skip">Pour done</span></div>`,
+  home: `<div class="ptitle">Brew</div>
+<div class="pc"><div class="pm">Last recorded setting</div><div class="pnum" style="margin:.15em 0">24<i>ticks</i></div><div class="pm">Comandante C40</div></div>
+<b>Most recent brew</b>
+<div class="pc"><div class="pm">Today, 08:10</div><b>Ethiopia natural</b><div class="pm">Four-pulse · 15 g · 1:16 · 24 ticks</div><div class="hand" style="margin-top:.6em">Bright and sweet, a little thin.</div><div class="pm hand">Next time: one tick finer</div><span class="pbtn">Repeat</span><span class="pbtn">Edit tasting notes</span></div>
+<div class="pfoot"><span class="pbtn pri">New brew</span></div>`,
+  record: `<div class="phead">Ethiopia natural</div><div class="pm" style="margin-top:-.6em">Today, 08:10</div>
+<div class="pc"><div class="pm">How was this cup?</div><div class="hand" style="font-size:1.15em;margin:.3em 0">Bright and sweet, a little thin. Sweeter as it cooled.</div><div class="pm">Fruity · Floral · Light body</div><span class="pbtn">Edit tasting notes</span></div>
+<div class="pc pgrid"><div><span class="pm">Recipe</span><b>Four-pulse</b></div><div><span class="pm">Grinder</span><b>Comandante C40</b></div><div><span class="pm">Dose</span><b>15 g</b></div><div><span class="pm">Grind setting</span><b>24 ticks</b></div><div><span class="pm">Water</span><b>239.6 g</b></div><div><span class="pm">Total brew time</span><b>2:58</b></div></div>
+<div class="pc"><div class="pm">Next time</div><div class="hand">Try one tick finer</div></div>
+<div class="pfoot"><span class="pbtn pri">Repeat</span></div>`
+};
+$$('[data-phone]').forEach(p => { p.innerHTML = phones[p.dataset.phone]; p.setAttribute('role', 'img'); p.setAttribute('aria-label', 'Brewprint app screen'); });
+$$('[data-widget="focus"]').forEach(e => e.innerHTML = focus('data-s'));
+
+let tn = 0;
+const segs = (name, opts, on) => `<fieldset><legend>${name}</legend><div class="segrow"><div class="seg"><i class="thumb"></i>${opts.map(o => `<label><input type="radio" name="t${tn}-${name}"${o === on ? ' checked' : ''}>${o}</label>`).join('')}</div><button type="button" class="clr" aria-label="Clear ${name}"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div></fieldset>`;
+$$('[data-widget="taste"]').forEach(e => { tn++; e.classList.add('taste');
+  e.innerHTML = `<div><h3>How was this cup?</h3><p class="note hand" style="margin-top:8px">Bright and sweet, a little thin. Sweeter as it cooled.</p></div>
+${segs('Sweetness', ['Low', 'Medium', 'High'], 'Medium')}${segs('Acidity', ['Low', 'Medium', 'High'], 'High')}${segs('Body', ['Light', 'Medium', 'Full'], 'Light')}
+<fieldset><legend>Flavor</legend><div class="blocks">${['Fruity', 'Floral', 'Chocolatey', 'Nutty', 'Spicy'].map((o, i) => `<label><input type="checkbox"${i < 2 ? ' checked' : ''}>${o}</label>`).join('')}</div></fieldset>`; });
+// a selected choice clears when tapped again, as in the app
+// the block slides between choices, and fades in place when the group was empty
+const place = seg => { const row = seg.parentNode, i = $$('input', seg).findIndex(x => x.checked);
+  if (i < 0) return row.classList.remove('has');
+  if (!row.classList.contains('has')) { seg.classList.add('jump'); seg.style.setProperty('--i', i); void seg.offsetWidth; seg.classList.remove('jump'); }
+  else seg.style.setProperty('--i', i);
+  row.classList.add('has'); };
+document.addEventListener('click', e => { const c = e.target.closest('.clr'), r = e.target.closest('.seg input');
+  if (c) { const seg = c.previousElementSibling; $$('input', seg).forEach(x => { x.checked = false; x.dataset.was = ''; }); place(seg); seg.querySelector('input').focus({ focusVisible: false }); return; }
+  if (!r) return;
+  if (r.dataset.was === '1') { r.checked = false; r.dataset.was = ''; }
+  else { $$('input', r.closest('.seg')).forEach(x => x.dataset.was = ''); r.dataset.was = '1'; }
+  place(r.closest('.seg')); });
+$$('.seg input:checked').forEach(r => r.dataset.was = '1');
+$$('.seg').forEach(place);
+
+$$('[data-widget="claude"]').forEach(e => { e.classList.add('chat');
+  e.innerHTML = `<p class="me">This morning's cup was juicy up front but a bit thin by the end. Sweeter once it cooled.</p>
+<p class="ai">I've drafted tasting notes for your Ethiopia natural: fruity, light body, and "sweeter as it cooled". They're waiting on the brew for you to check and save.</p>
+<div class="draft">${mark()}<div><b>Review tasting notes from Claude</b><span>Ethiopia natural · Today, 08:10</span></div></div><div class="typing" aria-hidden="true"><i></i><i></i><i></i></div>`;
+  // the first time it scrolls into view the exchange plays out: message, typing dots, a streamed reply, then the draft
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const [me, ai, draft, typing] = e.children, words = ai.textContent.split(' ');
+  ai.innerHTML = words.map((w, i) => `<span class="w" style="--n:${i}">${w}</span>`).join(' ');
+  e.classList.add('play');
+  const io = new IntersectionObserver(es => { if (!es[0].isIntersecting) return; io.disconnect();
+    typing.style.top = ai.offsetTop + 'px';
+    const at = (ms, fn) => setTimeout(fn, ms);
+    at(150, () => me.classList.add('in'));
+    at(900, () => typing.classList.add('in'));
+    at(2300, () => { typing.style.transition = 'none'; typing.classList.remove('in'); ai.classList.add('in'); });
+    at(2300 + words.length * 45 + 450, () => draft.classList.add('in'));
+  }, { threshold: .6 }); io.observe(e); });
+
+/* ---------- brew simulation ---------- */
+const P = [{ to: 45, pour: 8, wait: 12 }, { to: 120, pour: 12, wait: 8 }, { to: 180, pour: 10, wait: 8 }, { to: 240, pour: 10, wait: 0 }];
+const DOSE = 15, TOTAL = 240, TOP = 262, DD = 8, steps = [];
+const settled = i => i < 0 ? 0 : P[i].to + (i === 3 ? -.4 : .4);
+let acc = 0;
+P.forEach((p, i) => { steps.push({ k: 'pour', i, s: acc, e: acc + p.pour }); acc += p.pour; if (p.wait) { steps.push({ k: 'wait', i, s: acc, e: acc + p.wait }); acc += p.wait; } });
+steps.push({ k: 'draw', i: 3, s: acc, e: acc + DD });
+const LOOP = acc + DD, starts = steps.filter(s => s.k === 'pour').map(s => s.s);
+const stepAt = t => steps.find(s => t < s.e) || steps[steps.length - 1];
+const grams = t => { if (t <= 0) return 0; const s = stepAt(t); if (s.k !== 'pour') return settled(s.i);
+  const u = (t - s.s) / (s.e - s.s), a = settled(s.i - 1), b = settled(s.i); return a + (b - a) * (.65 * u + .35 * u * u * (3 - 2 * u)); };
+const fmt = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+const X = t => t / LOOP * 100, Y = g => 100 - g / TOP * 100;
+
+const planD = 'M0,100' + steps.filter(s => s.k === 'pour').map(s => `L${X(s.s)},${Y(s.i ? P[s.i - 1].to : 0)}L${X(s.e)},${Y(P[s.i].to)}`).join('') + `L100,${Y(TOTAL)}`;
+const charts = $$('[data-widget="chart"]').map(el => { el.classList.add('chart');
+  el.innerHTML = `<div class="plot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="c-plan" d="${planD}"/><line class="c-total" x1="0" x2="100" y1="${Y(TOTAL)}" y2="${Y(TOTAL)}"/><line class="c-target" x1="0" x2="100"/><path class="c-curve"/></svg><i class="c-dot"></i>${el.hasAttribute('data-axis') ? `<div class="c-axis">${starts.map(s => `<span style="left:${X(s)}%">${fmt(s)}</span>`).join('')}</div>` : ''}</div><span class="c-lab" style="bottom:${TOTAL / TOP * 100}%">${TOTAL} g</span><span class="c-lab c-tl"></span>`;
+  el.setAttribute('role', 'img'); el.setAttribute('aria-label', 'Water on the scale over time, rising to each pour target');
+  return { el, fast: el.hasAttribute('data-fast'), tl: el.querySelector('.c-target'), cv: el.querySelector('.c-curve'), dot: el.querySelector('.c-dot'), lab: el.querySelector('.c-tl') }; });
+
+const bound = {};
+$$('[data-s]').forEach(e => (bound[e.dataset.s] ||= []).push(e));
+const set = (k, v) => (bound[k] || []).forEach(e => { if (e.textContent !== v) e.textContent = v; });
+
+const plan = steps.filter(p => p.k !== 'draw');
+(bound.strip || []).forEach(st => st.innerHTML = plan.map(p => `<i class="${p.k}" style="flex:${p.e - p.s}"></i>`).join(''));
+
+function render(t) {
+  const s = stepAt(t), g = grams(t), n = s.i + 1, pour = s.k === 'pour', wait = s.k === 'wait';
+  const target = wait ? P[s.i + 1].to : P[s.i].to, left = Math.max(1, Math.ceil(s.e - t));
+  const flow = Math.max(0, (g - grams(t - .5)) / .5);
+  set('state', pour ? 'Pour' : wait ? 'Wait' : 'Drawdown');
+  set('pulse', pour ? `Pulse ${n} of 4` : wait ? `After pulse ${n} of 4` : 'After the last pour');
+  set('time', fmt(t)); set('grams', g.toFixed(1));
+  set('tlabel', pour ? 'Pour to' : wait ? 'Then pour to' : 'Planned');
+  set('target', String(target));
+  set('rlabel', pour ? 'On scale' : wait ? 'Time left' : 'Water');
+  set('reading', wait ? String(left) : g.toFixed(1)); set('runit', wait ? 's' : 'g');
+  set('detail', pour ? `${Math.max(0, target - g).toFixed(1)} g to go · ${flow.toFixed(1)} g/s` : wait ? `Pulse ${n + 1} starts at ${fmt(s.e)}` : 'Finish when it has drained');
+  set('left', pour ? `${left} s left` : '');
+  set('ratio', '1:' + (g / DOSE).toFixed(1));
+  set('skip', pour ? 'Pour done' : wait ? `Start pulse ${n + 1}` : 'Finish brew');
+  const prog = pour ? (g - settled(s.i - 1)) / (settled(s.i) - settled(s.i - 1)) : wait ? (t - s.s) / (s.e - s.s) : 1;
+  (bound.bar || []).forEach(b => b.style.transform = `scaleX(${prog.toFixed(3)})`);
+  (bound.strip || []).forEach(st => [...st.children].forEach((c, i) => { const p = plan[i];
+    c.style.setProperty('--f', Math.min(1, Math.max(0, (t - p.s) / (p.e - p.s))).toFixed(3)); }));
+  paint(charts.filter(c => !c.fast), t);
+}
+function paint(list, t) {
+  const s = stepAt(t), g = grams(t), target = s.k === 'wait' ? P[s.i + 1].to : P[s.i].to;
+  let d = 'M0,100'; for (let x = .4; x < t; x += .4) d += `L${X(x).toFixed(2)},${Y(grams(x)).toFixed(2)}`; d += `L${X(t).toFixed(2)},${Y(g).toFixed(2)}`;
+  const now = performance.now();
+  list.forEach(c => { c.ty = c.ty == null ? target : c.ty + (target - c.ty) * (1 - Math.exp(-(now - c.at) / 320)); c.at = now;
+    c.cv.setAttribute('d', d); c.tl.setAttribute('y1', Y(c.ty)); c.tl.setAttribute('y2', Y(c.ty));
+    c.dot.style.left = X(t) + '%'; c.dot.style.bottom = g / TOP * 100 + '%';
+    c.lab.style.bottom = c.ty / TOP * 100 + '%'; c.lab.textContent = target === TOTAL ? '' : target + ' g'; });
+}
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const t0 = performance.now() - 24500;
+render(26.4);
+if (!still) setInterval(() => { if (!document.hidden) render(((performance.now() - t0) / 1000) % LOOP); }, 100);
+
+// the large chart replays the whole brew at 4 times speed, holds the finished curve, then starts again
+const fast = charts.filter(c => c.fast), SPEED = 4, HOLD = 2.5;
+paint(fast, LOOP);
+if (!still) fast.forEach(c => { let f0 = 0, on = false;
+  const frame = now => { if (!on) return; paint([c], Math.min(LOOP, ((now - f0) / 1000 % (LOOP / SPEED + HOLD)) * SPEED)); requestAnimationFrame(frame); };
+  new IntersectionObserver(es => { const v = es[0].isIntersecting; if (v && !on) { on = true; f0 = performance.now(); requestAnimationFrame(frame); } else if (!v) on = false; }, { threshold: .25 }).observe(c.el); });
+
+/* ---------- pinned focus card, stepped by scroll ---------- */
+const STAGES = [
+  { state: 'Pour', pulse: 'Pulse 2 of 4', time: '0:26', tlabel: 'Pour to', target: '120', rlabel: 'On scale', reading: '104.6', runit: 'g', detail: '15.4 g to go · 6.2 g/s', left: '3 s left', bar: .79 },
+  { state: 'Wait', pulse: 'After pulse 2 of 4', time: '0:34', tlabel: 'Then pour to', target: '180', rlabel: 'Time left', reading: '6', runit: 's', detail: 'Pulse 3 starts at 0:40', left: '', bar: .25 },
+  { state: 'Drawdown', pulse: 'After the last pour', time: '2:41', tlabel: 'Planned', target: '240', rlabel: 'Water', reading: '239.6', runit: 'g', detail: 'Ratio 1:16.0', left: '', bar: 1 }];
+
+const track = document.querySelector('.vh .track');
+const layers = ['.vh .cards>*', '.vh .texts>*', '.vh .rail>*'].map(s => $$(s));
+layers[0].forEach((c, i) => { c.innerHTML = focus('data-k');
+  $$('[data-k]', c).forEach(e => e.dataset.k === 'bar' ? e.style.transform = `scaleX(${STAGES[i].bar})` : e.textContent = STAGES[i][e.dataset.k]); });
+let scene = -1;
+const onScroll = () => { const r = track.getBoundingClientRect(); if (!r.height) return;
+  const i = Math.floor(Math.min(.999, Math.max(0, -r.top / (r.height - innerHeight))) * 3);
+  if (i === scene) return; scene = i; layers.forEach(l => l.forEach((e, j) => e.classList.toggle('on', j === i))); };
+addEventListener('scroll', onScroll, { passive: true }); addEventListener('resize', onScroll);
+
+/* ---------- Hybrid: dot field behind the hero that answers the pointer ---------- */
+const vh = document.querySelector('.vh'), hero = vh.querySelector('.hero'), cv = hero.querySelector('.field'), cx = cv.getContext('2d');
+const GAP = 26, R = 230;
+let W = 0, H = 0, px = 0, py = 0, tx = 0, ty = 0, k = 0, tk = 0, raf = 0;
+function draw() {
+  cx.clearRect(0, 0, W, H);
+  const x0 = (W % GAP) / 2 + GAP / 2, near = [];
+  cx.fillStyle = 'rgba(18,19,22,.13)';
+  for (let y = GAP / 2; y < H; y += GAP) for (let x = x0; x < W; x += GAP) {
+    const dx = x - px, dy = y - py, d = Math.hypot(dx, dy);
+    if (k > .01 && d < R) near.push([x, y, dx, dy, d]); else cx.fillRect(x - 1, y - 1, 2, 2);
+  }
+  for (const [x, y, dx, dy, d] of near) { let f = 1 - d / R; f = k * f * f * (3 - 2 * f);
+    const push = f * 7 / (d || 1);
+    cx.fillStyle = `rgba(18,19,22,${(.13 + f * .3).toFixed(3)})`;
+    cx.beginPath(); cx.arc(x + dx * push, y + dy * push, 1 + f * 1.2, 0, 6.2832); cx.fill(); }
+}
+function tick() { px += (tx - px) * .1; py += (ty - py) * .1; k += (tk - k) * .07; draw();
+  raf = Math.abs(tk - k) > .004 || Math.hypot(tx - px, ty - py) > .3 ? requestAnimationFrame(tick) : 0; }
+new ResizeObserver(() => { const r = hero.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); if (!r.width) return;
+  W = r.width; H = r.height; cv.width = W * d; cv.height = H * d; cx.setTransform(d, 0, 0, d, 0, 0); draw(); }).observe(hero);
+if (!still) {
+  vh.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return;
+    const r = hero.getBoundingClientRect(); tx = e.clientX - r.left; ty = e.clientY - r.top;
+    tk = ty < H ? 1 : 0; if (k < .01) { px = tx; py = ty; }
+    if (!raf) raf = requestAnimationFrame(tick); });
+  vh.addEventListener('pointerleave', () => { tk = 0; if (!raf) raf = requestAnimationFrame(tick); });
+}
+
+onScroll();
+
+/* ---------- Claude: a sparse field of marks that drift and move away from the pointer ---------- */
+const sk = document.querySelector('.sparks'), sx = sk.getContext('2d');
+const LOGO = new Path2D('M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z');
+const stext = sk.parentNode.querySelector('.stack');
+let SW = 0, SH = 0, parts = [], mx = -1e4, my = -1e4, son = false, slast = 0;
+const rnd = (a, b) => a + Math.random() * (b - a);
+function seed() { parts = []; const G = SW < 700 ? 135 : 185;
+  for (let y = G / 2; y < SH + G / 2; y += G) for (let x = G / 2; x < SW + G / 2; x += G) { const dir = rnd(0, 6.2832), v = rnd(5, 13);
+    parts.push({ x: x + rnd(-.38, .38) * G, y: y + rnd(-.38, .38) * G, ox: 0, oy: 0, vx: 0, vy: 0, dx: Math.cos(dir) * v, dy: Math.sin(dir) * v,
+      s: rnd(16, 40), a: rnd(0, 6.2832), w: rnd(-.12, .12), al: rnd(.3, .58) }); } }
+function sdraw(dt) {
+  const r = sk.getBoundingClientRect(), px = mx - r.left, py = my - r.top, R = 190, M = 60;
+  const tr = stext.getBoundingClientRect(), tl = tr.left - r.left, tt = tr.top - r.top, tw = tr.width, th = tr.height;
+  sx.clearRect(0, 0, SW, SH); sx.fillStyle = '#D97757';
+  for (const p of parts) {
+    p.x += p.dx * dt; p.y += p.dy * dt;
+    if (p.x < -M) p.x += SW + 2 * M; else if (p.x > SW + M) p.x -= SW + 2 * M;
+    if (p.y < -M) p.y += SH + 2 * M; else if (p.y > SH + M) p.y -= SH + 2 * M;
+    const ex = p.x + p.ox - px, ey = p.y + p.oy - py, e = Math.hypot(ex, ey) || 1;
+    let ax = -12 * p.ox, ay = -12 * p.oy;
+    if (e < R) { const f = (1 - e / R) ** 2 * 3200; ax += ex / e * f; ay += ey / e * f; }
+    const damp = Math.exp(-5 * dt);
+    p.vx = (p.vx + ax * dt) * damp; p.vy = (p.vy + ay * dt) * damp; p.ox += p.vx * dt; p.oy += p.vy * dt;
+    p.a += (p.w + p.vx * .004) * dt;
+    const k = p.s / 24;
+    // marks fade out as they come up to the text, so none sits behind it
+    const qx = p.x + p.ox, qy = p.y + p.oy, gap = Math.hypot(Math.max(tl - qx, 0, qx - tl - tw), Math.max(tt - qy, 0, qy - tt - th)) - p.s / 2;
+    const near = Math.min(1, Math.max(0, gap / 70)); if (!near) continue;
+    sx.save(); sx.globalAlpha = p.al * near * near * (3 - 2 * near); sx.translate(p.x + p.ox, p.y + p.oy); sx.rotate(p.a); sx.scale(k, k); sx.translate(-12, -12); sx.fill(LOGO); sx.restore();
+  }
+}
+const sframe = now => { if (!son) return; sdraw(Math.min(.05, (now - slast) / 1000)); slast = now; requestAnimationFrame(sframe); };
+new ResizeObserver(() => { const r = sk.getBoundingClientRect(), dp = Math.min(2, devicePixelRatio || 1); if (!r.width) return;
+  if (Math.abs(r.width - SW) > 1 || Math.abs(r.height - SH) > 80) { SW = r.width; SH = r.height; seed(); }
+  sk.width = SW * dp; sk.height = SH * dp; sx.setTransform(dp, 0, 0, dp, 0, 0); sdraw(0); }).observe(sk);
+if (!still) {
+  new IntersectionObserver(es => { const v = es[0].isIntersecting; if (v && !son) { son = true; slast = performance.now(); requestAnimationFrame(sframe); } else if (!v) son = false; }).observe(sk);
+  addEventListener('pointermove', e => { if (e.pointerType !== 'touch') { mx = e.clientX; my = e.clientY; } }, { passive: true });
+  document.documentElement.addEventListener('pointerleave', () => { mx = my = -1e4; });
+}
+})();
+</script>
+</body>
+</html>

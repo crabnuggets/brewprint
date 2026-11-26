@@ -57,7 +57,7 @@ On a phone with the previous release, open Settings → Version, tap "Update", a
 The Claude plugin is not part of an app release and has no tag. Three parts ship when their PR merges to `main`:
 
 - **MCP server** (`supabase/functions/brewprint-mcp`): `.github/workflows/deploy-mcp.yml` deploys it to the Supabase project. It needs the `SUPABASE_ACCESS_TOKEN` Actions secret, a Supabase personal access token.
-- **Consent page** (`web/`): `.github/workflows/consent-page.yml` publishes it to GitHub Pages at `https://crabnuggets.github.io/brewprint/oauth/consent.html`. Pages must use "GitHub Actions" as its source.
+- **Consent page** (`web/oauth/`): `.github/workflows/website.yml` publishes all of `web/` to GitHub Pages, so the consent page is at `https://crabnuggets.github.io/brewprint/oauth/consent.html`. The same workflow publishes the landing page, `web/index.html`, at `https://crabnuggets.github.io/brewprint/`; its "Download for Android" button opens the latest release. Pages must use "GitHub Actions" as its source.
 - **Plugin** (`plugins/brewprint`, listed in `.claude-plugin/marketplace.json`): Claude Code reads it from `main`. Bump `version` in `plugins/brewprint/.claude-plugin/plugin.json` whenever the plugin's files change, using the version rules above; installed copies only update when it changes.
 
 Database migrations in `supabase/migrations/` are not applied by any workflow. The owner applies them, with `supabase link --project-ref ftwdmparhchrafsbmplv` and then `supabase db push`, before merging a PR whose code depends on them.
