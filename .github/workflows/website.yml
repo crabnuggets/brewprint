@@ -1,6 +1,7 @@
-name: Publish consent page
+name: Publish website
 
-# Merging a change to web/ publishes it to GitHub Pages, where apps such as Claude ask to connect to Brewprint.
+# Merging a change to web/ publishes it to GitHub Pages: the landing page, and the consent page where apps such as
+# Claude ask to connect to Brewprint.
 on:
   push:
     branches: [main]
